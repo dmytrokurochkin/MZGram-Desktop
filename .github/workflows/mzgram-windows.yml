@@ -79,6 +79,10 @@ jobs:
           git config --global user.email "ci@mzgram.local"
           git config --global user.name "MZGram CI"
 
+      # breakpad builds dump_syms, a host x64 tool, only in Release, and it needs
+      # ATL. Upstream CI never hits this because it builds Debug only. ATL ships
+      # per toolset, so the x64 job needs the 14.44 variant specifically, and the
+      # ARM64 job needs the x64 ATL as well: dump_syms links /MACHINE:X64 there.
       - name: Install VS Build Tools.
         if: matrix.arch == 'arm64'
         shell: pwsh
@@ -89,8 +93,22 @@ jobs:
             '--quiet','--wait','--norestart','--nocache', `
             '--add','Microsoft.VisualStudio.Workload.VCTools', `
             '--add','Microsoft.VisualStudio.Component.VC.Tools.ARM64', `
-            '--add','Microsoft.VisualStudio.Component.VC.ATL.ARM64'
+            '--add','Microsoft.VisualStudio.Component.VC.ATL.ARM64', `
+            '--add','Microsoft.VisualStudio.Component.VC.ATL'
           Remove-Item $exe -Force -ErrorAction SilentlyContinue
+          if ($p.ExitCode -ne 0 -and $p.ExitCode -ne 3010) { exit $p.ExitCode }
+
+      - name: Install ATL for the 14.44 toolset.
+        if: matrix.arch == 'x64'
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $installPath = & $vswhere -latest -products * -property installationPath
+          $setup = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\setup.exe"
+          $p = Start-Process -FilePath $setup -Wait -PassThru -ArgumentList `
+            'modify','--installPath',"`"$installPath`"", `
+            '--add','Microsoft.VisualStudio.Component.VC.14.44.17.14.ATL', `
+            '--quiet','--norestart','--nocache'
           if ($p.ExitCode -ne 0 -and $p.ExitCode -ne 3010) { exit $p.ExitCode }
 
       - name: Native Tools Command Prompt.
