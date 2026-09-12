@@ -1,10 +1,15 @@
 name: MZGram Windows
 
-# Builds MZGram for Windows x64 and ARM64.
+# Compile check for Windows x64 and ARM64, built as Debug.
+#
+# Release binaries are built locally instead. The dependency tree with both
+# Debug and Release variants measures ~44 GB, which does not fit a free
+# GitHub runner: the Release attempt ran out of disk while building Qt.
+# Upstream CI fits for the same reason this does, by skipping Release.
 #
 # Derived from the upstream win.yml, trimmed to what a fork needs: no Qt or
-# generator matrix, no nightly branch handling, Release instead of Debug, and
-# credentials from repository secrets rather than hardcoded values.
+# generator matrix, no nightly branch handling, and credentials from
+# repository secrets rather than hardcoded values.
 
 on:
   push:
@@ -13,7 +18,7 @@ on:
       - 'mzgram/**'
   workflow_dispatch:
 
-# A full dependency build runs for hours. Without this, pushing twice in a
+# A cold dependency build runs for hours. Without this, pushing twice in a
 # morning leaves the first run burning a runner on code nobody will ship.
 concurrency:
   group: mzgram-windows-${{ github.ref }}
@@ -79,10 +84,8 @@ jobs:
           git config --global user.email "ci@mzgram.local"
           git config --global user.name "MZGram CI"
 
-      # breakpad builds dump_syms, a host x64 tool, only in Release, and it needs
-      # ATL. Upstream CI never hits this because it builds Debug only. ATL ships
-      # per toolset, so the x64 job needs the 14.44 variant specifically, and the
-      # ARM64 job needs the x64 ATL as well: dump_syms links /MACHINE:X64 there.
+      # The ARM64 runner image carries no C++ toolchain. This is the same
+      # component set upstream installs there.
       - name: Install VS Build Tools.
         if: matrix.arch == 'arm64'
         shell: pwsh
@@ -93,22 +96,8 @@ jobs:
             '--quiet','--wait','--norestart','--nocache', `
             '--add','Microsoft.VisualStudio.Workload.VCTools', `
             '--add','Microsoft.VisualStudio.Component.VC.Tools.ARM64', `
-            '--add','Microsoft.VisualStudio.Component.VC.ATL.ARM64', `
-            '--add','Microsoft.VisualStudio.Component.VC.ATL'
+            '--add','Microsoft.VisualStudio.Component.VC.ATL.ARM64'
           Remove-Item $exe -Force -ErrorAction SilentlyContinue
-          if ($p.ExitCode -ne 0 -and $p.ExitCode -ne 3010) { exit $p.ExitCode }
-
-      - name: Install ATL for the 14.44 toolset.
-        if: matrix.arch == 'x64'
-        shell: pwsh
-        run: |
-          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-          $installPath = & $vswhere -latest -products * -property installationPath
-          $setup = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\setup.exe"
-          $p = Start-Process -FilePath $setup -Wait -PassThru -ArgumentList `
-            'modify','--installPath',"`"$installPath`"", `
-            '--add','Microsoft.VisualStudio.Component.VC.14.44.17.14.ATL', `
-            '--quiet','--norestart','--nocache'
           if ($p.ExitCode -ne 0 -and $p.ExitCode -ne 3010) { exit $p.ExitCode }
 
       - name: Native Tools Command Prompt.
@@ -137,15 +126,14 @@ jobs:
             ${{ env.LibrariesPath }}\*
             !${{ env.LibrariesPath }}\cache_keys
             ${{ env.LibrariesPath }}\cache_keys\*
-          key: ${{ runner.OS }}-${{ matrix.arch }}-libs-qt6-release-${{ env.CACHE_KEY }}
-          restore-keys: ${{ runner.OS }}-${{ matrix.arch }}-libs-qt6-release-
+          key: ${{ runner.OS }}-${{ matrix.arch }}-libs-qt6-debug-${{ env.CACHE_KEY }}
+          restore-keys: ${{ runner.OS }}-${{ matrix.arch }}-libs-qt6-debug-
 
-      # No skip-release here: upstream CI can skip it because it ships Debug
-      # binaries, but a Release link needs the Release variant of every library.
-      # qt6 is not a preference: prepare.py builds no Qt5 for the ARM64 target.
+      # skip-release is what keeps this inside the runner's disk. qt6 is not a
+      # preference: prepare.py builds no Qt5 for the ARM64 target.
       - name: Libraries.
         run: |
-          %TBUILD%\%REPO_NAME%\Telegram\build\prepare\win.bat silent qt6
+          %TBUILD%\%REPO_NAME%\Telegram\build\prepare\win.bat skip-release silent qt6
 
       - name: Resolve API credentials.
         shell: bash
@@ -165,6 +153,8 @@ jobs:
         shell: bash
         run: find $LibrariesPath '(' '(' ! '(' -name '*.lib' -o -name '*.a' -o -name '*.exe' -o -name '*.h' -o -name '*.hpp' -o -name '*.inc' -o -name '*.cmake' -o -name '*.pc' -o -path '*/include/*' -o -path '*/objects-*' -o -path '*/cache_keys/*' -o -path '*/patches/*' -o -path '*/nv-codec-headers/*' ')' -type f ')' -o -empty ')' -delete
 
+      # An empty debug information format keeps PDBs from eating the disk the
+      # dependency tree already left thin, as upstream does.
       - name: Build.
         run: |
           cd %TBUILD%\%REPO_NAME%\Telegram
@@ -173,20 +163,21 @@ jobs:
           ${{ matrix.configure_arch }} ^
           qt6 ^
           %MZGRAM_API% ^
-          -D CMAKE_CONFIGURATION_TYPES=Release ^
+          -D CMAKE_CONFIGURATION_TYPES=Debug ^
+          -D CMAKE_MSVC_DEBUG_INFORMATION_FORMAT= ^
           -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON ^
           -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON
 
-          cmake --build ..\out --config Release --parallel
+          cmake --build ..\out --config Debug --parallel
 
       - name: Collect artifact.
         run: |
-          set OUT=%TBUILD%\%REPO_NAME%\out\Release
+          set OUT=%TBUILD%\%REPO_NAME%\out\Debug
           mkdir artifact
           move %OUT%\Telegram.exe artifact\
 
       - name: Upload artifact.
         uses: actions/upload-artifact@v7
         with:
-          name: MZGram-Windows-${{ matrix.arch }}
+          name: MZGram-Windows-${{ matrix.arch }}-Debug
           path: artifact\
