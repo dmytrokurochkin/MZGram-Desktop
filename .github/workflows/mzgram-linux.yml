@@ -1,0 +1,171 @@
+name: MZGram Linux
+
+# Compile check for Linux x64, built as Debug inside the upstream Rocky Linux 8
+# image, the same way upstream CI checks Linux.
+#
+# The image builds every dependency (Qt, WebRTC, FFmpeg and the rest) from
+# source against an old glibc, so the binary also runs on current
+# distributions. A cold image build takes hours; the Docker layer cache keeps
+# later runs short.
+#
+# Derived from the upstream linux.yml, trimmed to what a fork needs: no
+# defines matrix, no paid runners, and credentials from repository secrets
+# rather than the test API.
+
+on:
+  push:
+    branches:
+      - mzgram
+      - 'mzgram/**'
+  workflow_dispatch:
+
+# Same reason as in mzgram-windows.yml: a superseded run is wasted hours.
+concurrency:
+  group: mzgram-linux-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    name: Linux x64
+    runs-on: ubuntu-latest
+
+    env:
+      IMAGE_TAG: tdesktop:centos_env
+
+    steps:
+      - name: Clone.
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      # The Dockerfile in the repository is a template; gen_dockerfile renders
+      # it. Empty DEBUG and LTO select the plain dependency build.
+      - name: First set up.
+        run: |
+          sudo apt update
+          curl -sSL https://install.python-poetry.org | python3 -
+          curl -sSL https://github.com/ccache/ccache/releases/download/v4.13.6/ccache-4.13.6-linux-x86_64-glibc.tar.xz \
+          | sudo tar xJ -C /usr/local/bin --strip-components=1 ccache-4.13.6-linux-x86_64-glibc/ccache
+          echo "CCACHE_DIR=$RUNNER_TEMP/.tdesktop-cache" >> $GITHUB_ENV
+          cd Telegram/build/docker/centos_env
+          poetry install
+          DOCKERFILE=$(DEBUG= LTO= poetry run gen_dockerfile)
+          echo "$DOCKERFILE" > Dockerfile
+          rm -rf __pycache__
+
+      - name: Free up some disk space.
+        uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
+        with:
+          tool-cache: true
+
+      - name: Set up Docker Buildx.
+        id: setup-buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Libraries cache.
+        id: cache-libs
+        uses: actions/cache@v6
+        with:
+          path: |
+            ${{ runner.temp }}/.buildx-cache
+            ${{ runner.temp }}/.mount-cache
+          key: ${{ runner.OS }}-libs-${{ hashFiles('Telegram/build/docker/centos_env/**') }}
+          restore-keys: ${{ runner.OS }}-libs-
+
+      - name: Restore Docker cache mounts.
+        uses: reproducible-containers/buildkit-cache-dance@5422eac04292c961a382e0f584ea0f03ad9da723
+        with:
+          builder: ${{ steps.setup-buildx.outputs.name }}
+          cache-dir: ${{ runner.temp }}/.mount-cache
+          dockerfile: Telegram/build/docker/centos_env/Dockerfile
+          skip-extraction: ${{ steps.cache-libs.outputs.cache-hit }}
+
+      - name: Libraries.
+        uses: docker/build-push-action@v7
+        with:
+          context: Telegram/build/docker/centos_env
+          load: true
+          tags: ${{ env.IMAGE_TAG }}
+          cache-from: type=local,src=${{ runner.temp }}/.buildx-cache
+          cache-to: type=local,dest=${{ runner.temp }}/.buildx-cache-new,mode=max
+
+      - name: Move cache.
+        run: |
+          rm -rf ${{ runner.temp }}/.buildx-cache
+          mv ${{ runner.temp }}/.buildx-cache{-new,}
+
+      - name: Restore Telegram Desktop cache.
+        id: cache-tdesktop
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ${{ runner.OS }}-tdesktop-${{ github.run_id }}
+          restore-keys: ${{ runner.OS }}-tdesktop-
+
+      - name: Resolve API credentials.
+        env:
+          API_ID: ${{ secrets.TELEGRAM_API_ID }}
+          API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
+        run: |
+          if [ -n "$API_ID" ] && [ -n "$API_HASH" ]; then
+            echo "Using repository secrets."
+            echo "MZGRAM_API=-D TDESKTOP_API_ID=$API_ID -D TDESKTOP_API_HASH=$API_HASH" >> $GITHUB_ENV
+          else
+            echo "No credentials set, building with the test API. Sign-in will fail."
+            echo "MZGRAM_API=-D TDESKTOP_API_TEST=ON" >> $GITHUB_ENV
+          fi
+
+      # The container runs as the runner user. Creating the ccache directory
+      # first keeps Docker from creating it as root on a cache miss.
+      # MZGRAM_API is left unquoted on purpose: it splits into -D arguments.
+      - name: Build.
+        run: |
+          mkdir -p "$CCACHE_DIR"
+          ccache -z
+
+          docker run --rm \
+          -u $(id -u) \
+          -v $PWD:/usr/src/tdesktop \
+          -v $CCACHE_DIR:/var/cache/ccache \
+          -e CONFIG=Debug \
+          -e CCACHE_SLOPPINESS=pch_defines,time_macros \
+          $IMAGE_TAG \
+          env -u CCACHE_DISABLE /usr/src/tdesktop/Telegram/build/docker/centos_env/build.sh \
+          -D CMAKE_CONFIGURATION_TYPES=Debug \
+          -D CMAKE_C_FLAGS_DEBUG="-O0 -fpch-preprocess" \
+          -D CMAKE_CXX_FLAGS_DEBUG="-O0 -fpch-preprocess" \
+          $MZGRAM_API \
+          -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON \
+          -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON
+
+      - name: Count ccache misses.
+        id: ccache-stats
+        run: |
+          MISSES=$(ccache --print-stats | sed -n 's/^cache_miss\t//p' | head -1)
+          case "$MISSES" in (*[!0-9]*|'') MISSES=0;; esac
+          echo "misses=$MISSES" >> $GITHUB_OUTPUT
+          echo "ccache misses this run: $MISSES"
+
+      # Saved only from the main fork branch, and only when enough changed to
+      # be worth the space in the repository cache quota.
+      - name: Save Telegram Desktop cache.
+        if: >
+          github.ref_name == 'mzgram'
+            && fromJSON(steps.ccache-stats.outputs.misses) > 300
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ${{ steps.cache-tdesktop.outputs.cache-primary-key }}
+
+      # Packed as tar because an artifact zip drops the executable bit.
+      - name: Collect artifact.
+        run: |
+          test -f out/Debug/Telegram
+          mkdir artifact
+          tar -czf artifact/MZGram-Linux-x64-Debug.tar.gz -C out/Debug Telegram
+
+      - name: Upload artifact.
+        uses: actions/upload-artifact@v7
+        with:
+          name: MZGram-Linux-x64-Debug
+          path: artifact/

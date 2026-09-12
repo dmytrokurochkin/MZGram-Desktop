@@ -17,7 +17,8 @@ fork stays a readable set of patches instead of an entangled history.
 
 ## Building
 
-Windows x64 and ARM64 builds run in CI (`.github/workflows/mzgram-windows.yml`).
+Windows x64 and ARM64 builds run in CI (`.github/workflows/mzgram-windows.yml`),
+and so does Linux x64 (`.github/workflows/mzgram-linux.yml`).
 The upstream workflows in this directory are inherited from the parent project
 and are not used here.
 
