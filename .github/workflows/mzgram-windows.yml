@@ -119,12 +119,15 @@ jobs:
             ${{ env.LibrariesPath }}\*
             !${{ env.LibrariesPath }}\cache_keys
             ${{ env.LibrariesPath }}\cache_keys\*
-          key: ${{ runner.OS }}-${{ matrix.arch }}-libs-v2-${{ env.CACHE_KEY }}
-          restore-keys: ${{ runner.OS }}-${{ matrix.arch }}-libs-v2-
+          key: ${{ runner.OS }}-${{ matrix.arch }}-libs-qt6-release-${{ env.CACHE_KEY }}
+          restore-keys: ${{ runner.OS }}-${{ matrix.arch }}-libs-qt6-release-
 
+      # No skip-release here: upstream CI can skip it because it ships Debug
+      # binaries, but a Release link needs the Release variant of every library.
+      # qt6 is not a preference: prepare.py builds no Qt5 for the ARM64 target.
       - name: Libraries.
         run: |
-          %TBUILD%\%REPO_NAME%\Telegram\build\prepare\win.bat skip-release silent
+          %TBUILD%\%REPO_NAME%\Telegram\build\prepare\win.bat silent qt6
 
       - name: Resolve API credentials.
         shell: bash
@@ -150,6 +153,7 @@ jobs:
 
           call configure.bat ^
           ${{ matrix.configure_arch }} ^
+          qt6 ^
           %MZGRAM_API% ^
           -D CMAKE_CONFIGURATION_TYPES=Release ^
           -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON ^
