@@ -13,6 +13,8 @@ extern const char kOptionGhostMode[];
 extern const char kOptionSendReadReceipts[];
 extern const char kOptionSendTyping[];
 extern const char kOptionSendOnline[];
+extern const char kOptionAntiRecall[];
+extern const char kOptionEditHistory[];
 
 // Ghost mode is a master switch: each of the three below stays meaningful on
 // its own, so a user can keep typing status while withholding read receipts.
@@ -20,5 +22,8 @@ extern const char kOptionSendOnline[];
 [[nodiscard]] bool SendReadReceipts();
 [[nodiscard]] bool SendTyping();
 [[nodiscard]] bool SendOnline();
+
+[[nodiscard]] bool AntiRecall();
+[[nodiscard]] bool EditHistory();
 
 } // namespace MZGram

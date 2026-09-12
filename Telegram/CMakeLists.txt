@@ -100,6 +100,16 @@ PRIVATE
     desktop-app::external_xxhash
 )
 
+# MZGram keeps deleted messages and edit history in SQLite. Linked here rather
+# than in cmake/external/qt, which is a submodule that CI clones from upstream.
+# Qt6 is named outright: every MZGram build passes qt6.
+find_package(Qt6 COMPONENTS Sql REQUIRED)
+target_link_libraries(Telegram
+PRIVATE
+    Qt6::Sql
+    Qt6::QSQLiteDriverPlugin
+)
+
 if (NOT DESKTOP_APP_DISABLE_SWIFT6)
     telegram_add_apple_swift_runtime(Telegram)
 endif()
@@ -1466,6 +1476,12 @@ PRIVATE
     main/session/send_as_peers.h
     main/session/session_show.cpp
     main/session/session_show.h
+    mzgram/mzgram_anti_recall.cpp
+    mzgram/mzgram_anti_recall.h
+    mzgram/mzgram_edit_history_box.cpp
+    mzgram/mzgram_edit_history_box.h
+    mzgram/mzgram_message_store.cpp
+    mzgram/mzgram_message_store.h
     mzgram/mzgram_options.cpp
     mzgram/mzgram_options.h
     media/audio/media_audio.cpp

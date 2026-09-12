@@ -462,6 +462,8 @@ void SetupExperimental(
 				MZGram::kOptionSendReadReceipts,
 				MZGram::kOptionSendTyping,
 				MZGram::kOptionSendOnline,
+				MZGram::kOptionAntiRecall,
+				MZGram::kOptionEditHistory,
 			}
 		},
 		{

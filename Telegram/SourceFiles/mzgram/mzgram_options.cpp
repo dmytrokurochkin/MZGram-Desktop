@@ -39,12 +39,27 @@ base::options::toggle OptionSendOnline({
 	.defaultValue = false,
 });
 
+// Off by default: both keep other people's text on disk in plain SQLite.
+base::options::toggle OptionAntiRecall({
+	.id = kOptionAntiRecall,
+	.name = "Anti-recall",
+	.description = "Keep messages others delete, marked as deleted",
+});
+
+base::options::toggle OptionEditHistory({
+	.id = kOptionEditHistory,
+	.name = "Edit history",
+	.description = "Keep earlier versions of edited messages",
+});
+
 } // namespace
 
 const char kOptionGhostMode[] = "mzgram-ghost-mode";
 const char kOptionSendReadReceipts[] = "mzgram-ghost-send-read-receipts";
 const char kOptionSendTyping[] = "mzgram-ghost-send-typing";
 const char kOptionSendOnline[] = "mzgram-ghost-send-online";
+const char kOptionAntiRecall[] = "mzgram-anti-recall";
+const char kOptionEditHistory[] = "mzgram-edit-history";
 
 bool GhostMode() {
 	return OptionGhostMode.value();
@@ -60,6 +75,14 @@ bool SendTyping() {
 
 bool SendOnline() {
 	return !GhostMode() || OptionSendOnline.value();
+}
+
+bool AntiRecall() {
+	return OptionAntiRecall.value();
+}
+
+bool EditHistory() {
+	return OptionEditHistory.value();
 }
 
 } // namespace MZGram

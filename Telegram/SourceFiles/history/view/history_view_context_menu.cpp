@@ -27,6 +27,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history.h"
 #include "history/history_item.h"
 #include "history/history_item_components.h"
+#include "mzgram/mzgram_anti_recall.h"
 #include "history/history_item_helpers.h"
 #include "history/history_item_text.h"
 #include "history/view/history_view_schedule_box.h"
@@ -2480,6 +2481,7 @@ void AddWhenEditedForwardedAuthorActionHelper(
 		}
 		menu->addAction(MakeMessageAuthorAction(menu, item, controller));
 	}
+	MZGram::AddEditHistoryAction(menu, item, controller);
 }
 
 void AddWhoReactedAction(

@@ -17,6 +17,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_service_message.h"
 #include "history/view/media/history_view_media_grouped.h"
 #include "history/history_item_components.h"
+#include "mzgram/mzgram_anti_recall.h"
 #include "history/history_item_helpers.h"
 #include "history/history_unread_things.h"
 #include "history/history.h"
@@ -2343,6 +2344,7 @@ void HistoryItem::clearMainView() {
 }
 
 void HistoryItem::applyEdition(HistoryMessageEdition &&edition) {
+	MZGram::RecordEditBefore(this, edition.textWithEntities);
 	history()->session().ephemeralMessages().revertAnchored(this);
 
 	int keyboardTop = -1;
