@@ -104,6 +104,31 @@ PRIVATE
 # than in cmake/external/qt, which is a submodule that CI clones from upstream.
 # Qt6 is named outright: every MZGram build passes qt6.
 find_package(Qt6 COMPONENTS Sql REQUIRED)
+
+# Qt6::Sql is an imported target, so unlike the Qt libraries upstream links,
+# it carries Qt6::Core's zlib dependency onto the link line. That dependency
+# resolves through FindZLIB using the zlibstatic names that
+# cmake/external/qt/package.cmake still sets, while prepare.py now builds
+# libzs, so the link fails with LNK1181. Route it to the zlib target tdesktop
+# already links correctly, reading the paths from that target itself.
+# Windows only: the stale names live in the WIN32 branch of package.cmake, and
+# on Linux external_zlib has no Debug location to copy.
+if (WIN32)
+    get_target_property(mzgram_zlib_release desktop-app::external_zlib IMPORTED_LOCATION)
+    get_target_property(mzgram_zlib_debug desktop-app::external_zlib IMPORTED_LOCATION_DEBUG)
+    foreach (mzgram_zlib_wrapper WrapZLIB::WrapZLIB WrapSystemZLIB::WrapSystemZLIB)
+        if (TARGET ${mzgram_zlib_wrapper})
+            set_property(TARGET ${mzgram_zlib_wrapper}
+                PROPERTY INTERFACE_LINK_LIBRARIES desktop-app::external_zlib)
+        endif()
+    endforeach()
+    if (TARGET ZLIB::ZLIB)
+        set_target_properties(ZLIB::ZLIB PROPERTIES
+            IMPORTED_LOCATION_RELEASE "${mzgram_zlib_release}"
+            IMPORTED_LOCATION_DEBUG "${mzgram_zlib_debug}")
+    endif()
+endif()
+
 target_link_libraries(Telegram
 PRIVATE
     Qt6::Sql
