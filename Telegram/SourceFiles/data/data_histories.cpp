@@ -26,6 +26,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/unixtime.h"
 #include "base/random.h"
 #include "main/main_session.h"
+#include "mzgram/mzgram_options.h"
 #include "window/notifications_manager.h"
 #include "history/history.h"
 #include "history/history_item.h"
@@ -741,6 +742,14 @@ void Histories::sendReadRequest(not_null<History*> history, State &state) {
 			sendReadRequests();
 			finish();
 		};
+		if (!MZGram::SendReadReceipts()) {
+			// state.sentReadTill already holds tillId, so running the local
+			// bookkeeping without the request clears the unread badge here
+			// while the peer learns nothing. Deferred because finished()
+			// re-enters sendReadRequests().
+			crl::on_main(&session(), finished);
+			return mtpRequestId(0);
+		}
 		if (const auto channel = history->peer->asChannel()) {
 			return session().api().request(MTPchannels_ReadHistory(
 				channel->inputChannel(),

@@ -13,6 +13,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_user.h"
 #include "base/unixtime.h"
 #include "data/data_peer_values.h"
+#include "mzgram/mzgram_options.h"
 #include "apiwrap.h"
 
 namespace Api {
@@ -152,6 +153,11 @@ void SendProgressManager::send(const Key &key, int progress) {
 }
 
 bool SendProgressManager::skipRequest(const Key &key) const {
+	// Speaking is the group call indicator, not a typing status: withholding
+	// it would make the caller look muted to everyone else in the call.
+	if (!MZGram::SendTyping() && key.type != SendProgressType::Speaking) {
+		return true;
+	}
 	const auto user = key.history->peer->asUser();
 	if (!user) {
 		return false;

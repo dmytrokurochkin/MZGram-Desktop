@@ -17,6 +17,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_unread_things.h"
 #include "api/api_transcribes.h"
 #include "main/main_session.h"
+#include "mzgram/mzgram_options.h"
 #include "main/main_account.h"
 #include "mtproto/mtp_instance.h"
 #include "mtproto/mtproto_config.h"
@@ -1019,13 +1020,19 @@ void Updates::updateOnline(crl::time lastNonIdleTime, bool gotOtherOffline) {
 
 		_lastWasOnline = isOnline;
 		_lastSetOnline = ms;
+
+		// Ghost mode reports offline instead of skipping the request: the
+		// quitting branch below releases the quit lock from the reply, so a
+		// request that never goes out would hang the shutdown.
+		const auto offline = !isOnline || !MZGram::SendOnline();
+
 		if (!Core::Quitting()) {
 			_onlineRequest = api().request(MTPaccount_UpdateStatus(
-				MTP_bool(!isOnline)
+				MTP_bool(offline)
 			)).send();
 		} else {
 			_onlineRequest = api().request(MTPaccount_UpdateStatus(
-				MTP_bool(!isOnline)
+				MTP_bool(offline)
 			)).done([=] {
 				Core::App().quitPreventFinished();
 			}).fail([=] {

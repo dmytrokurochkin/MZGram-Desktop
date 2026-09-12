@@ -1,0 +1,24 @@
+/*
+This file is part of MZGram,
+a fork of Telegram Desktop.
+
+For license and copyright information please follow this link:
+https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
+*/
+#pragma once
+
+namespace MZGram {
+
+extern const char kOptionGhostMode[];
+extern const char kOptionSendReadReceipts[];
+extern const char kOptionSendTyping[];
+extern const char kOptionSendOnline[];
+
+// Ghost mode is a master switch: each of the three below stays meaningful on
+// its own, so a user can keep typing status while withholding read receipts.
+[[nodiscard]] bool GhostMode();
+[[nodiscard]] bool SendReadReceipts();
+[[nodiscard]] bool SendTyping();
+[[nodiscard]] bool SendOnline();
+
+} // namespace MZGram
