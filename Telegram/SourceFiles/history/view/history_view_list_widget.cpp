@@ -27,6 +27,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_about_view.h"
 #include "history/view/history_view_drag.h"
 #include "history/view/history_view_element.h"
+#include "mzgram/mzgram_message_dim.h"
 #include "history/view/history_view_emoji_interactions.h"
 #include "chat_helpers/emoji_interactions.h"
 #include "history/view/history_view_message.h"
@@ -3135,7 +3136,7 @@ void ListWidget::paintEvent(QPaintEvent *e) {
 			context.fullMessageSelected = selection.fullMessageSelected;
 			context.messageSelection = selection.messageSelection;
 			context.highlight = _highlighter.state(item);
-			view->draw(p, context);
+			MZGram::DrawMessage(p, view, context);
 		}
 		if (_translateTracker) {
 			_translateTracker->add(view);

@@ -58,6 +58,14 @@ base::options::toggle OptionKeepSelfDestructing({
 	.description = "Keep view-once and timed media after it is opened",
 });
 
+// On by default: it only changes how messages are drawn.
+base::options::toggle OptionMarkMessages({
+	.id = kOptionMarkMessages,
+	.name = "Mark deleted and edited messages",
+	.description = "Dim kept deleted messages and add a pencil to edited ones",
+	.defaultValue = true,
+});
+
 } // namespace
 
 const char kOptionGhostMode[] = "mzgram-ghost-mode";
@@ -67,6 +75,8 @@ const char kOptionSendOnline[] = "mzgram-ghost-send-online";
 const char kOptionAntiRecall[] = "mzgram-anti-recall";
 const char kOptionEditHistory[] = "mzgram-edit-history";
 const char kOptionKeepSelfDestructing[] = "mzgram-keep-self-destructing";
+// The id keeps its first name so a saved choice survives the rename.
+const char kOptionMarkMessages[] = "mzgram-dim-marked";
 
 bool GhostMode() {
 	return OptionGhostMode.value();
@@ -94,6 +104,10 @@ bool EditHistory() {
 
 bool KeepSelfDestructing() {
 	return OptionKeepSelfDestructing.value();
+}
+
+bool MarkKeptMessages() {
+	return OptionMarkMessages.value();
 }
 
 } // namespace MZGram

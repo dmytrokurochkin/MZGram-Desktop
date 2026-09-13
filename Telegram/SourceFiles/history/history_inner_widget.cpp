@@ -39,6 +39,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_top_peers_selector.h"
 #include "history/history_inner_widget_accessibility.h"
 #include "history/history_item_components.h"
+#include "mzgram/mzgram_message_dim.h"
 #include "history/history_item_text.h"
 #include "payments/payments_reaction_process.h"
 #include "ui/widgets/menu/menu_add_action_callback_factory.h"
@@ -1604,7 +1605,7 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 			context.fullMessageSelected = selection.fullMessageSelected;
 			context.messageSelection = selection.messageSelection;
 			context.highlight = _widget->itemHighlight(view->data());
-			view->draw(p, context);
+			MZGram::DrawMessage(p, view, context);
 			processPainted(view, top, height);
 
 			top += height;
@@ -1673,7 +1674,7 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 				context.fullMessageSelected = selection.fullMessageSelected;
 				context.messageSelection = selection.messageSelection;
 				context.highlight = _widget->itemHighlight(item);
-				view->draw(p, context);
+				MZGram::DrawMessage(p, view, context);
 				processPainted(view, top, height);
 			}
 			top += height;

@@ -16,6 +16,7 @@ extern const char kOptionSendOnline[];
 extern const char kOptionAntiRecall[];
 extern const char kOptionEditHistory[];
 extern const char kOptionKeepSelfDestructing[];
+extern const char kOptionMarkMessages[];
 
 // Ghost mode is a master switch: each of the three below stays meaningful on
 // its own, so a user can keep typing status while withholding read receipts.
@@ -27,5 +28,7 @@ extern const char kOptionKeepSelfDestructing[];
 [[nodiscard]] bool AntiRecall();
 [[nodiscard]] bool EditHistory();
 [[nodiscard]] bool KeepSelfDestructing();
+// Dims kept deleted messages and puts a pencil on edited ones.
+[[nodiscard]] bool MarkKeptMessages();
 
 } // namespace MZGram

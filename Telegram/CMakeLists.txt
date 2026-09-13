@@ -1507,6 +1507,8 @@ PRIVATE
     mzgram/mzgram_archive.h
     mzgram/mzgram_edit_history_box.cpp
     mzgram/mzgram_edit_history_box.h
+    mzgram/mzgram_message_dim.cpp
+    mzgram/mzgram_message_dim.h
     mzgram/mzgram_message_store.cpp
     mzgram/mzgram_message_store.h
     mzgram/mzgram_options.cpp

@@ -19,6 +19,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lang/lang_keys.h"
 #include "history/history_item_components.h"
 #include "mzgram/mzgram_anti_recall.h"
+#include "mzgram/mzgram_options.h"
 #include "history/history_item_helpers.h"
 #include "history/history_item.h"
 #include "history/history.h"
@@ -505,13 +506,28 @@ void BottomInfo::layoutDateText() {
 	const auto deleted = (_data.flags & Data::Flag::Deleted)
 		? u"deleted "_q
 		: QString();
-	const auto date = deleted + (editedPrimary
+	const auto dateText = editedPrimary
 		? FormatEditedDate(_data.date, _data.editedDate)
 		: edited + ((_data.flags & Data::Flag::ForwardedDate)
 		? Ui::FormatDateTimeSavedFrom(_data.date)
-		: QLocale().toString(_data.date.time(), QLocale::ShortFormat)));
+		: QLocale().toString(_data.date.time(), QLocale::ShortFormat));
+	// MZGram: a pencil makes edited messages stand out without dimming them.
+	// Flag::Edited follows displayedEditDate, so hidden edits get no pencil.
+	// It is drawn at 60% of emoji size, so it reads as a mark, not content.
+	const auto pencil = ((_data.flags & Data::Flag::Edited)
+		&& MZGram::MarkKeptMessages())
+		? Ui::Emoji::Find(QString::fromUtf8("\xe2\x9c\x8f\xef\xb8\x8f"))
+		: nullptr;
+	const auto ratio = style::DevicePixelRatio();
+	const auto emojiPixels = Ui::Emoji::GetSizeNormal();
+	const auto pencilPixels = emojiPixels * 3 / 5;
+	const auto pencilWidth = pencil
+		? (pencilPixels / ratio + st::msgDateFont->spacew)
+		: 0;
+	const auto date = deleted + dateText;
 	const auto afterAuthor = prefix + date;
-	const auto afterAuthorWidth = st::msgDateFont->width(afterAuthor);
+	const auto afterAuthorWidth = st::msgDateFont->width(afterAuthor)
+		+ pencilWidth;
 	const auto authorWidth = st::msgDateFont->width(author);
 	const auto maxWidth = st::maxSignatureSize;
 	_authorElided = !author.isEmpty()
@@ -519,13 +535,6 @@ void BottomInfo::layoutDateText() {
 	const auto name = _authorElided
 		? st::msgDateFont->elided(author, maxWidth - afterAuthorWidth)
 		: author;
-	const auto full = (_data.flags & Data::Flag::Sponsored)
-		? QString()
-		: (_data.flags & Data::Flag::Imported)
-		? (date + ' ' + tr::lng_imported(tr::now))
-		: name.isEmpty()
-		? date
-		: (name + afterAuthor);
 	auto helper = Ui::Text::CustomEmojiHelper(
 		Core::TextContext({ .session = &_reactionsOwner->session() }));
 	auto marked = TextWithEntities();
@@ -547,7 +556,35 @@ void BottomInfo::layoutDateText() {
 			.textColor = false,
 		})).append("  ");
 	}
-	marked.append(full);
+	const auto appendDate = [&] {
+		marked.append(deleted);
+		if (pencil) {
+			marked.append(helper.image({
+				.image = Ui::Emoji::SinglePixmap(
+					pencil,
+					emojiPixels).toImage().scaledToHeight(
+						pencilPixels,
+						Qt::SmoothTransformation),
+				.margin = QMargins(
+					0,
+					(emojiPixels - pencilPixels) / (2 * ratio),
+					0,
+					0),
+				.textColor = false,
+			})).append(u" "_q);
+		}
+		marked.append(dateText);
+	};
+	if (_data.flags & Data::Flag::Sponsored) {
+	} else if (_data.flags & Data::Flag::Imported) {
+		appendDate();
+		marked.append(u" "_q + tr::lng_imported(tr::now));
+	} else if (name.isEmpty()) {
+		appendDate();
+	} else {
+		marked.append(name + prefix);
+		appendDate();
+	}
 	_authorEditedDate.setMarkedText(
 		st::msgDateTextStyle,
 		marked,
