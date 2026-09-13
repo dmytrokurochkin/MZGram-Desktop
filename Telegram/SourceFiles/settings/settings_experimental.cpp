@@ -11,7 +11,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/components/passkeys.h"
 #include "ui/layers/generic_box.h"
 #include "main/main_session.h"
-#include "mzgram/mzgram_options.h"
 #include "ui/boxes/confirm_box.h"
 #include "ui/search_field_controller.h"
 #include "ui/text/text_entity.h"
@@ -453,17 +452,6 @@ void SetupExperimental(
 #endif
 				Window::kOptionDisableTouchbar,
 				Window::kOptionNewWindowsSizeAsFirst,
-			}
-		},
-		{
-			u"MZGram"_q,
-			{
-				MZGram::kOptionGhostMode,
-				MZGram::kOptionSendReadReceipts,
-				MZGram::kOptionSendTyping,
-				MZGram::kOptionSendOnline,
-				MZGram::kOptionAntiRecall,
-				MZGram::kOptionEditHistory,
 			}
 		},
 		{

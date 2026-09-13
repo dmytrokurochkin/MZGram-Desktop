@@ -1511,6 +1511,8 @@ PRIVATE
     mzgram/mzgram_message_store.h
     mzgram/mzgram_options.cpp
     mzgram/mzgram_options.h
+    mzgram/mzgram_settings.cpp
+    mzgram/mzgram_settings.h
     media/audio/media_audio.cpp
     media/audio/media_audio.h
     media/audio/media_audio_edit.cpp

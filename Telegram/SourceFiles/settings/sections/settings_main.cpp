@@ -38,6 +38,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lang/lang_keys.h"
 #include "lottie/lottie_icon.h"
 #include "menu/menu_checked_action.h"
+#include "mzgram/mzgram_settings.h"
 #include "main/main_account.h"
 #include "main/main_app_config.h"
 #include "main/main_domain.h"
@@ -373,6 +374,14 @@ void BuildSectionButtons(SectionBuilder &builder) {
 			.keywords = { u"profile"_q, u"edit"_q, u"information"_q },
 		});
 	}
+
+	// MZGram: right below the account, so fork features are one click away.
+	builder.addSectionButton({
+		.title = rpl::single(u"MZGram"_q),
+		.targetSection = MZGramId(),
+		.icon = { &st::menuIconStealth },
+		.keywords = { u"mzgram"_q, u"ghost"_q, u"deleted"_q, u"edited"_q },
+	});
 
 	builder.addSectionButton({
 		.title = tr::lng_settings_section_notify(),
