@@ -26,6 +26,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/unixtime.h"
 #include "base/random.h"
 #include "main/main_session.h"
+#include "mzgram/mzgram_archive.h"
 #include "mzgram/mzgram_options.h"
 #include "window/notifications_manager.h"
 #include "history/history.h"
@@ -1032,6 +1033,7 @@ void Histories::deleteMessages(const MessageIdsList &ids, bool revoke) {
 		const auto history = item->history();
 		const auto wasLast = (history->lastMessage() == item);
 		const auto wasInChats = (history->chatListMessage() == item);
+		MZGram::ForgetDeletedByUser(item);
 		item->destroy();
 
 		if (wasLast || wasInChats) {

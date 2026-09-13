@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "history/history.h"
 
+#include "mzgram/mzgram_archive.h"
+
 #include "history/view/history_view_element.h"
 #include "history/view/history_view_item_preview.h"
 #include "history/view/history_view_translate_tracker.h"
@@ -589,9 +591,15 @@ not_null<HistoryItem*> History::createItem(
 		}
 		return result;
 	}
-	const auto result = message.match([&](const auto &data) {
+	// MZGram: an opened view-once copy from the server is swapped for the one
+	// kept before it was opened, whichever path creates the item first.
+	auto kept = std::optional<MTPMessage>();
+	const auto &source = MZGram::PreferKeptCopy(this, id, message, kept);
+	const auto result = source.match([&](const auto &data) {
 		return makeMessage(id, data, localFlags);
 	});
+	MZGram::CaptureMessage(result, message);
+	MZGram::RestoreSavedMedia(result);
 	if (newMessage && result->out() && result->isRegular()) {
 		session().topPeers().increment(peer, result->date());
 		if (result->starsPaid()) {
@@ -1839,7 +1847,14 @@ void History::addEdgesToSharedMedia() {
 	}
 }
 
-void History::addOlderSlice(const QVector<MTPMessage> &slice) {
+void History::addOlderSlice(const QVector<MTPMessage> &serverSlice) {
+	// MZGram: kept deleted messages rejoin the range they were cut from.
+	auto merged = QVector<MTPMessage>();
+	const auto &slice = MZGram::MergePreserved(
+		this,
+		serverSlice,
+		true,
+		merged);
 	if (slice.isEmpty()) {
 		_loadedAtTop = true;
 		checkLocalMessages();
@@ -1852,6 +1867,9 @@ void History::addOlderSlice(const QVector<MTPMessage> &slice) {
 		// If no items were added it means we've loaded everything old.
 		_loadedAtTop = true;
 		addEdgesToSharedMedia();
+	}
+	if (serverSlice.isEmpty()) {
+		_loadedAtTop = true;
 	}
 	checkLocalMessages();
 	checkLastMessage();
@@ -1878,10 +1896,18 @@ void History::addCreatedOlderSlice(
 	addToSharedMedia(items);
 }
 
-void History::addNewerSlice(const QVector<MTPMessage> &slice) {
+void History::addNewerSlice(const QVector<MTPMessage> &serverSlice) {
 	bool wasLoadedAtBottom = loadedAtBottom();
 
-	if (slice.isEmpty()) {
+	// MZGram: see addOlderSlice.
+	auto merged = QVector<MTPMessage>();
+	const auto &slice = MZGram::MergePreserved(
+		this,
+		serverSlice,
+		false,
+		merged);
+
+	if (serverSlice.isEmpty()) {
 		_loadedAtBottom = true;
 		if (!lastMessage()) {
 			setLastMessage(lastAvailableMessage());

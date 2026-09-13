@@ -1503,6 +1503,8 @@ PRIVATE
     main/session/session_show.h
     mzgram/mzgram_anti_recall.cpp
     mzgram/mzgram_anti_recall.h
+    mzgram/mzgram_archive.cpp
+    mzgram/mzgram_archive.h
     mzgram/mzgram_edit_history_box.cpp
     mzgram/mzgram_edit_history_box.h
     mzgram/mzgram_message_store.cpp

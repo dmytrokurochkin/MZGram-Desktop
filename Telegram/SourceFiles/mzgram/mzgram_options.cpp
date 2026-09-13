@@ -52,6 +52,12 @@ base::options::toggle OptionEditHistory({
 	.description = "Keep earlier versions of edited messages",
 });
 
+base::options::toggle OptionKeepSelfDestructing({
+	.id = kOptionKeepSelfDestructing,
+	.name = "Keep self-destructing media",
+	.description = "Keep view-once and timed media after it is opened",
+});
+
 } // namespace
 
 const char kOptionGhostMode[] = "mzgram-ghost-mode";
@@ -60,6 +66,7 @@ const char kOptionSendTyping[] = "mzgram-ghost-send-typing";
 const char kOptionSendOnline[] = "mzgram-ghost-send-online";
 const char kOptionAntiRecall[] = "mzgram-anti-recall";
 const char kOptionEditHistory[] = "mzgram-edit-history";
+const char kOptionKeepSelfDestructing[] = "mzgram-keep-self-destructing";
 
 bool GhostMode() {
 	return OptionGhostMode.value();
@@ -83,6 +90,10 @@ bool AntiRecall() {
 
 bool EditHistory() {
 	return OptionEditHistory.value();
+}
+
+bool KeepSelfDestructing() {
+	return OptionKeepSelfDestructing.value();
 }
 
 } // namespace MZGram

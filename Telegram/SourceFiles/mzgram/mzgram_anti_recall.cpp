@@ -13,6 +13,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history_item.h"
 #include "history/history_item_components.h"
 #include "main/main_session.h"
+#include "mzgram/mzgram_archive.h"
 #include "mzgram/mzgram_edit_history_box.h"
 #include "mzgram/mzgram_options.h"
 #include "ui/layers/generic_box.h"
@@ -23,11 +24,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 namespace MZGram {
 namespace {
 
-// The one place the per-chat allowlist will plug into. Until it exists,
-// every chat qualifies.
-[[nodiscard]] bool ChatQualifies(
-		[[maybe_unused]] not_null<const HistoryItem*> item) {
-	return true;
+// Only the chats the user picked keep deleted messages and edit history.
+[[nodiscard]] bool ChatQualifies(not_null<const HistoryItem*> item) {
+	return IsTracked(item->history()->peer);
 }
 
 } // namespace

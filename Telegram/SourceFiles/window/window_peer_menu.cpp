@@ -77,6 +77,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_updates.h"
 #include "mtproto/mtproto_config.h"
 #include "history/history.h"
+#include "mzgram/mzgram_archive.h"
+#include "mzgram/mzgram_options.h"
 #include "history/history_item_helpers.h" // GetErrorForSending.
 #include "history/history_item_components.h"
 #include "history/view/controls/history_view_forward_panel.h"
@@ -348,6 +350,7 @@ private:
 	void addBoostChat();
 	void addToggleFee();
 	void addSetPersonalChannel();
+	void addMZGramKeepMessages();
 
 	[[nodiscard]] bool skipCreateActions() const;
 	[[nodiscard]] SendMenu::Details createSendMenuDetails() const;
@@ -1843,6 +1846,33 @@ void Filler::fillCommunityChatsListActions() {
 	}
 }
 
+// MZGram: picks the chats where deleted messages, edit history and
+// view-once media are kept. Hidden while none of those features is on.
+void Filler::addMZGramKeepMessages() {
+	const auto history = _request.key.history();
+	if (!history || _topic || _sublist || _folder) {
+		return;
+	} else if (!MZGram::AntiRecall()
+		&& !MZGram::EditHistory()
+		&& !MZGram::KeepSelfDestructing()) {
+		return;
+	}
+	const auto peer = history->peer;
+	const auto tracked = MZGram::IsTracked(peer);
+	const auto controller = _controller;
+	_addAction(
+		(tracked
+			? u"Stop saving deleted messages"_q
+			: u"Save deleted messages"_q),
+		[=] {
+			MZGram::SetTracked(peer, !tracked);
+			controller->showToast(tracked
+				? u"Deleted messages are no longer saved in this chat."_q
+				: u"Deleted messages in this chat will be saved."_q);
+		},
+		&st::menuIconStealth);
+}
+
 void Filler::fillChatsListActions() {
 	const auto channel = _peer ? _peer->asChannel() : nullptr;
 	if (channel && channel->isCommunity()) {
@@ -1905,6 +1935,7 @@ void Filler::fillContextMenuActions() {
 	}
 	addToggleMuteSubmenu(false);
 	addToggleUnreadMark();
+	addMZGramKeepMessages();
 	addToggleTopicClosed();
 	addToggleFolder();
 	if (const auto user = _peer->asUser()) {
@@ -1923,6 +1954,7 @@ void Filler::fillHistoryActions() {
 	addToggleMuteSubmenu(true);
 	addCreateTopic();
 	addInfo();
+	addMZGramKeepMessages();
 	addViewAsTopics();
 	addManageChat();
 	addStoryArchive();

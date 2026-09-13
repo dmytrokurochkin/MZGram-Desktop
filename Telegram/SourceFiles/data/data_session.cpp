@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "main/main_session.h"
 #include "mzgram/mzgram_anti_recall.h"
+#include "mzgram/mzgram_archive.h"
 #include "main/main_session_settings.h"
 #include "main/main_app_config.h"
 #include "apiwrap.h"
@@ -3076,6 +3077,11 @@ void Session::updateEditedMessage(const MTPMessage &data) {
 		Reactions::CheckUnknownForUnread(this, data);
 		return;
 	}
+	// MZGram: an edition that only strips kept view-once media is ignored,
+	// so the media stays for the rest of the session too.
+	if (MZGram::KeepsMediaAgainst(existing, data)) {
+		return;
+	}
 	if (existing->isLocalUpdateMedia() && data.type() == mtpc_message) {
 		updateExistingMessage(data.c_message());
 	}
@@ -3085,6 +3091,7 @@ void Session::updateEditedMessage(const MTPMessage &data) {
 	}, [&](const auto &data) {
 		existing->applyEdition(HistoryMessageEdition(_session, data));
 	});
+	MZGram::CaptureMessage(existing, data);
 }
 
 void Session::processMessages(
@@ -3343,6 +3350,8 @@ void Session::checkFormattedDateUpdates() {
 void Session::processMessagesDeleted(
 		PeerId peerId,
 		const QVector<MTPint> &data) {
+	// MZGram: before the early return, which skips chats not loaded now.
+	MZGram::RecordRemoteDeletion(_session, peerId, data);
 	const auto list = messagesList(peerId);
 	const auto affected = historyLoaded(peerId);
 	if (!list && !affected) {
@@ -3376,6 +3385,7 @@ void Session::processMessagesDeleted(
 }
 
 void Session::processNonChannelMessagesDeleted(const QVector<MTPint> &data) {
+	MZGram::RecordRemoteDeletion(_session, data);
 	auto toDestroy = std::vector<not_null<HistoryItem*>>();
 	auto historiesToCheck = base::flat_set<not_null<History*>>();
 	for (const auto &messageId : data) {

@@ -18,6 +18,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/media/history_view_media_grouped.h"
 #include "history/history_item_components.h"
 #include "mzgram/mzgram_anti_recall.h"
+#include "mzgram/mzgram_archive.h"
+#include "mzgram/mzgram_options.h"
 #include "history/history_item_helpers.h"
 #include "history/history_unread_things.h"
 #include "history/history.h"
@@ -2867,6 +2869,11 @@ void HistoryItem::clearMediaAsExpired() {
 		return;
 	}
 	unarmMediaDestroy();
+	// MZGram: every burn path (viewer close, voice playback end, timer, a
+	// read on another device) ends here, so one check keeps the media.
+	if (MZGram::KeepSelfDestructing() && MZGram::IsTracked(_history->peer)) {
+		return;
+	}
 	auto &owner = _history->owner();
 	if (const auto document = media->document()) {
 		document->cancel();
