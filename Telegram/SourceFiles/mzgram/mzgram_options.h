@@ -45,4 +45,7 @@ extern const char kOptionDisableStories[];
 extern const char kOptionDisableGreetingSticker[];
 [[nodiscard]] bool DisableGreetingSticker();
 
+extern const char kOptionHideChannelBottomButton[];
+[[nodiscard]] bool HideChannelBottomButton();
+
 } // namespace MZGram

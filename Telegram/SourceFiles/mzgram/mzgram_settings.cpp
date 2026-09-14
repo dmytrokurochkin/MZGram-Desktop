@@ -228,6 +228,12 @@ void BuildMZGramSection(SectionBuilder &builder) {
 		"Disable greeting sticker",
 		kOptionDisableGreetingSticker,
 		{ u"greeting"_q, u"sticker"_q, u"hello"_q });
+	AddOptionToggle(
+		builder,
+		u"mzgram/hide-channel-bottom-button"_q,
+		"Hide channel bottom button",
+		kOptionHideChannelBottomButton,
+		{ u"channel"_q, u"mute"_q, u"unmute"_q, u"button"_q });
 	builder.addSkip();
 	builder.addDividerText(Text("Ported from AyuGram Desktop."));
 

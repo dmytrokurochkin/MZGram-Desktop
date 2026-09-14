@@ -92,6 +92,14 @@ base::options::toggle OptionDisableGreetingSticker({
 	.description = "Hide the hello sticker in new empty private chats",
 });
 
+// Ported from AyuGram Desktop dev (ayu/ayu_settings.h, channelBottomButton,
+// the Hidden variant; MuteUnmute/DiscussWithFallback are not ported).
+base::options::toggle OptionHideChannelBottomButton({
+	.id = kOptionHideChannelBottomButton,
+	.name = "Hide channel bottom button",
+	.description = "Hide the mute/unmute bar in channels you cannot post to",
+});
+
 } // namespace
 
 const char kOptionGhostMode[] = "mzgram-ghost-mode";
@@ -107,6 +115,8 @@ const char kOptionMessageSeconds[] = "mzgram-message-seconds";
 const char kOptionDisableStories[] = "mzgram-disable-stories";
 const char kOptionDisableGreetingSticker[] =
 	"mzgram-disable-greeting-sticker";
+const char kOptionHideChannelBottomButton[] =
+	"mzgram-hide-channel-bottom-button";
 
 bool GhostMode() {
 	return OptionGhostMode.value();
@@ -163,6 +173,10 @@ bool DisableStories() {
 
 bool DisableGreetingSticker() {
 	return OptionDisableGreetingSticker.value();
+}
+
+bool HideChannelBottomButton() {
+	return OptionHideChannelBottomButton.value();
 }
 
 } // namespace MZGram
