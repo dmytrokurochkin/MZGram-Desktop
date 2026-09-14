@@ -13,6 +13,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "apiwrap.h"
 #include "base/random.h"
 #include "base/unixtime.h"
+#include "mzgram/mzgram_options.h"
 #include "ui/effects/premium_stars.h"
 #include "boxes/premium_preview_box.h"
 #include "chat_helpers/stickers_lottie.h"
@@ -269,6 +270,9 @@ auto GenerateChatIntro(
 				st::defaultTextStyle,
 				links));
 		};
+		// Ported from AyuGram Desktop dev (ayu/ayu_settings.h,
+		// disableGreetingSticker), applied to GenerateChatIntro.
+		const auto disableGreeting = MZGram::DisableGreetingSticker();
 		const auto title = data.customPhrases()
 			? data.title
 			: tr::lng_chat_intro_default_title(tr::now);
@@ -276,37 +280,41 @@ auto GenerateChatIntro(
 			? data.description
 			: tr::lng_chat_intro_default_message(tr::now);
 		pushText(tr::bold(title), st::chatIntroTitleMargin);
-		pushText({ description }, title.isEmpty()
-			? st::chatIntroTitleMargin
-			: st::chatIntroMargin);
-		const auto sticker = [=] {
-			using Tag = ChatHelpers::StickerLottieSize;
-			auto sticker = data.sticker;
-			if (!sticker) {
-				const auto api = &parent->history()->session().api();
-				const auto &list = api->premium().helloStickers();
-				if (!list.empty()) {
-					sticker = list[base::RandomIndex(list.size())];
-					if (helloChosen) {
-						helloChosen(sticker);
+		if (!disableGreeting || data.customPhrases()) {
+			pushText({ description }, title.isEmpty()
+				? st::chatIntroTitleMargin
+				: st::chatIntroMargin);
+		}
+		if (!disableGreeting || data.sticker) {
+			const auto sticker = [=] {
+				using Tag = ChatHelpers::StickerLottieSize;
+				auto sticker = data.sticker;
+				if (!sticker && !disableGreeting) {
+					const auto api = &parent->history()->session().api();
+					const auto &list = api->premium().helloStickers();
+					if (!list.empty()) {
+						sticker = list[base::RandomIndex(list.size())];
+						if (helloChosen) {
+							helloChosen(sticker);
+						}
 					}
 				}
-			}
-			const auto send = [=] {
-				sendIntroSticker(sticker);
+				const auto send = [=] {
+					sendIntroSticker(sticker);
+				};
+				return StickerInBubblePart::Data{
+					.sticker = sticker,
+					.size = st::chatIntroStickerSize,
+					.cacheTag = Tag::ChatIntroHelloSticker,
+					.link = std::make_shared<LambdaClickHandler>(send),
+				};
 			};
-			return StickerInBubblePart::Data{
-				.sticker = sticker,
-				.size = st::chatIntroStickerSize,
-				.cacheTag = Tag::ChatIntroHelloSticker,
-				.link = std::make_shared<LambdaClickHandler>(send),
-			};
-		};
-		push(std::make_unique<StickerInBubblePart>(
-			parent,
-			replacing,
-			sticker,
-			st::chatIntroStickerPadding));
+			push(std::make_unique<StickerInBubblePart>(
+				parent,
+				replacing,
+				sticker,
+				st::chatIntroStickerPadding));
+		}
 	};
 }
 
@@ -764,7 +772,7 @@ bool AboutView::refresh() {
 				makeIntro(user);
 			} else if (const auto stars = user->starsPerMessageChecked()) {
 				setItem(makeStarsPerMessage(stars), nullptr);
-			} else {
+			} else if (!MZGram::DisableGreetingSticker()) {
 				makeIntro(user);
 			}
 			return true;

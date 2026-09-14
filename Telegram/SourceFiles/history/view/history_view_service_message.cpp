@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_service_message.h"
 
 #include "history/view/media/history_view_media.h"
+#include "mzgram/mzgram_options.h"
 #include "history/view/reactions/history_view_reactions.h"
 #include "history/view/history_view_cursor_state.h"
 #include "history/history.h"
@@ -870,6 +871,9 @@ EmptyPainter::EmptyPainter(not_null<History*> history)
 , _text(st::msgMinWidth) {
 	if (NeedAboutGroup(_history)) {
 		fillAboutGroup();
+	} else if (_history->peer->isUser()
+		&& MZGram::DisableGreetingSticker()) {
+		SetText(_header, tr::lng_chat_intro_default_title(tr::now));
 	}
 }
 

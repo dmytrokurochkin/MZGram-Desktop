@@ -222,6 +222,12 @@ void BuildMZGramSection(SectionBuilder &builder) {
 		"Hide Stories",
 		kOptionDisableStories,
 		{ u"stories"_q, u"hide"_q });
+	AddOptionToggle(
+		builder,
+		u"mzgram/disable-greeting-sticker"_q,
+		"Disable greeting sticker",
+		kOptionDisableGreetingSticker,
+		{ u"greeting"_q, u"sticker"_q, u"hello"_q });
 	builder.addSkip();
 	builder.addDividerText(Text("Ported from AyuGram Desktop."));
 

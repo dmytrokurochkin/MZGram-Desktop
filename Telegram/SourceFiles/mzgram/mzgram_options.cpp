@@ -84,6 +84,14 @@ base::options::toggle OptionDisableStories({
 	.description = "Hide the stories strip in the chat list and profiles",
 });
 
+// Ported from AyuGram Desktop dev
+// (ayu/ayu_settings.h, disableGreetingSticker).
+base::options::toggle OptionDisableGreetingSticker({
+	.id = kOptionDisableGreetingSticker,
+	.name = "Disable greeting sticker",
+	.description = "Hide the hello sticker in new empty private chats",
+});
+
 } // namespace
 
 const char kOptionGhostMode[] = "mzgram-ghost-mode";
@@ -97,6 +105,8 @@ const char kOptionKeepSelfDestructing[] = "mzgram-keep-self-destructing";
 const char kOptionMarkMessages[] = "mzgram-dim-marked";
 const char kOptionMessageSeconds[] = "mzgram-message-seconds";
 const char kOptionDisableStories[] = "mzgram-disable-stories";
+const char kOptionDisableGreetingSticker[] =
+	"mzgram-disable-greeting-sticker";
 
 bool GhostMode() {
 	return OptionGhostMode.value();
@@ -149,6 +159,10 @@ QString FormatMessageTime(const QTime &time) {
 
 bool DisableStories() {
 	return OptionDisableStories.value();
+}
+
+bool DisableGreetingSticker() {
+	return OptionDisableGreetingSticker.value();
 }
 
 } // namespace MZGram
