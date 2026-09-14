@@ -48,4 +48,7 @@ extern const char kOptionDisableGreetingSticker[];
 extern const char kOptionHideChannelBottomButton[];
 [[nodiscard]] bool HideChannelBottomButton();
 
+extern const char kOptionAutoPauseVideo[];
+[[nodiscard]] bool AutoPauseVideo();
+
 } // namespace MZGram

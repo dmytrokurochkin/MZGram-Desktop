@@ -238,6 +238,19 @@ void BuildMZGramSection(SectionBuilder &builder) {
 	builder.addDividerText(Text("Ported from AyuGram Desktop."));
 
 	builder.addSkip();
+	builder.addSubsectionTitle(Text("Chat"));
+	AddOptionToggle(
+		builder,
+		u"mzgram/auto-pause-video"_q,
+		"Auto pause video",
+		kOptionAutoPauseVideo,
+		{ u"video"_q, u"pause"_q, u"focus"_q, u"minimize"_q });
+	builder.addSkip();
+	builder.addDividerText(Text("Pauses the video viewer when the window is "
+		"minimized or loses focus. MZGram's own code, mirroring the "
+		"Android version."));
+
+	builder.addSkip();
 	builder.addSubsectionTitle(Text("Ghost mode"));
 	AddOptionToggle(
 		builder,

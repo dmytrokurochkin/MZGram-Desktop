@@ -99,6 +99,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/unixtime.h"
 #include "base/qt_signal_producer.h"
 #include "base/event_filter.h"
+#include "mzgram/mzgram_options.h"
 #include "main/main_account.h"
 #include "main/main_domain.h" // Domain::activeSessionValue.
 #include "main/main_session.h"
@@ -742,7 +743,27 @@ OverlayWidget::OverlayWidget()
 	const auto mouseButton = [](not_null<QEvent*> e) {
 		return static_cast<QMouseEvent*>(e.get())->button();
 	};
-	base::install_event_filter(_window, [=](not_null<QEvent*> e) {
+	// Ported from AyuGram4A ui/PhotoViewer.java (autoPauseVideo), mirrored
+	// here for Desktop: AyuGram Desktop has no equivalent of its own.
+	const auto mzgramAutoPause = [=](bool shouldPause, bool *pausedByUs) {
+		if (!MZGram::AutoPauseVideo() || !_streamed) {
+			return;
+		}
+		const auto &player = _streamed->instance.player();
+		if (shouldPause) {
+			if (!*pausedByUs && !player.paused() && !player.finished()) {
+				playbackPauseResume();
+				*pausedByUs = true;
+			}
+		} else if (*pausedByUs) {
+			*pausedByUs = false;
+			if (player.paused()) {
+				playbackPauseResume();
+			}
+		}
+	};
+	base::install_event_filter(_window, [=, mzgramPausedByUs = false](
+			not_null<QEvent*> e) mutable {
 		const auto type = e->type();
 		if (type == QEvent::Move) {
 			const auto position = static_cast<QMoveEvent*>(e.get())->pos();
@@ -795,6 +816,13 @@ OverlayWidget::OverlayWidget()
 				_windowed = true;
 				savePosition();
 			}
+			mzgramAutoPause(
+				state == Qt::WindowMinimized,
+				&mzgramPausedByUs);
+		} else if (type == QEvent::WindowDeactivate) {
+			mzgramAutoPause(true, &mzgramPausedByUs);
+		} else if (type == QEvent::WindowActivate) {
+			mzgramAutoPause(false, &mzgramPausedByUs);
 		}
 		return base::EventFilterResult::Continue;
 	});

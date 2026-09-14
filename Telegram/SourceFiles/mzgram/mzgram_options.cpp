@@ -100,6 +100,15 @@ base::options::toggle OptionHideChannelBottomButton({
 	.description = "Hide the mute/unmute bar in channels you cannot post to",
 });
 
+// MZGram's own code (AyuGram Desktop has no equivalent), mirroring the
+// autoPauseVideo option already ported to MZGram Android from Nekogram.
+base::options::toggle OptionAutoPauseVideo({
+	.id = kOptionAutoPauseVideo,
+	.name = "Auto pause video",
+	.description = "Pause video in the viewer when the window is minimized "
+		"or loses focus",
+});
+
 } // namespace
 
 const char kOptionGhostMode[] = "mzgram-ghost-mode";
@@ -117,6 +126,7 @@ const char kOptionDisableGreetingSticker[] =
 	"mzgram-disable-greeting-sticker";
 const char kOptionHideChannelBottomButton[] =
 	"mzgram-hide-channel-bottom-button";
+const char kOptionAutoPauseVideo[] = "mzgram-auto-pause-video";
 
 bool GhostMode() {
 	return OptionGhostMode.value();
@@ -177,6 +187,10 @@ bool DisableGreetingSticker() {
 
 bool HideChannelBottomButton() {
 	return OptionHideChannelBottomButton.value();
+}
+
+bool AutoPauseVideo() {
+	return OptionAutoPauseVideo.value();
 }
 
 } // namespace MZGram
