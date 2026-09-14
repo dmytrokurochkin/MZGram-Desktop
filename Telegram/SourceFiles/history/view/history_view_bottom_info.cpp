@@ -510,7 +510,7 @@ void BottomInfo::layoutDateText() {
 		? FormatEditedDate(_data.date, _data.editedDate)
 		: edited + ((_data.flags & Data::Flag::ForwardedDate)
 		? Ui::FormatDateTimeSavedFrom(_data.date)
-		: QLocale().toString(_data.date.time(), QLocale::ShortFormat));
+		: MZGram::FormatMessageTime(_data.date.time()));
 	// MZGram: a pencil makes edited messages stand out without dimming them.
 	// Flag::Edited follows displayedEditDate, so hidden edits get no pencil.
 	// It is drawn at 60% of emoji size, so it reads as a mark, not content.

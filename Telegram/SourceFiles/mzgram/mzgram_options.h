@@ -7,6 +7,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
+class QTime;
+class QString;
+
 namespace MZGram {
 
 extern const char kOptionGhostMode[];
@@ -30,5 +33,10 @@ extern const char kOptionMarkMessages[];
 [[nodiscard]] bool KeepSelfDestructing();
 // Dims kept deleted messages and puts a pencil on edited ones.
 [[nodiscard]] bool MarkKeptMessages();
+
+extern const char kOptionMessageSeconds[];
+[[nodiscard]] bool MessageSeconds();
+// Formats a message bubble's time, adding seconds when the option is on.
+[[nodiscard]] QString FormatMessageTime(const QTime &time);
 
 } // namespace MZGram

@@ -9,6 +9,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "base/options.h"
 
+#include <QtCore/QLocale>
+#include <QtCore/QString>
+#include <QtCore/QTime>
+
 namespace MZGram {
 namespace {
 
@@ -66,6 +70,13 @@ base::options::toggle OptionMarkMessages({
 	.defaultValue = true,
 });
 
+// Ported from AyuGram Desktop dev (ayu/ayu_settings.h, showMessageSeconds).
+base::options::toggle OptionMessageSeconds({
+	.id = kOptionMessageSeconds,
+	.name = "Message time with seconds",
+	.description = "Show seconds in message bubble timestamps",
+});
+
 } // namespace
 
 const char kOptionGhostMode[] = "mzgram-ghost-mode";
@@ -77,6 +88,7 @@ const char kOptionEditHistory[] = "mzgram-edit-history";
 const char kOptionKeepSelfDestructing[] = "mzgram-keep-self-destructing";
 // The id keeps its first name so a saved choice survives the rename.
 const char kOptionMarkMessages[] = "mzgram-dim-marked";
+const char kOptionMessageSeconds[] = "mzgram-message-seconds";
 
 bool GhostMode() {
 	return OptionGhostMode.value();
@@ -108,6 +120,23 @@ bool KeepSelfDestructing() {
 
 bool MarkKeptMessages() {
 	return OptionMarkMessages.value();
+}
+
+bool MessageSeconds() {
+	return OptionMessageSeconds.value();
+}
+
+// Ported from AyuGram Desktop dev
+// (ayu/utils/telegram_helpers.cpp, formatMessageTime).
+QString FormatMessageTime(const QTime &time) {
+	if (!MessageSeconds()) {
+		return QLocale().toString(time, QLocale::ShortFormat);
+	}
+	const auto format = QLocale().timeFormat(QLocale::ShortFormat).contains(
+		u"AP"_q)
+		? u"h:mm:ss AP"_q
+		: u"HH:mm:ss"_q;
+	return QLocale().toString(time, format);
 }
 
 } // namespace MZGram

@@ -209,6 +209,17 @@ void BuildMZGramSection(SectionBuilder &builder) {
 	const auto session = builder.session();
 
 	builder.addSkip();
+	builder.addSubsectionTitle(Text("Appearance"));
+	AddOptionToggle(
+		builder,
+		u"mzgram/message-seconds"_q,
+		"Show seconds in message time",
+		kOptionMessageSeconds,
+		{ u"seconds"_q, u"time"_q, u"clock"_q });
+	builder.addSkip();
+	builder.addDividerText(Text("Ported from AyuGram Desktop."));
+
+	builder.addSkip();
 	builder.addSubsectionTitle(Text("Ghost mode"));
 	AddOptionToggle(
 		builder,
