@@ -29,6 +29,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history_item_components.h"
 #include "mzgram/mzgram_anti_recall.h"
 #include "mzgram/mzgram_context_actions.h"
+#include "mzgram/mzgram_qr_scan.h"
 #include "history/history_item_helpers.h"
 #include "history/history_item_text.h"
 #include "history/view/history_view_schedule_box.h"
@@ -396,6 +397,7 @@ void AddPhotoActions(
 			std::move(callback),
 			&st::menuIconStickers);
 	}
+	MZGram::AddScanQrCodeAction(menu, photo, item, list->controller());
 }
 
 void SaveGif(

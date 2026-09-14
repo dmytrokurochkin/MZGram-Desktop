@@ -1515,8 +1515,16 @@ PRIVATE
     mzgram/mzgram_message_store.h
     mzgram/mzgram_options.cpp
     mzgram/mzgram_options.h
+    mzgram/mzgram_qr_scan.cpp
+    mzgram/mzgram_qr_scan.h
     mzgram/mzgram_settings.cpp
     mzgram/mzgram_settings.h
+    mzgram/quirc/decode.c
+    mzgram/quirc/identify.c
+    mzgram/quirc/quirc.c
+    mzgram/quirc/quirc.h
+    mzgram/quirc/quirc_internal.h
+    mzgram/quirc/version_db.c
     media/audio/media_audio.cpp
     media/audio/media_audio.h
     media/audio/media_audio_edit.cpp

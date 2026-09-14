@@ -277,8 +277,17 @@ void BuildMZGramSection(SectionBuilder &builder) {
 		"Show \"Message details\" in the message menu",
 		kOptionMessageDetails,
 		{ u"details"_q, u"id"_q, u"views"_q });
+	AddOptionToggle(
+		builder,
+		u"mzgram/scan-qr-code"_q,
+		"Show \"Scan for QR code\" on photos",
+		kOptionScanQrCode,
+		{ u"qr"_q, u"scan"_q, u"code"_q });
 	builder.addSkip();
-	builder.addDividerText(Text("Ported from AyuGram Desktop."));
+	builder.addDividerText(Text("Repeat and Message details are ported from "
+		"AyuGram Desktop. Scan for QR code is MZGram's own code, mirroring "
+		"the Android version: it decodes a QR code from an already "
+		"downloaded photo entirely offline."));
 
 	builder.addSkip();
 	builder.addSubsectionTitle(Text("Ghost mode"));

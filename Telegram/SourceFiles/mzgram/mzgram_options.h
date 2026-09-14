@@ -61,4 +61,7 @@ extern const char kOptionMessageDetails[];
 [[nodiscard]] bool RepeatMessageAction();
 [[nodiscard]] bool MessageDetailsAction();
 
+extern const char kOptionScanQrCode[];
+[[nodiscard]] bool ScanQrCodeAction();
+
 } // namespace MZGram

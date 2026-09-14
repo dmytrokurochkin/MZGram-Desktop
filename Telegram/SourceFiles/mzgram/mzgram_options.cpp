@@ -139,6 +139,16 @@ base::options::toggle OptionMessageDetails({
 	.description = "Show the message id, dates and media info",
 });
 
+// MZGram's own code (AyuGram Desktop has no equivalent), mirroring the QR
+// scanning feature already present in Telegram for Android. Decodes a QR
+// code from an already-downloaded photo entirely offline, using the
+// bundled quirc library (see mzgram/quirc).
+base::options::toggle OptionScanQrCode({
+	.id = kOptionScanQrCode,
+	.name = "Show \"Scan for QR code\" on photos",
+	.description = "Decode a QR code from a downloaded photo, offline",
+});
+
 } // namespace
 
 const char kOptionGhostMode[] = "mzgram-ghost-mode";
@@ -161,6 +171,7 @@ const char kOptionVoiceConfirmation[] = "mzgram-voice-confirmation";
 const char kOptionRoundConfirmation[] = "mzgram-round-confirmation";
 const char kOptionRepeatMessage[] = "mzgram-repeat-message";
 const char kOptionMessageDetails[] = "mzgram-message-details";
+const char kOptionScanQrCode[] = "mzgram-scan-qr-code";
 
 bool GhostMode() {
 	return OptionGhostMode.value();
@@ -241,6 +252,10 @@ bool RepeatMessageAction() {
 
 bool MessageDetailsAction() {
 	return OptionMessageDetails.value();
+}
+
+bool ScanQrCodeAction() {
+	return OptionScanQrCode.value();
 }
 
 } // namespace MZGram
