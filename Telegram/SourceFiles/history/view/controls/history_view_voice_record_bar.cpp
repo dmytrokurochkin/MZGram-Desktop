@@ -11,6 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/event_filter.h"
 #include "base/random.h"
 #include "base/unixtime.h"
+#include "mzgram/mzgram_options.h"
 #include "ui/boxes/confirm_box.h"
 #include "calls/calls_instance.h"
 #include "chat_helpers/compose/compose_show.h"
@@ -3006,13 +3007,29 @@ void VoiceRecordBar::stopRecording(StopType type, bool ttlBeforeHide) {
 								? std::numeric_limits<int>::max()
 								: 0),
 						};
-						_sendVoiceRequests.fire({
-							.bytes = data.content,
-							//.waveform = {},
-							.duration = data.duration,
-							.options = options,
-							.video = true,
-						});
+						// Ported from AyuGram Desktop dev (ayu/ayu_settings.h,
+						// roundConfirmation).
+						auto sendRoundCallback = crl::guard(
+							this,
+							[=](Fn<void()> &&close) {
+								_sendVoiceRequests.fire({
+									.bytes = data.content,
+									//.waveform = {},
+									.duration = data.duration,
+									.options = options,
+									.video = true,
+								});
+								close();
+							});
+						if (MZGram::RoundConfirmation()) {
+							_show->showBox(Ui::MakeConfirmBox({
+								.text = u"Send this video message?"_q,
+								.confirmed = std::move(sendRoundCallback),
+								.confirmText = tr::lng_send_button(),
+							}));
+						} else {
+							sendRoundCallback([] {});
+						}
 					}
 				});
 			});
@@ -3036,12 +3053,28 @@ void VoiceRecordBar::stopRecording(StopType type, bool ttlBeforeHide) {
 					? std::numeric_limits<int>::max()
 					: 0),
 			};
-			_sendVoiceRequests.fire({
-				.bytes = _data.content,
-				.waveform = _data.waveform,
-				.duration = _data.duration,
-				.options = options,
-			});
+			// Ported from AyuGram Desktop dev (ayu/ayu_settings.h,
+			// voiceConfirmation).
+			auto sendVoiceCallback = crl::guard(
+				this,
+				[=](Fn<void()> &&close) {
+					_sendVoiceRequests.fire({
+						.bytes = _data.content,
+						.waveform = _data.waveform,
+						.duration = _data.duration,
+						.options = options,
+					});
+					close();
+				});
+			if (MZGram::VoiceConfirmation()) {
+				_show->showBox(Ui::MakeConfirmBox({
+					.text = u"Send this voice message?"_q,
+					.confirmed = std::move(sendVoiceCallback),
+					.confirmText = tr::lng_send_button(),
+				}));
+			} else {
+				sendVoiceCallback([] {});
+			}
 		}));
 	}
 }
@@ -3107,13 +3140,35 @@ void VoiceRecordBar::requestToSendWithOptions(Api::SendOptions options) {
 			_listen->prepareForSendAnimation();
 			_listen->applyTrimBeforeSend();
 		}
-		_sendVoiceRequests.fire({
-			.bytes = _data.content,
-			.waveform = _data.waveform,
-			.duration = _data.duration,
-			.options = options,
-			.video = !_data.minithumbs.isNull(),
-		});
+		const auto video = !_data.minithumbs.isNull();
+		// Ported from AyuGram Desktop dev (ayu/ayu_settings.h,
+		// voiceConfirmation, roundConfirmation).
+		auto sendVoiceCallback = crl::guard(
+			this,
+			[=](Fn<void()> &&close) {
+				_sendVoiceRequests.fire({
+					.bytes = _data.content,
+					.waveform = _data.waveform,
+					.duration = _data.duration,
+					.options = options,
+					.video = video,
+				});
+				close();
+			});
+		const auto confirmationNeeded = video
+			? MZGram::RoundConfirmation()
+			: MZGram::VoiceConfirmation();
+		if (confirmationNeeded) {
+			_show->showBox(Ui::MakeConfirmBox({
+				.text = (video
+					? u"Send this video message?"_q
+					: u"Send this voice message?"_q),
+				.confirmed = std::move(sendVoiceCallback),
+				.confirmText = tr::lng_send_button(),
+			}));
+		} else {
+			sendVoiceCallback([] {});
+		}
 	}
 }
 

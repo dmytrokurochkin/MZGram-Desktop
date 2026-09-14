@@ -51,4 +51,9 @@ extern const char kOptionHideChannelBottomButton[];
 extern const char kOptionAutoPauseVideo[];
 [[nodiscard]] bool AutoPauseVideo();
 
+extern const char kOptionVoiceConfirmation[];
+extern const char kOptionRoundConfirmation[];
+[[nodiscard]] bool VoiceConfirmation();
+[[nodiscard]] bool RoundConfirmation();
+
 } // namespace MZGram

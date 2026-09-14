@@ -109,6 +109,20 @@ base::options::toggle OptionAutoPauseVideo({
 		"or loses focus",
 });
 
+// Ported from AyuGram Desktop dev
+// (ayu/ayu_settings.h, voiceConfirmation, roundConfirmation).
+base::options::toggle OptionVoiceConfirmation({
+	.id = kOptionVoiceConfirmation,
+	.name = "Confirm before sending voice messages",
+	.description = "Ask for confirmation before sending a voice message",
+});
+
+base::options::toggle OptionRoundConfirmation({
+	.id = kOptionRoundConfirmation,
+	.name = "Confirm before sending round videos",
+	.description = "Ask for confirmation before sending a round video",
+});
+
 } // namespace
 
 const char kOptionGhostMode[] = "mzgram-ghost-mode";
@@ -127,6 +141,8 @@ const char kOptionDisableGreetingSticker[] =
 const char kOptionHideChannelBottomButton[] =
 	"mzgram-hide-channel-bottom-button";
 const char kOptionAutoPauseVideo[] = "mzgram-auto-pause-video";
+const char kOptionVoiceConfirmation[] = "mzgram-voice-confirmation";
+const char kOptionRoundConfirmation[] = "mzgram-round-confirmation";
 
 bool GhostMode() {
 	return OptionGhostMode.value();
@@ -191,6 +207,14 @@ bool HideChannelBottomButton() {
 
 bool AutoPauseVideo() {
 	return OptionAutoPauseVideo.value();
+}
+
+bool VoiceConfirmation() {
+	return OptionVoiceConfirmation.value();
+}
+
+bool RoundConfirmation() {
+	return OptionRoundConfirmation.value();
 }
 
 } // namespace MZGram

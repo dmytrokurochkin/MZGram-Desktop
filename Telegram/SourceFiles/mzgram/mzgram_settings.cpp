@@ -245,10 +245,23 @@ void BuildMZGramSection(SectionBuilder &builder) {
 		"Auto pause video",
 		kOptionAutoPauseVideo,
 		{ u"video"_q, u"pause"_q, u"focus"_q, u"minimize"_q });
+	AddOptionToggle(
+		builder,
+		u"mzgram/voice-confirmation"_q,
+		"Confirm before sending voice messages",
+		kOptionVoiceConfirmation,
+		{ u"voice"_q, u"confirm"_q });
+	AddOptionToggle(
+		builder,
+		u"mzgram/round-confirmation"_q,
+		"Confirm before sending round videos",
+		kOptionRoundConfirmation,
+		{ u"round"_q, u"video"_q, u"confirm"_q });
 	builder.addSkip();
 	builder.addDividerText(Text("Pauses the video viewer when the window is "
-		"minimized or loses focus. MZGram's own code, mirroring the "
-		"Android version."));
+		"minimized or loses focus (MZGram's own code, mirroring the "
+		"Android version). Voice and round confirmation are ported from "
+		"AyuGram Desktop."));
 
 	builder.addSkip();
 	builder.addSubsectionTitle(Text("Ghost mode"));
