@@ -2452,7 +2452,10 @@ else()
         set(bundle_identifier "com.tdesktop.Telegram")
     endif()
     set(bundle_entitlements "Telegram.entitlements")
-    set(output_name "Telegram")
+    # MZGram: rename only the built binary's file name, not the CMake target
+    # name (still "Telegram" everywhere else in this file) or bundle_identifier
+    # just above -- those are internal identifiers, not the visible artifact.
+    set(output_name "MZGram")
 endif()
 
 if (CMAKE_GENERATOR STREQUAL Xcode)

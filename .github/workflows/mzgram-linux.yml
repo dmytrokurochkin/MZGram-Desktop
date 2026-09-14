@@ -160,9 +160,9 @@ jobs:
       # Packed as tar because an artifact zip drops the executable bit.
       - name: Collect artifact.
         run: |
-          test -f out/Debug/Telegram
+          test -f out/Debug/MZGram
           mkdir artifact
-          tar -czf artifact/MZGram-Linux-x64-Debug.tar.gz -C out/Debug Telegram
+          tar -czf artifact/MZGram-Linux-x64-Debug.tar.gz -C out/Debug MZGram
 
       - name: Upload artifact.
         uses: actions/upload-artifact@v7

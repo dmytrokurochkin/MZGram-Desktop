@@ -46,7 +46,7 @@ int APIENTRY wWinMain(
 		ShellExecute(
 			nullptr,
 			nullptr,
-			(directory + L"\\Telegram.exe").c_str(),
+			(directory + L"\\MZGram.exe").c_str(), // MZGram: was "\\Telegram.exe"
 			L"-autostart",
 			directory.data(),
 			SW_SHOWNORMAL);
