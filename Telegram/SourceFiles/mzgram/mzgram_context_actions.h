@@ -35,4 +35,13 @@ void AddMessageDetailsAction(
 	not_null<HistoryItem*> item,
 	not_null<Window::SessionController*> controller);
 
+// Ported from MZGram Android (showAddToSavedMessages, itself ported from
+// Nekogram). Forwards the message to Saved Messages, keeping the
+// "Forwarded from" header, same as a normal forward. AyuGram Desktop has
+// no equivalent.
+void AddSaveMessageAction(
+	not_null<Ui::PopupMenu*> menu,
+	not_null<HistoryItem*> item,
+	not_null<Window::SessionController*> controller);
+
 } // namespace MZGram

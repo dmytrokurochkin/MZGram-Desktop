@@ -67,4 +67,7 @@ extern const char kOptionScanQrCode[];
 extern const char kOptionOpenArchiveOnPull[];
 [[nodiscard]] bool OpenArchiveOnPull();
 
+extern const char kOptionSaveMessage[];
+[[nodiscard]] bool SaveMessageAction();
+
 } // namespace MZGram

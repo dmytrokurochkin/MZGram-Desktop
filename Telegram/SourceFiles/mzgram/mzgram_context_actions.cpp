@@ -15,6 +15,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_photo.h"
 #include "data/data_session.h"
 #include "data/data_types.h"
+#include "data/data_user.h"
 #include "history/history.h"
 #include "history/history_item.h"
 #include "history/history_item_components.h"
@@ -203,6 +204,46 @@ void AddMessageDetailsAction(
 			}
 		}));
 	}, &st::menuIconInfo);
+}
+
+void AddSaveMessageAction(
+		not_null<Ui::PopupMenu*> menu,
+		not_null<HistoryItem*> item,
+		not_null<Window::SessionController*> controller) {
+	if (!SaveMessageAction()) {
+		return;
+	}
+	if (!item->isHistoryEntry()
+		|| item->isService()
+		|| item->isLocal()
+		|| !item->allowsForward()
+		|| item->id <= 0) {
+		return;
+	}
+	const auto history = item->history();
+	if (history->peer->isSelf()) {
+		return; // Already in Saved Messages.
+	}
+	const auto itemId = item->fullId();
+	const auto session = &history->session();
+	menu->addAction(u"Save message"_q, [=] {
+		const auto current = session->data().message(itemId);
+		if (!current) {
+			return;
+		}
+		auto draft = Data::ForwardDraft{ .ids = MessageIdsList{ 1, itemId } };
+		auto resolved = history->resolveForwardDraft(draft);
+		if (resolved.items.empty()) {
+			return;
+		}
+		const auto to = session->data().history(session->user());
+		auto action = Api::SendAction(to);
+		action.clearDraft = false;
+		session->api().forwardMessages(
+			std::move(resolved),
+			action,
+			[] {});
+	}, &st::menuIconSavedMessages);
 }
 
 } // namespace MZGram

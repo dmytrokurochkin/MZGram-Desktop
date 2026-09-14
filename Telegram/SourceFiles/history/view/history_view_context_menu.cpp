@@ -1417,6 +1417,10 @@ void AddMessageActions(
 			menu,
 			request.item,
 			list->controller());
+		MZGram::AddSaveMessageAction(
+			menu,
+			request.item,
+			list->controller());
 	}
 	AddOfferAction(menu, request, list);
 	AddSendNowAction(menu, request, list);

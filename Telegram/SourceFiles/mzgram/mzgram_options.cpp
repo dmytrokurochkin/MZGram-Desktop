@@ -157,6 +157,14 @@ base::options::toggle OptionOpenArchiveOnPull({
 	.description = "Pulling the chat list down past the Archive row opens it",
 });
 
+// Ported from MZGram Android (showAddToSavedMessages, itself ported from
+// Nekogram). AyuGram Desktop has no equivalent.
+base::options::toggle OptionSaveMessage({
+	.id = kOptionSaveMessage,
+	.name = "Show \"Save message\" in the message menu",
+	.description = "Forward a message to Saved Messages in one click",
+});
+
 } // namespace
 
 const char kOptionGhostMode[] = "mzgram-ghost-mode";
@@ -181,6 +189,7 @@ const char kOptionRepeatMessage[] = "mzgram-repeat-message";
 const char kOptionMessageDetails[] = "mzgram-message-details";
 const char kOptionScanQrCode[] = "mzgram-scan-qr-code";
 const char kOptionOpenArchiveOnPull[] = "mzgram-open-archive-on-pull";
+const char kOptionSaveMessage[] = "mzgram-save-message";
 
 bool GhostMode() {
 	return OptionGhostMode.value();
@@ -269,6 +278,10 @@ bool ScanQrCodeAction() {
 
 bool OpenArchiveOnPull() {
 	return OptionOpenArchiveOnPull.value();
+}
+
+bool SaveMessageAction() {
+	return OptionSaveMessage.value();
 }
 
 } // namespace MZGram
