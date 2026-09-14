@@ -216,6 +216,12 @@ void BuildMZGramSection(SectionBuilder &builder) {
 		"Show seconds in message time",
 		kOptionMessageSeconds,
 		{ u"seconds"_q, u"time"_q, u"clock"_q });
+	AddOptionToggle(
+		builder,
+		u"mzgram/disable-stories"_q,
+		"Hide Stories",
+		kOptionDisableStories,
+		{ u"stories"_q, u"hide"_q });
 	builder.addSkip();
 	builder.addDividerText(Text("Ported from AyuGram Desktop."));
 

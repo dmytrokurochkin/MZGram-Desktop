@@ -77,6 +77,13 @@ base::options::toggle OptionMessageSeconds({
 	.description = "Show seconds in message bubble timestamps",
 });
 
+// Ported from AyuGram Desktop dev (ayu/ayu_settings.h, disableStories).
+base::options::toggle OptionDisableStories({
+	.id = kOptionDisableStories,
+	.name = "Hide Stories",
+	.description = "Hide the stories strip in the chat list and profiles",
+});
+
 } // namespace
 
 const char kOptionGhostMode[] = "mzgram-ghost-mode";
@@ -89,6 +96,7 @@ const char kOptionKeepSelfDestructing[] = "mzgram-keep-self-destructing";
 // The id keeps its first name so a saved choice survives the rename.
 const char kOptionMarkMessages[] = "mzgram-dim-marked";
 const char kOptionMessageSeconds[] = "mzgram-message-seconds";
+const char kOptionDisableStories[] = "mzgram-disable-stories";
 
 bool GhostMode() {
 	return OptionGhostMode.value();
@@ -137,6 +145,10 @@ QString FormatMessageTime(const QTime &time) {
 		? u"h:mm:ss AP"_q
 		: u"HH:mm:ss"_q;
 	return QLocale().toString(time, format);
+}
+
+bool DisableStories() {
+	return OptionDisableStories.value();
 }
 
 } // namespace MZGram

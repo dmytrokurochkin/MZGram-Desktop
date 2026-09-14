@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "dialogs/ui/dialogs_stories_list.h"
 #include "lang/lang_keys.h"
+#include "mzgram/mzgram_options.h"
 #include "info/info_wrap_widget.h"
 #include "info/info_controller.h"
 #include "info/profile/info_profile_values.h"
@@ -521,6 +522,9 @@ void TopBar::updateControlsVisibility(anim::type animated) {
 }
 
 void TopBar::setStories(rpl::producer<Dialogs::Stories::Content> content) {
+	if (MZGram::DisableStories()) {
+		return;
+	}
 	_storiesLifetime.destroy();
 	delete _storiesWrap.data();
 	if (content) {

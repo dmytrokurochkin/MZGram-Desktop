@@ -39,4 +39,7 @@ extern const char kOptionMessageSeconds[];
 // Formats a message bubble's time, adding seconds when the option is on.
 [[nodiscard]] QString FormatMessageTime(const QTime &time);
 
+extern const char kOptionDisableStories[];
+[[nodiscard]] bool DisableStories();
+
 } // namespace MZGram

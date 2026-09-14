@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_session.h"
 #include "mzgram/mzgram_anti_recall.h"
 #include "mzgram/mzgram_archive.h"
+#include "mzgram/mzgram_options.h"
 #include "main/main_session_settings.h"
 #include "main/main_app_config.h"
 #include "apiwrap.h"
@@ -421,7 +422,9 @@ Session::Session(not_null<Main::Session*> session)
 			}
 		}, _lifetime);
 
-		_stories->loadMore(Data::StorySourcesList::NotHidden);
+		if (!MZGram::DisableStories()) {
+			_stories->loadMore(Data::StorySourcesList::NotHidden);
+		}
 	});
 
 	session->appConfig().ignoredRestrictionReasonsChanges(

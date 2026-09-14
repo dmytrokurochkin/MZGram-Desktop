@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/call_delayed.h"
 #include "base/qt/qt_key_modifiers.h"
 #include "base/options.h"
+#include "mzgram/mzgram_options.h"
 #include "dialogs/ui/chat_search_in.h"
 #include "dialogs/ui/dialogs_stories_content.h"
 #include "dialogs/ui/dialogs_stories_list.h"
@@ -1057,7 +1058,8 @@ void Widget::chosenRow(const ChosenRow &row) {
 		&& row.userpicClick
 		&& (row.message.fullId.msg == ShowAtUnreadMsgId)
 		&& history->peer->hasActiveStories()
-		&& !history->peer->isSelf()) {
+		&& !history->peer->isSelf()
+		&& !MZGram::DisableStories()) {
 		controller()->openPeerStories(history->peer->id);
 		return;
 	} else if (userpicCommunity) {
@@ -1704,6 +1706,10 @@ void Widget::setupMainMenuToggle() {
 }
 
 void Widget::setupStories() {
+	if (MZGram::DisableStories()) {
+		return;
+	}
+
 	_stories->verticalScrollEvents(
 	) | rpl::on_next([=](not_null<QWheelEvent*> e) {
 		_scroll->viewportEvent(e);
@@ -2841,6 +2847,10 @@ void Widget::stopWidthAnimation() {
 void Widget::updateStoriesVisibility() {
 	updateLockUnlockVisibility(anim::type::normal);
 	if (!_stories) {
+		return;
+	}
+	if (MZGram::DisableStories()) {
+		_stories->setVisible(false);
 		return;
 	}
 	const auto widthAnimation = !_widthAnimationCache.isNull();
