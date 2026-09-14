@@ -21,6 +21,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/session/send_as_peers.h"
 #include "data/components/credits.h"
 #include "data/data_user.h"
+#include "mzgram/mzgram_options.h"
 #include "data/data_session.h"
 #include "data/data_histories.h"
 #include "data/data_changes.h"
@@ -1505,6 +1506,12 @@ void Reactions::send(not_null<HistoryItem*> item, bool addToRecent) {
 		i = _sentRequests.emplace(id).first;
 	}
 	const auto chosen = item->chosenReactions();
+	// MZGram: own code. Reacting is an explicit interaction with this
+	// message; mark it read even under ghost mode's general read-receipt
+	// suppression. Skipped when chosen is empty (removing a reaction).
+	if (!chosen.empty()) {
+		MZGram::MarkMessageReadDueToInteraction(item->history(), id.msg);
+	}
 	using Flag = MTPmessages_SendReaction::Flag;
 	const auto flags = (chosen.empty() ? Flag(0) : Flag::f_reaction)
 		| (addToRecent ? Flag::f_add_to_recent : Flag(0));

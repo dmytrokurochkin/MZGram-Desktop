@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history.h"
 
 #include "mzgram/mzgram_archive.h"
+#include "mzgram/mzgram_options.h"
 
 #include "history/view/history_view_element.h"
 #include "history/view/history_view_item_preview.h"
@@ -839,6 +840,15 @@ not_null<HistoryItem*> History::addNewItem(
 		return item;
 	} else if (!item->isHistoryEntry()) {
 		return item;
+	}
+
+	// MZGram: own code. Replying is an explicit interaction with the
+	// replied-to message; mark it read even under ghost mode's general
+	// read-receipt suppression.
+	if (item->out()) {
+		if (const auto reply = item->Get<HistoryMessageReply>()) {
+			MZGram::MarkMessageReadDueToInteraction(this, reply->messageId());
+		}
 	}
 
 	// In case we've loaded a new 'last' message

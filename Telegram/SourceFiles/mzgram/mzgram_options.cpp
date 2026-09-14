@@ -7,7 +7,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "mzgram/mzgram_options.h"
 
+#include "apiwrap.h"
 #include "base/options.h"
+#include "data/data_channel.h"
+#include "data/data_peer.h"
+#include "history/history.h"
+#include "main/main_session.h"
 
 #include <QtCore/QLocale>
 #include <QtCore/QString>
@@ -233,6 +238,29 @@ bool SendTyping() {
 
 bool SendOnline() {
 	return !GhostMode() || OptionSendOnline.value();
+}
+
+void MarkMessageReadDueToInteraction(
+		not_null<History*> history,
+		MsgId messageId) {
+	if (SendReadReceipts() || !messageId) {
+		return;
+	}
+	const auto peer = history->peer;
+	const auto session = &history->session();
+	if (const auto channel = peer->asChannel()) {
+		session->api().request(MTPchannels_ReadHistory(
+			channel->inputChannel(),
+			MTP_int(messageId)
+		)).send();
+	} else {
+		session->api().request(MTPmessages_ReadHistory(
+			peer->input(),
+			MTP_int(messageId)
+		)).done([session, peer](const MTPmessages_AffectedMessages &result) {
+			session->api().applyAffectedMessages(peer, result);
+		}).send();
+	}
 }
 
 bool AntiRecall() {

@@ -7,8 +7,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
+#include "data/data_msg_id.h"
+
 class QTime;
 class QString;
+class History;
 
 namespace MZGram {
 
@@ -27,6 +30,15 @@ extern const char kOptionMarkMessages[];
 [[nodiscard]] bool SendReadReceipts();
 [[nodiscard]] bool SendTyping();
 [[nodiscard]] bool SendOnline();
+
+// MZGram's own code. While ghost mode is suppressing read receipts,
+// replying to or reacting to a specific message is an explicit
+// interaction, so that one message is marked read on the server
+// regardless -- independent of the batched/suppressed read-request
+// queue in Data::Histories.
+void MarkMessageReadDueToInteraction(
+	not_null<History*> history,
+	MsgId messageId);
 
 [[nodiscard]] bool AntiRecall();
 [[nodiscard]] bool EditHistory();
