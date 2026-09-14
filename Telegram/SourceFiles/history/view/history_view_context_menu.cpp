@@ -28,6 +28,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history_item.h"
 #include "history/history_item_components.h"
 #include "mzgram/mzgram_anti_recall.h"
+#include "mzgram/mzgram_context_actions.h"
 #include "history/history_item_helpers.h"
 #include "history/history_item_text.h"
 #include "history/view/history_view_schedule_box.h"
@@ -1405,6 +1406,16 @@ void AddMessageActions(
 		not_null<ListWidget*> list) {
 	AddPostLinkAction(menu, request);
 	AddForwardAction(menu, request, list);
+	if (request.item && request.selectedItems.empty()) {
+		MZGram::AddRepeatMessageAction(
+			menu,
+			request.item,
+			list->controller());
+		MZGram::AddMessageDetailsAction(
+			menu,
+			request.item,
+			list->controller());
+	}
 	AddOfferAction(menu, request, list);
 	AddSendNowAction(menu, request, list);
 	AddDeleteAction(menu, request, list);

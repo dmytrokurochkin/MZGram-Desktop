@@ -56,4 +56,9 @@ extern const char kOptionRoundConfirmation[];
 [[nodiscard]] bool VoiceConfirmation();
 [[nodiscard]] bool RoundConfirmation();
 
+extern const char kOptionRepeatMessage[];
+extern const char kOptionMessageDetails[];
+[[nodiscard]] bool RepeatMessageAction();
+[[nodiscard]] bool MessageDetailsAction();
+
 } // namespace MZGram

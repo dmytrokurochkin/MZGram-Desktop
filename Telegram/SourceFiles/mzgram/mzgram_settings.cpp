@@ -264,6 +264,23 @@ void BuildMZGramSection(SectionBuilder &builder) {
 		"AyuGram Desktop."));
 
 	builder.addSkip();
+	builder.addSubsectionTitle(Text("Context menu"));
+	AddOptionToggle(
+		builder,
+		u"mzgram/repeat-message"_q,
+		"Show \"Repeat\" in the message menu",
+		kOptionRepeatMessage,
+		{ u"repeat"_q, u"resend"_q });
+	AddOptionToggle(
+		builder,
+		u"mzgram/message-details"_q,
+		"Show \"Message details\" in the message menu",
+		kOptionMessageDetails,
+		{ u"details"_q, u"id"_q, u"views"_q });
+	builder.addSkip();
+	builder.addDividerText(Text("Ported from AyuGram Desktop."));
+
+	builder.addSkip();
 	builder.addSubsectionTitle(Text("Ghost mode"));
 	AddOptionToggle(
 		builder,

@@ -123,6 +123,22 @@ base::options::toggle OptionRoundConfirmation({
 	.description = "Ask for confirmation before sending a round video",
 });
 
+// Ported from AyuGram Desktop dev
+// (ayu/ui/context_menu/context_menu.cpp, AddRepeatMessageAction).
+base::options::toggle OptionRepeatMessage({
+	.id = kOptionRepeatMessage,
+	.name = "Show \"Repeat\" in the message menu",
+	.description = "Resend a message's content to the same chat",
+});
+
+// Ported from AyuGram Desktop dev
+// (ayu/ui/context_menu/context_menu.cpp, AddMessageDetailsAction).
+base::options::toggle OptionMessageDetails({
+	.id = kOptionMessageDetails,
+	.name = "Show \"Message details\" in the message menu",
+	.description = "Show the message id, dates and media info",
+});
+
 } // namespace
 
 const char kOptionGhostMode[] = "mzgram-ghost-mode";
@@ -143,6 +159,8 @@ const char kOptionHideChannelBottomButton[] =
 const char kOptionAutoPauseVideo[] = "mzgram-auto-pause-video";
 const char kOptionVoiceConfirmation[] = "mzgram-voice-confirmation";
 const char kOptionRoundConfirmation[] = "mzgram-round-confirmation";
+const char kOptionRepeatMessage[] = "mzgram-repeat-message";
+const char kOptionMessageDetails[] = "mzgram-message-details";
 
 bool GhostMode() {
 	return OptionGhostMode.value();
@@ -215,6 +233,14 @@ bool VoiceConfirmation() {
 
 bool RoundConfirmation() {
 	return OptionRoundConfirmation.value();
+}
+
+bool RepeatMessageAction() {
+	return OptionRepeatMessage.value();
+}
+
+bool MessageDetailsAction() {
+	return OptionMessageDetails.value();
 }
 
 } // namespace MZGram
