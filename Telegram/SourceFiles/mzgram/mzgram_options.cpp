@@ -173,6 +173,14 @@ base::options::toggle OptionSetReminder({
 	.description = "Forward a message to Saved Messages, scheduled for later",
 });
 
+// Ported from MZGram Android (showOpenIn, itself ported from Nekogram).
+// AyuGram Desktop has no equivalent.
+base::options::toggle OptionOpenIn({
+	.id = kOptionOpenIn,
+	.name = "Show \"Open in...\" for downloaded files",
+	.description = "Adds the OS \"Open with\" dialog to the file menu",
+});
+
 } // namespace
 
 const char kOptionGhostMode[] = "mzgram-ghost-mode";
@@ -199,6 +207,7 @@ const char kOptionScanQrCode[] = "mzgram-scan-qr-code";
 const char kOptionOpenArchiveOnPull[] = "mzgram-open-archive-on-pull";
 const char kOptionSaveMessage[] = "mzgram-save-message";
 const char kOptionSetReminder[] = "mzgram-set-reminder";
+const char kOptionOpenIn[] = "mzgram-open-in";
 
 bool GhostMode() {
 	return OptionGhostMode.value();
@@ -295,6 +304,10 @@ bool SaveMessageAction() {
 
 bool SetReminderAction() {
 	return OptionSetReminder.value();
+}
+
+bool OpenInAction() {
+	return OptionOpenIn.value();
 }
 
 } // namespace MZGram

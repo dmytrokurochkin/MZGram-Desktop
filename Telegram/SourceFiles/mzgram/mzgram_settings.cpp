@@ -307,13 +307,20 @@ void BuildMZGramSection(SectionBuilder &builder) {
 		"Show \"Set a reminder\" in the message menu",
 		kOptionSetReminder,
 		{ u"reminder"_q, u"schedule"_q, u"saved messages"_q });
+	AddOptionToggle(
+		builder,
+		u"mzgram/open-in"_q,
+		"Show \"Open in...\" for downloaded files",
+		kOptionOpenIn,
+		{ u"open"_q, u"file"_q, u"video"_q });
 	builder.addSkip();
 	builder.addDividerText(Text("Repeat and Message details are ported from "
-		"AyuGram Desktop. Scan for QR code, Save message and Set a reminder "
-		"are MZGram's own code, mirroring the Android version: QR scanning "
-		"decodes an already-downloaded photo entirely offline, Save message "
-		"forwards to Saved Messages in one click, and Set a reminder forwards "
-		"there scheduled for a chosen time."));
+		"AyuGram Desktop. Scan for QR code, Save message, Set a reminder and "
+		"Open in... are MZGram's own code, mirroring the Android version: QR "
+		"scanning decodes an already-downloaded photo entirely offline, Save "
+		"message forwards to Saved Messages in one click, Set a reminder "
+		"forwards there scheduled for a chosen time, and Open in... shows "
+		"the OS \"Open with\" dialog for a downloaded file."));
 
 	builder.addSkip();
 	builder.addSubsectionTitle(Text("Ghost mode"));

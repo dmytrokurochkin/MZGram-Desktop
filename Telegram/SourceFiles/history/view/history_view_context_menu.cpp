@@ -498,6 +498,7 @@ void AddDocumentActions(
 				: tr::lng_context_show_in_folder(tr::now)),
 			[=] { ShowInFolder(document); },
 			&st::menuIconShowInFolder);
+		MZGram::AddOpenInAction(menu, document);
 	}
 	if (document->hasAttachedStickers()) {
 		const auto controller = list->controller();

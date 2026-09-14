@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_common.h"
 #include "apiwrap.h"
 #include "base/unixtime.h"
+#include "core/file_utilities.h"
 #include "data/data_document.h"
 #include "data/data_media_types.h"
 #include "data/data_photo.h"
@@ -296,6 +297,21 @@ void AddSetReminderAction(
 			},
 			submit));
 	}, &st::menuIconSchedule);
+}
+
+void AddOpenInAction(
+		not_null<Ui::PopupMenu*> menu,
+		not_null<DocumentData*> document) {
+	if (!OpenInAction()) {
+		return;
+	}
+	const auto filepath = document->filepath(true);
+	if (filepath.isEmpty()) {
+		return;
+	}
+	menu->addAction(u"Open in..."_q, [=] {
+		File::OpenWith(filepath);
+	}, &st::menuIconFile);
 }
 
 } // namespace MZGram

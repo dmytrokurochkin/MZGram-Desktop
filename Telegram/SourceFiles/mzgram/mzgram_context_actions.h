@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #pragma once
 
 class HistoryItem;
+class DocumentData;
 
 namespace Ui {
 class PopupMenu;
@@ -53,5 +54,15 @@ void AddSetReminderAction(
 	not_null<Ui::PopupMenu*> menu,
 	not_null<HistoryItem*> item,
 	not_null<Window::SessionController*> controller);
+
+// Ported from MZGram Android (showOpenIn, itself ported from Nekogram).
+// Opens the OS "Open with" dialog for an already-downloaded document, the
+// same native chooser tdesktop already uses for outgoing attachments
+// (Core::File::OpenWith). Not applicable on Desktop's Android-equivalent
+// media viewer without a matching in-place "Open in" concept, so this adds
+// a plain menu item next to "Show in folder" instead.
+void AddOpenInAction(
+	not_null<Ui::PopupMenu*> menu,
+	not_null<DocumentData*> document);
 
 } // namespace MZGram

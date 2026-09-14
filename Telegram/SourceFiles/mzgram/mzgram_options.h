@@ -73,4 +73,7 @@ extern const char kOptionSaveMessage[];
 extern const char kOptionSetReminder[];
 [[nodiscard]] bool SetReminderAction();
 
+extern const char kOptionOpenIn[];
+[[nodiscard]] bool OpenInAction();
+
 } // namespace MZGram
