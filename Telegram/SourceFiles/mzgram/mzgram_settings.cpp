@@ -301,12 +301,19 @@ void BuildMZGramSection(SectionBuilder &builder) {
 		"Show \"Save message\" in the message menu",
 		kOptionSaveMessage,
 		{ u"save"_q, u"saved messages"_q, u"forward"_q });
+	AddOptionToggle(
+		builder,
+		u"mzgram/set-reminder"_q,
+		"Show \"Set a reminder\" in the message menu",
+		kOptionSetReminder,
+		{ u"reminder"_q, u"schedule"_q, u"saved messages"_q });
 	builder.addSkip();
 	builder.addDividerText(Text("Repeat and Message details are ported from "
-		"AyuGram Desktop. Scan for QR code and Save message are MZGram's own "
-		"code, mirroring the Android version: QR scanning decodes an "
-		"already-downloaded photo entirely offline, and Save message "
-		"forwards to Saved Messages in one click."));
+		"AyuGram Desktop. Scan for QR code, Save message and Set a reminder "
+		"are MZGram's own code, mirroring the Android version: QR scanning "
+		"decodes an already-downloaded photo entirely offline, Save message "
+		"forwards to Saved Messages in one click, and Set a reminder forwards "
+		"there scheduled for a chosen time."));
 
 	builder.addSkip();
 	builder.addSubsectionTitle(Text("Ghost mode"));

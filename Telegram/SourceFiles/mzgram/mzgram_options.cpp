@@ -165,6 +165,14 @@ base::options::toggle OptionSaveMessage({
 	.description = "Forward a message to Saved Messages in one click",
 });
 
+// Ported from MZGram Android (showSetReminder, itself ported from
+// Nekogram). AyuGram Desktop has no equivalent.
+base::options::toggle OptionSetReminder({
+	.id = kOptionSetReminder,
+	.name = "Show \"Set a reminder\" in the message menu",
+	.description = "Forward a message to Saved Messages, scheduled for later",
+});
+
 } // namespace
 
 const char kOptionGhostMode[] = "mzgram-ghost-mode";
@@ -190,6 +198,7 @@ const char kOptionMessageDetails[] = "mzgram-message-details";
 const char kOptionScanQrCode[] = "mzgram-scan-qr-code";
 const char kOptionOpenArchiveOnPull[] = "mzgram-open-archive-on-pull";
 const char kOptionSaveMessage[] = "mzgram-save-message";
+const char kOptionSetReminder[] = "mzgram-set-reminder";
 
 bool GhostMode() {
 	return OptionGhostMode.value();
@@ -282,6 +291,10 @@ bool OpenArchiveOnPull() {
 
 bool SaveMessageAction() {
 	return OptionSaveMessage.value();
+}
+
+bool SetReminderAction() {
+	return OptionSetReminder.value();
 }
 
 } // namespace MZGram

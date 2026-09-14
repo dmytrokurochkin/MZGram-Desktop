@@ -44,4 +44,14 @@ void AddSaveMessageAction(
 	not_null<HistoryItem*> item,
 	not_null<Window::SessionController*> controller);
 
+// Ported from MZGram Android (showSetReminder, itself ported from
+// Nekogram). Opens tdesktop's own date/time picker (the same one used for
+// "Reminder" scheduling to Saved Messages) and forwards the message to
+// Saved Messages scheduled for that time. AyuGram Desktop has no
+// equivalent.
+void AddSetReminderAction(
+	not_null<Ui::PopupMenu*> menu,
+	not_null<HistoryItem*> item,
+	not_null<Window::SessionController*> controller);
+
 } // namespace MZGram

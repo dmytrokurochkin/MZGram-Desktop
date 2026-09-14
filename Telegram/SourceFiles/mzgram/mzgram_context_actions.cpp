@@ -19,8 +19,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history.h"
 #include "history/history_item.h"
 #include "history/history_item_components.h"
+#include "history/view/history_view_schedule_box.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
+#include "menu/menu_send_details.h"
 #include "mzgram/mzgram_options.h"
 #include "ui/layers/generic_box.h"
 #include "ui/text/format_values.h"
@@ -244,6 +246,56 @@ void AddSaveMessageAction(
 			action,
 			[] {});
 	}, &st::menuIconSavedMessages);
+}
+
+void AddSetReminderAction(
+		not_null<Ui::PopupMenu*> menu,
+		not_null<HistoryItem*> item,
+		not_null<Window::SessionController*> controller) {
+	if (!SetReminderAction()) {
+		return;
+	}
+	if (!item->isHistoryEntry()
+		|| item->isService()
+		|| item->isLocal()
+		|| !item->allowsForward()
+		|| item->id <= 0) {
+		return;
+	}
+	const auto history = item->history();
+	if (history->peer->isSelf()) {
+		return; // Reminders forward into Saved Messages; already there.
+	}
+	const auto itemId = item->fullId();
+	const auto session = &history->session();
+	menu->addAction(u"Set a reminder"_q, [=] {
+		const auto submit = [=](Api::SendOptions options) {
+			const auto current = session->data().message(itemId);
+			if (!current) {
+				return;
+			}
+			auto draft = Data::ForwardDraft{ .ids = MessageIdsList{ 1, itemId } };
+			auto resolved = history->resolveForwardDraft(draft);
+			if (resolved.items.empty()) {
+				return;
+			}
+			const auto to = session->data().history(session->user());
+			auto action = Api::SendAction(to, options);
+			action.clearDraft = false;
+			session->api().forwardMessages(
+				std::move(resolved),
+				action,
+				[] {});
+		};
+		controller->show(HistoryView::PrepareScheduleBox(
+			session,
+			controller->uiShow(),
+			SendMenu::Details{
+				.type = SendMenu::Type::Reminder,
+				.barePeerId = session->user()->id.value,
+			},
+			submit));
+	}, &st::menuIconSchedule);
 }
 
 } // namespace MZGram

@@ -70,4 +70,7 @@ extern const char kOptionOpenArchiveOnPull[];
 extern const char kOptionSaveMessage[];
 [[nodiscard]] bool SaveMessageAction();
 
+extern const char kOptionSetReminder[];
+[[nodiscard]] bool SetReminderAction();
+
 } // namespace MZGram
