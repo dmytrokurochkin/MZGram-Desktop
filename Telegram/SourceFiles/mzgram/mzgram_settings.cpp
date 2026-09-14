@@ -238,6 +238,18 @@ void BuildMZGramSection(SectionBuilder &builder) {
 	builder.addDividerText(Text("Ported from AyuGram Desktop."));
 
 	builder.addSkip();
+	AddOptionToggle(
+		builder,
+		u"mzgram/open-archive-on-pull"_q,
+		"Open Archive on pull down",
+		kOptionOpenArchiveOnPull,
+		{ u"archive"_q, u"pull"_q, u"overscroll"_q });
+	builder.addSkip();
+	builder.addDividerText(Text("Pulling the chat list down past the Archive "
+		"row opens it, mirroring MZGram Android. MZGram's own code: "
+		"AyuGram Desktop has no equivalent."));
+
+	builder.addSkip();
 	builder.addSubsectionTitle(Text("Chat"));
 	AddOptionToggle(
 		builder,

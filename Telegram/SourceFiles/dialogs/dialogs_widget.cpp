@@ -467,6 +467,14 @@ Widget::Widget(
 	_scrollToTop->raise();
 	_lockUnlock->toggle(false, anim::type::instant);
 
+	// MZGram: ported concept from Nekogram Android (openArchiveOnPull).
+	// Watched separately from the stories overscroll pipeline above, so it
+	// keeps working even when stories are hidden or DisableStories is on.
+	_scroll->positionValue(
+	) | rpl::on_next([=](Ui::ElasticScrollPosition position) {
+		checkPullToOpenArchive(position.overscroll);
+	}, lifetime());
+
 	_inner->updated(
 	) | rpl::on_next([=] {
 		listScrollUpdated();
@@ -3884,6 +3892,32 @@ void Widget::listScrollUpdated() {
 
 	// Fix button rendering glitch, Qt bug with WA_OpaquePaintEvent widgets.
 	_scrollToTop->update();
+}
+
+void Widget::checkPullToOpenArchive(int overscroll) {
+	if (overscroll >= 0) {
+		// The list settled back or never left the top: arm for next pull.
+		_archivePullTriggered = false;
+		return;
+	}
+	if (_archivePullTriggered
+		|| !MZGram::OpenArchiveOnPull()
+		|| _openedFolder
+		|| _openedForum
+		|| _openedCommunity
+		|| !_searchState.query.isEmpty()) {
+		return;
+	}
+	if (-overscroll < st::dialogsFilterSkip * 2) {
+		return;
+	}
+	const auto folder = session().data().folderLoaded(Data::Folder::kId);
+	if (!folder || folder->chatsList()->empty()) {
+		return;
+	}
+	_archivePullTriggered = true;
+	controller()->openFolder(folder);
+	hideChildList();
 }
 
 void Widget::updateCancelSearch() {

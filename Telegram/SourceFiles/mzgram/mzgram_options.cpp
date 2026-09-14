@@ -149,6 +149,14 @@ base::options::toggle OptionScanQrCode({
 	.description = "Decode a QR code from a downloaded photo, offline",
 });
 
+// Ported from MZGram Android (openArchiveOnPull, itself ported from
+// Nekogram's DialogsActivity.java). AyuGram Desktop has no equivalent.
+base::options::toggle OptionOpenArchiveOnPull({
+	.id = kOptionOpenArchiveOnPull,
+	.name = "Open Archive on pull down",
+	.description = "Pulling the chat list down past the Archive row opens it",
+});
+
 } // namespace
 
 const char kOptionGhostMode[] = "mzgram-ghost-mode";
@@ -172,6 +180,7 @@ const char kOptionRoundConfirmation[] = "mzgram-round-confirmation";
 const char kOptionRepeatMessage[] = "mzgram-repeat-message";
 const char kOptionMessageDetails[] = "mzgram-message-details";
 const char kOptionScanQrCode[] = "mzgram-scan-qr-code";
+const char kOptionOpenArchiveOnPull[] = "mzgram-open-archive-on-pull";
 
 bool GhostMode() {
 	return OptionGhostMode.value();
@@ -256,6 +265,10 @@ bool MessageDetailsAction() {
 
 bool ScanQrCodeAction() {
 	return OptionScanQrCode.value();
+}
+
+bool OpenArchiveOnPull() {
+	return OptionOpenArchiveOnPull.value();
 }
 
 } // namespace MZGram

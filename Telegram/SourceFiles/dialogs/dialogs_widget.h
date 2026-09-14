@@ -175,6 +175,7 @@ private:
 
 	void chosenRow(const ChosenRow &row);
 	void listScrollUpdated();
+	void checkPullToOpenArchive(int overscroll);
 	void searchCursorMoved();
 	void completeHashtag(QString tag);
 	void requestPublicPosts(bool fromStart);
@@ -393,6 +394,7 @@ private:
 	HashOrCashtag _searchHashOrCashtag = {};
 	bool _searchWithPostsPreview = false;
 
+	bool _archivePullTriggered = false;
 	Data::Folder *_openedFolder = nullptr;
 	Data::Forum *_openedForum = nullptr;
 	Data::CommunityInfo *_openedCommunity = nullptr;
