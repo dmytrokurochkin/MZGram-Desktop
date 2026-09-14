@@ -250,6 +250,19 @@ void BuildMZGramSection(SectionBuilder &builder) {
 		"AyuGram Desktop has no equivalent."));
 
 	builder.addSkip();
+	AddOptionToggle(
+		builder,
+		u"mzgram/media-preview-on-chat-preview"_q,
+		"Media preview instead of Chat Preview",
+		kOptionMediaPreviewOnChatPreview,
+		{ u"media"_q, u"preview"_q, u"chat preview"_q, u"photo"_q, u"video"_q });
+	builder.addSkip();
+	builder.addDividerText(Text("Press-and-hold a chat's avatar normally "
+		"opens the Chat Preview peek. When the last message is a photo or "
+		"video, this shows it directly instead. MZGram's own code, "
+		"mirroring the Android version."));
+
+	builder.addSkip();
 	builder.addSubsectionTitle(Text("Chat"));
 	AddOptionToggle(
 		builder,

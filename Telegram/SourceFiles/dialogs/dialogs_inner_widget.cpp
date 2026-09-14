@@ -68,10 +68,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "settings/settings_common.h"
 #include "storage/storage_account.h"
 #include "apiwrap.h"
+#include "data/data_document.h"
+#include "data/data_photo.h"
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
 #include "menu/menu_mark_as_read.h"
 #include "menu/menu_sponsored.h"
+#include "mzgram/mzgram_options.h"
 #include "window/notifications_manager.h"
 #include "window/window_controller.h"
 #include "window/window_session_controller.h"
@@ -115,6 +118,44 @@ constexpr auto kPreviewPostsLimit = 3;
 
 [[nodiscard]] uint64 RowsCacheKey(Entry *entry) {
 	return uint64(reinterpret_cast<quintptr>(entry));
+}
+
+// MZGram: own code, no Nekogram/AyuGram equivalent. When the row's last
+// message is a photo or video, open it directly through the existing
+// media viewer instead of scheduling the Chat Preview peek. Round video
+// messages are left to Chat Preview, matching the Android version.
+[[nodiscard]] bool MZGramTryOpenMediaInsteadOfChatPreview(
+		not_null<Window::SessionController*> controller,
+		const RowDescriptor &row) {
+	if (!MZGram::MediaPreviewOnChatPreview()) {
+		return false;
+	}
+	const auto history = row.key.history();
+	if (!history) {
+		return false;
+	}
+	const auto item = history->chatListMessage();
+	if (!item) {
+		return false;
+	}
+	const auto media = item->media();
+	if (!media) {
+		return false;
+	}
+	const auto context = Window::SessionController::MessageContext{
+		.id = item->fullId(),
+		.topicRootId = item->topicRootId(),
+	};
+	if (const auto photo = media->photo()) {
+		controller->openPhoto(photo, context);
+		return true;
+	} else if (const auto document = media->document()) {
+		if (document->isVideoFile()) {
+			controller->openDocument(document, true, context);
+			return true;
+		}
+	}
+	return false;
 }
 
 [[nodiscard]] InnerWidget::ChatsFilterTagsKey SerializeFilterTagsKey(
@@ -3851,6 +3892,9 @@ void InnerWidget::fillSupportSearchMenu(not_null<Ui::PopupMenu*> menu) {
 
 bool InnerWidget::showChatPreview() {
 	const auto row = computeChatPreviewRow();
+	if (MZGramTryOpenMediaInsteadOfChatPreview(_controller, row)) {
+		return true;
+	}
 	const auto callback = crl::guard(this, [=](bool shown) {
 		chatPreviewShown(shown, row);
 	});
@@ -3883,6 +3927,11 @@ void InnerWidget::chatPreviewShown(bool shown, RowDescriptor row) {
 
 bool InnerWidget::scheduleChatPreview(QPoint positionOverride) {
 	const auto row = computeChatPreviewRow();
+	if (MZGramTryOpenMediaInsteadOfChatPreview(_controller, row)) {
+		// Handled as a side effect: nothing was scheduled, so callers must
+		// not track this press as an ongoing (touch-draggable) preview.
+		return false;
+	}
 	const auto callback = crl::guard(this, [=](bool shown) {
 		chatPreviewShown(shown, row);
 	});

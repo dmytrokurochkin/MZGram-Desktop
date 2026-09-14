@@ -181,6 +181,14 @@ base::options::toggle OptionOpenIn({
 	.description = "Adds the OS \"Open with\" dialog to the file menu",
 });
 
+// MZGram's own code, no Nekogram/AyuGram equivalent found.
+base::options::toggle OptionMediaPreviewOnChatPreview({
+	.id = kOptionMediaPreviewOnChatPreview,
+	.name = "Media preview instead of Chat Preview",
+	.description = "When the last message is a photo or video, show it "
+		"instead of the Chat Preview peek",
+});
+
 } // namespace
 
 const char kOptionGhostMode[] = "mzgram-ghost-mode";
@@ -208,6 +216,8 @@ const char kOptionOpenArchiveOnPull[] = "mzgram-open-archive-on-pull";
 const char kOptionSaveMessage[] = "mzgram-save-message";
 const char kOptionSetReminder[] = "mzgram-set-reminder";
 const char kOptionOpenIn[] = "mzgram-open-in";
+const char kOptionMediaPreviewOnChatPreview[] =
+	"mzgram-media-preview-on-chat-preview";
 
 bool GhostMode() {
 	return OptionGhostMode.value();
@@ -308,6 +318,10 @@ bool SetReminderAction() {
 
 bool OpenInAction() {
 	return OptionOpenIn.value();
+}
+
+bool MediaPreviewOnChatPreview() {
+	return OptionMediaPreviewOnChatPreview.value();
 }
 
 } // namespace MZGram

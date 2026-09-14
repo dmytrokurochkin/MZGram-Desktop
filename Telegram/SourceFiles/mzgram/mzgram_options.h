@@ -76,4 +76,11 @@ extern const char kOptionSetReminder[];
 extern const char kOptionOpenIn[];
 [[nodiscard]] bool OpenInAction();
 
+// MZGram's own code, no Nekogram/AyuGram equivalent found. Long-pressing
+// (Android) or press-and-holding the avatar (Desktop) on a chat list row
+// normally opens the native Chat Preview peek. When the chat's last
+// message is a photo or video, this shows that media directly instead.
+extern const char kOptionMediaPreviewOnChatPreview[];
+[[nodiscard]] bool MediaPreviewOnChatPreview();
+
 } // namespace MZGram
