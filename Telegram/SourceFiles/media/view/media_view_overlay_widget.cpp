@@ -4533,6 +4533,38 @@ void OverlayWidget::activate() {
 
 void OverlayWidget::show(OpenRequest request) {
 	const auto story = request.story();
+	// MZGram: own code. show(request) is only called by external code
+	// opening the viewer; internal navigation between already-open stories
+	// goes through storiesJumpTo() instead, never through here. isHidden()
+	// further narrows this to a genuine first entry, not a second show()
+	// call for a different peer while the overlay is already on screen.
+	if (story
+		&& isHidden()
+		&& !_mzgramSkipGhostModePrompt
+		&& MZGram::OfferGhostModeBeforeStories()
+		&& !MZGram::GhostMode()) {
+		if (const auto window = findWindow()) {
+			window->show(Ui::MakeConfirmBox({
+				.text = QString("Ghost mode is off. Viewing this story "
+					"will mark it as seen. Turn ghost mode on first?"),
+				.confirmed = crl::guard(_widget, [=] {
+					MZGram::EnableGhostMode();
+					_mzgramSkipGhostModePrompt = true;
+					show(request);
+				}),
+				.cancelled = crl::guard(_widget, [=] {
+					_mzgramSkipGhostModePrompt = true;
+					show(request);
+				}),
+				.confirmText = QString("Enable and view"),
+				.cancelText = QString("View anyway"),
+			}), Ui::LayerOption::CloseOther);
+			return;
+		}
+	}
+	if (_mzgramSkipGhostModePrompt) {
+		_mzgramSkipGhostModePrompt = false;
+	}
 	const auto document = story ? story->document() : request.document();
 	const auto photo = story ? story->photo() : request.photo();
 	const auto call = story ? story->call() : request.call();

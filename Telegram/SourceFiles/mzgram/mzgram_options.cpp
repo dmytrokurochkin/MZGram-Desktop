@@ -64,6 +64,15 @@ base::options::toggle OptionGhostSilentSend({
 		"sound for the recipient.",
 });
 
+// MZGram's own code (AyuGram4A has no equivalent on either platform). Not
+// gated on ghost mode being on already -- this is what offers turning it on.
+base::options::toggle OptionOfferGhostModeBeforeStories({
+	.id = kOptionOfferGhostModeBeforeStories,
+	.name = "Offer ghost mode before Stories",
+	.description = "Before opening a story for the first time, ask "
+		"whether to turn ghost mode on first.",
+});
+
 // Off by default: both keep other people's text on disk in plain SQLite.
 base::options::toggle OptionAntiRecall({
 	.id = kOptionAntiRecall,
@@ -218,6 +227,7 @@ const char kOptionSendTyping[] = "mzgram-ghost-send-typing";
 const char kOptionSendOnline[] = "mzgram-ghost-send-online";
 const char kOptionGhostAutoDelaySend[] = "mzgram-ghost-auto-delay-send";
 const char kOptionGhostSilentSend[] = "mzgram-ghost-silent-send";
+const char kOptionOfferGhostModeBeforeStories[] = "mzgram-offer-ghost-mode-before-stories";
 const char kOptionAntiRecall[] = "mzgram-anti-recall";
 const char kOptionEditHistory[] = "mzgram-edit-history";
 const char kOptionKeepSelfDestructing[] = "mzgram-keep-self-destructing";
@@ -264,6 +274,14 @@ bool GhostAutoDelaySend() {
 
 bool GhostSilentSend() {
 	return GhostMode() && OptionGhostSilentSend.value();
+}
+
+void EnableGhostMode() {
+	base::options::lookup<bool>(kOptionGhostMode).set(true);
+}
+
+bool OfferGhostModeBeforeStories() {
+	return OptionOfferGhostModeBeforeStories.value();
 }
 
 void MarkMessageReadDueToInteraction(

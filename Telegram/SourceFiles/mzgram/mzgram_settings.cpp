@@ -403,6 +403,19 @@ void BuildMZGramSection(SectionBuilder &builder) {
 		"mirroring the Android version."));
 
 	builder.addSkip();
+	AddOptionToggle(
+		builder,
+		u"mzgram/offer-ghost-mode-before-stories"_q,
+		"Offer ghost mode before Stories",
+		kOptionOfferGhostModeBeforeStories,
+		{ u"ghost"_q, u"stories"_q, u"seen"_q });
+	builder.addSkip();
+	builder.addDividerText(Text("Before opening a story for the first "
+		"time (not when swiping to the next one), asks whether to turn "
+		"ghost mode on first, so viewing it does not mark it as seen. "
+		"MZGram's own code, mirroring the Android version."));
+
+	builder.addSkip();
 	builder.addSubsectionTitle(Text("Message history"));
 	AddOptionToggle(
 		builder,

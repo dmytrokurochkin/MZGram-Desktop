@@ -725,6 +725,10 @@ private:
 	bool _staticContentTransparent = false;
 	bool _blurred = true;
 	bool _reShow = false;
+	// MZGram: own code. Set right before show(request) re-invokes itself
+	// after the ghost-mode-before-Stories prompt below is answered, so
+	// that second call does not show the prompt again.
+	bool _mzgramSkipGhostModePrompt = false;
 
 	ContentGeometry _oldGeometry;
 	Ui::Animations::Simple _geometryAnimation;

@@ -53,6 +53,16 @@ extern const char kOptionGhostAutoDelaySend[];
 extern const char kOptionGhostSilentSend[];
 [[nodiscard]] bool GhostSilentSend();
 
+// MZGram's own code. Turns ghost mode on (used right before a story is
+// shown, when the user picked "enable and view" on the prompt below).
+void EnableGhostMode();
+
+// MZGram's own code. Before opening the story viewer for the first time
+// (not when swiping to the next already-open story), offers to turn ghost
+// mode on so viewing does not mark the story as seen for the other side.
+extern const char kOptionOfferGhostModeBeforeStories[];
+[[nodiscard]] bool OfferGhostModeBeforeStories();
+
 [[nodiscard]] bool AntiRecall();
 [[nodiscard]] bool EditHistory();
 [[nodiscard]] bool KeepSelfDestructing();
