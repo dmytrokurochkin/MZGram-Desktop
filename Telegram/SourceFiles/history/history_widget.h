@@ -550,6 +550,11 @@ private:
 	void sendingFilesConfirmed(
 		std::shared_ptr<Ui::PreparedBundle> bundle,
 		Api::SendOptions options);
+	// MZGram: own code, ghost mode auto-delay send. sendingFilesConfirmed's
+	// body used to run directly; it now only decides whether to delay.
+	void sendingFilesConfirmedNow(
+		std::shared_ptr<Ui::PreparedBundle> bundle,
+		Api::SendOptions options);
 
 	void sendBotCommand(
 		const Bot::SendCommandRequest &request,

@@ -40,6 +40,13 @@ void MarkMessageReadDueToInteraction(
 	not_null<History*> history,
 	MsgId messageId);
 
+// MZGram's own code. Holds an outgoing message back for a few seconds
+// before it actually sends, so composing and sending right away does not
+// create a burst of activity that can make you look online. The settings
+// screen warns this is not recommended on an unreliable connection.
+extern const char kOptionGhostAutoDelaySend[];
+[[nodiscard]] bool GhostAutoDelaySend();
+
 [[nodiscard]] bool AntiRecall();
 [[nodiscard]] bool EditHistory();
 [[nodiscard]] bool KeepSelfDestructing();

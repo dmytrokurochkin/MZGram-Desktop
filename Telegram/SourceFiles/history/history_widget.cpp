@@ -5665,8 +5665,37 @@ void HistoryWidget::send(Api::SendOptions options) {
 			return;
 		}
 	}
+	// MZGram: own code, ghost mode auto-delay send. Holds off the actual
+	// send for a few seconds, so composing and sending right away does not
+	// create a burst of activity that can make you look online. Scheduled
+	// messages carry their own explicit timing and are left alone. The
+	// text field is captured and cleared right now, matching the normal
+	// instant UX, instead of being re-read after the delay -- the user
+	// could keep typing into it meanwhile.
+	const auto delayed = !options.scheduled
+		&& MZGram::GhostMode()
+		&& MZGram::GhostAutoDelaySend();
 	if (_voiceRecordBar->isListenState()) {
+		if (delayed) {
+			base::call_delayed(12000, this, [=] {
+				if (_history) {
+					_voiceRecordBar->requestToSendWithOptions(options);
+				}
+			});
+			return;
+		}
 		_voiceRecordBar->requestToSendWithOptions(options);
+		return;
+	}
+
+	if (delayed) {
+		const auto text = _field->getTextWithAppliedMarkdown();
+		clearFieldText();
+		base::call_delayed(12000, this, [=] {
+			if (_history) {
+				sendTextWithTags(text, true, options, nullptr);
+			}
+		});
 		return;
 	}
 
@@ -7873,6 +7902,27 @@ void HistoryWidget::sendingFilesConfirmed(
 		std::shared_ptr<Ui::PreparedBundle> bundle,
 		Api::SendOptions options) {
 	if (!_peer || showSendingFilesError(*bundle)) {
+		return;
+	}
+	// MZGram: own code, ghost mode auto-delay send. See send() for the
+	// text-message counterpart; media gets a longer delay.
+	if (!options.scheduled
+		&& MZGram::GhostMode()
+		&& MZGram::GhostAutoDelaySend()) {
+		base::call_delayed(20000, this, [=] {
+			sendingFilesConfirmedNow(bundle, options);
+		});
+		return;
+	}
+	sendingFilesConfirmedNow(std::move(bundle), options);
+}
+
+void HistoryWidget::sendingFilesConfirmedNow(
+		std::shared_ptr<Ui::PreparedBundle> bundle,
+		Api::SendOptions options) {
+	// MZGram: re-checked here too, since a delayed send (see
+	// sendingFilesConfirmed) can fire after the widget switched chats.
+	if (!_peer) {
 		return;
 	}
 	const auto ephemeralReply = session().ephemeralMessages()

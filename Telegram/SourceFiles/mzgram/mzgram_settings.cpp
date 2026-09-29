@@ -372,6 +372,23 @@ void BuildMZGramSection(SectionBuilder &builder) {
 		"through."));
 
 	builder.addSkip();
+	AddOptionToggle(
+		builder,
+		u"mzgram/ghost-auto-delay-send"_q,
+		"Delay sending messages",
+		kOptionGhostAutoDelaySend,
+		{ u"delay"_q, u"send"_q, u"online"_q },
+		OptionValue(kOptionGhostMode));
+	builder.addSkip();
+	builder.addDividerText(Text("Holds an outgoing message (about 12 "
+		"seconds, longer for photos/videos/files) before actually sending "
+		"it, so composing and sending right away does not make you look "
+		"online. Not recommended on an unreliable connection: a delayed "
+		"message can still be waiting to send if the app closes or the "
+		"network drops in the meantime. MZGram's own code, mirroring the "
+		"Android version."));
+
+	builder.addSkip();
 	builder.addSubsectionTitle(Text("Message history"));
 	AddOptionToggle(
 		builder,

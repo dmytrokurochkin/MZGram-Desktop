@@ -48,6 +48,14 @@ base::options::toggle OptionSendOnline({
 	.defaultValue = false,
 });
 
+// MZGram's own code (AyuGram4A has no equivalent on either platform).
+base::options::toggle OptionGhostAutoDelaySend({
+	.id = kOptionGhostAutoDelaySend,
+	.name = "Ghost mode: delay sending messages",
+	.description = "Hold an outgoing message a few seconds before actually "
+		"sending it. Not recommended on an unreliable connection.",
+});
+
 // Off by default: both keep other people's text on disk in plain SQLite.
 base::options::toggle OptionAntiRecall({
 	.id = kOptionAntiRecall,
@@ -200,6 +208,7 @@ const char kOptionGhostMode[] = "mzgram-ghost-mode";
 const char kOptionSendReadReceipts[] = "mzgram-ghost-send-read-receipts";
 const char kOptionSendTyping[] = "mzgram-ghost-send-typing";
 const char kOptionSendOnline[] = "mzgram-ghost-send-online";
+const char kOptionGhostAutoDelaySend[] = "mzgram-ghost-auto-delay-send";
 const char kOptionAntiRecall[] = "mzgram-anti-recall";
 const char kOptionEditHistory[] = "mzgram-edit-history";
 const char kOptionKeepSelfDestructing[] = "mzgram-keep-self-destructing";
@@ -238,6 +247,10 @@ bool SendTyping() {
 
 bool SendOnline() {
 	return !GhostMode() || OptionSendOnline.value();
+}
+
+bool GhostAutoDelaySend() {
+	return GhostMode() && OptionGhostAutoDelaySend.value();
 }
 
 void MarkMessageReadDueToInteraction(
