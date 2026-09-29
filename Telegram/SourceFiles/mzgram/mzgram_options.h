@@ -47,6 +47,12 @@ void MarkMessageReadDueToInteraction(
 extern const char kOptionGhostAutoDelaySend[];
 [[nodiscard]] bool GhostAutoDelaySend();
 
+// MZGram's own code. Forces every outgoing message to be sent without a
+// notification sound for the recipient while ghost mode is on, regardless
+// of the per-message "send without sound" choice.
+extern const char kOptionGhostSilentSend[];
+[[nodiscard]] bool GhostSilentSend();
+
 [[nodiscard]] bool AntiRecall();
 [[nodiscard]] bool EditHistory();
 [[nodiscard]] bool KeepSelfDestructing();

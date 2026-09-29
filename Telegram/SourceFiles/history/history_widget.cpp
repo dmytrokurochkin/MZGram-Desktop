@@ -5646,6 +5646,12 @@ void HistoryWidget::sendVoice(const VoiceToSend &data) {
 }
 
 void HistoryWidget::send(Api::SendOptions options) {
+	// MZGram: own code, ghost mode send-without-sound. Applied to every
+	// branch below (rich draft, delayed send, normal send) since options
+	// is captured by value.
+	if (MZGram::GhostMode() && MZGram::GhostSilentSend()) {
+		options.silent = true;
+	}
 	if (!_history) {
 		return;
 	} else if (_editMsgId) {
@@ -7903,6 +7909,11 @@ void HistoryWidget::sendingFilesConfirmed(
 		Api::SendOptions options) {
 	if (!_peer || showSendingFilesError(*bundle)) {
 		return;
+	}
+	// MZGram: own code, ghost mode send-without-sound. See send() for the
+	// text-message counterpart.
+	if (MZGram::GhostMode() && MZGram::GhostSilentSend()) {
+		options.silent = true;
 	}
 	// MZGram: own code, ghost mode auto-delay send. See send() for the
 	// text-message counterpart; media gets a longer delay.

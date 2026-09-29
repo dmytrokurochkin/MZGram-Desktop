@@ -389,6 +389,20 @@ void BuildMZGramSection(SectionBuilder &builder) {
 		"Android version."));
 
 	builder.addSkip();
+	AddOptionToggle(
+		builder,
+		u"mzgram/ghost-silent-send"_q,
+		"Send without sound",
+		kOptionGhostSilentSend,
+		{ u"silent"_q, u"sound"_q, u"notification"_q },
+		OptionValue(kOptionGhostMode));
+	builder.addSkip();
+	builder.addDividerText(Text("Sends every outgoing message without a "
+		"notification sound for the recipient, regardless of the "
+		"per-message \"send without sound\" choice. MZGram's own code, "
+		"mirroring the Android version."));
+
+	builder.addSkip();
 	builder.addSubsectionTitle(Text("Message history"));
 	AddOptionToggle(
 		builder,
