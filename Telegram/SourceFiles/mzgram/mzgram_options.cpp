@@ -340,6 +340,14 @@ QString StripZalgo(const QString &text) {
 	return result;
 }
 
+TextWithEntities StripZalgoMessageText(TextWithEntities text) {
+	if (!text.entities.isEmpty()) {
+		return text;
+	}
+	text.text = StripZalgo(text.text);
+	return text;
+}
+
 void MarkMessageReadDueToInteraction(
 		not_null<History*> history,
 		MsgId messageId) {

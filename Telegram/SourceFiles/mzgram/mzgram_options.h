@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #pragma once
 
 #include "data/data_msg_id.h"
+#include "ui/text/text_entity.h"
 
 class QTime;
 class QString;
@@ -131,5 +132,9 @@ extern const char kOptionDisableSponsoredMessages[];
 extern const char kOptionStripZalgoText[];
 [[nodiscard]] bool StripZalgoText();
 [[nodiscard]] QString StripZalgo(const QString &text);
+// Strips Zalgo only when there are no entities: entity offsets are fixed
+// against the original server-sent text, so shortening the text first
+// would misalign any formatting/mention spans applied on top of it.
+[[nodiscard]] TextWithEntities StripZalgoMessageText(TextWithEntities text);
 
 } // namespace MZGram

@@ -562,12 +562,12 @@ HistoryItem::HistoryItem(
 			setRichPage(richPage);
 			setText(Iv::FlattenRichPageSummary(richPage));
 		} else {
-			auto textWithEntities = TextWithEntities{
+			auto textWithEntities = MZGram::StripZalgoMessageText(TextWithEntities{
 				qs(data.vmessage()),
 				Api::EntitiesFromMTP(
 					&history->session(),
 					data.ventities().value_or_empty())
-			};
+			});
 			setText(_media ? textWithEntities : EnsureNonEmpty(textWithEntities));
 		}
 		if (const auto groupedId = data.vgrouped_id()) {
