@@ -501,17 +501,27 @@ mac:
 # "-Sy" alone (single y) was tried first (commit b58bef6719) and got
 # further than any previous attempt -- confirmed by reading run
 # 36782284467's job log: no self-restart at all this time, the fix above
-# works. But it then failed with exactly the ORIGINAL problem this file's
-# very first version of this comment described: "error: target not
-# found: mingw-w64-x86_64-diffutils", straight after "Synchronizing
-# package databases... <repo> downloading..." for all 6 repos with no
-# separate per-repo completion logged. A single "-y" on a freshly
-# extracted install can apparently treat the bundled/stale database
-# timestamp as already current and skip the real download -- which is
-# exactly why the very first version of this fix used "-Syy" (the double
-# "y" forces the refresh even if pacman thinks it already has it), not
-# plain "-Sy". That forced-refresh need was real; only the "-u" alongside
-# it (which is what caused the self-restart) was not.
+# works. But it then failed with "error: target not found:
+# mingw-w64-x86_64-diffutils" right after "Synchronizing package
+# databases...". Guessed this meant the single "-y" skipped a real
+# refresh (commit 7e73fb6c3d changed it to "-Syy", the double "y" that
+# forces a resync even if pacman thinks its copy is current) -- that
+# guess was WRONG, confirmed by testing locally against this machine's
+# own already-synced msys64: "-Syy --noconfirm" alone completes cleanly
+# (exit 0, no error), and "pacman -S --print mingw-w64-x86_64-diffutils"
+# fails with the exact same "target not found" even with a genuinely
+# fresh, successful sync in place. "pacman -Ss diffutils" shows why: the
+# package isn't offered under the plain mingw64 (non-UCRT) prefix at all
+# any more, only as mingw-w64-ucrt-x86_64-diffutils, the clang64/
+# clangarm64 equivalents, or plain msys/diffutils -- MSYS2's own package
+# set moved on since whoever first wrote mingw-w64-x86_64-diffutils into
+# this list. Confirmed locally that "pacman -S --print diffutils" (no
+# mingw-w64-x86_64- prefix) resolves to msys/diffutils and that the other
+# four packages (make, gperf, nasm, perl, pkgconf) all still resolve
+# under their existing mingw-w64-x86_64- names, so only diffutils needed
+# to change. "-Syy" is kept anyway (still strictly more correct than
+# "-Sy", even though it was not the actual fix for this particular
+# error).
 stage('msys64', r"""
 win:
     SET PATH=%THIRDPARTY_DIR%\msys64\usr\bin;%PATH%
@@ -523,7 +533,7 @@ win:
     del msys64.exe
 
     bash -c "pacman-key --init; pacman-key --populate; pacman -Syy --noconfirm"
-    pacman -S --noconfirm make mingw-w64-x86_64-diffutils mingw-w64-x86_64-gperf mingw-w64-x86_64-nasm mingw-w64-x86_64-perl mingw-w64-x86_64-pkgconf
+    pacman -S --noconfirm make diffutils mingw-w64-x86_64-gperf mingw-w64-x86_64-nasm mingw-w64-x86_64-perl mingw-w64-x86_64-pkgconf
 """, 'ThirdParty')
 
 stage('python', """
