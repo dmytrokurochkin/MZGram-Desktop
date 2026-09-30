@@ -19,6 +19,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history.h"
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
+#include "mzgram/mzgram_options.h"
 
 namespace Data {
 namespace {
@@ -58,6 +59,16 @@ PromoSuggestions::PromoSuggestions(
 PromoSuggestions::~PromoSuggestions() = default;
 
 void PromoSuggestions::refreshTopPromotion() {
+	// MZGram: own code. Stops the chat-list promo/proxy banner at the
+	// single place it is periodically (re-)fetched from, and clears an
+	// already-set one immediately, mirroring Android's
+	// checkPromoInfoInternal/hidePromoDialog.
+	if (MZGram::DisableSponsoredMessages()) {
+		if (_topPromoted) {
+			setTopPromoted(nullptr, QString(), QString());
+		}
+		return;
+	}
 	if (_contactBirthdaysLastDayRequest != -1
 		&& _contactBirthdaysLastDayRequest != QDate::currentDate().day()) {
 		_refreshed.fire({});
