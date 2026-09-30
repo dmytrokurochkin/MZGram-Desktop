@@ -48,6 +48,15 @@ base::options::toggle OptionSendOnline({
 	.defaultValue = false,
 });
 
+// MZGram's own code, Spy mode section. Independent of Ghost mode: reuses
+// the same SendOnline() suppression point (see below) so a user can hide
+// online status without turning on read-receipt/typing suppression too.
+base::options::toggle OptionSpyHideOnlineStatus({
+	.id = kOptionSpyHideOnlineStatus,
+	.name = "Spy mode: hide own online status",
+	.description = "Always report offline, regardless of Ghost mode",
+});
+
 // MZGram's own code (AyuGram4A has no equivalent on either platform).
 base::options::toggle OptionGhostAutoDelaySend({
 	.id = kOptionGhostAutoDelaySend,
@@ -269,6 +278,7 @@ const char kOptionSetReminder[] = "mzgram-set-reminder";
 const char kOptionOpenIn[] = "mzgram-open-in";
 const char kOptionMediaPreviewOnChatPreview[] =
 	"mzgram-media-preview-on-chat-preview";
+const char kOptionSpyHideOnlineStatus[] = "mzgram-spy-hide-online-status";
 
 bool GhostMode() {
 	return OptionGhostMode.value();
@@ -283,6 +293,9 @@ bool SendTyping() {
 }
 
 bool SendOnline() {
+	if (OptionSpyHideOnlineStatus.value()) {
+		return false;
+	}
 	return !GhostMode() || OptionSendOnline.value();
 }
 

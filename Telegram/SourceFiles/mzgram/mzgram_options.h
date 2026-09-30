@@ -31,6 +31,10 @@ extern const char kOptionMarkMessages[];
 [[nodiscard]] bool SendTyping();
 [[nodiscard]] bool SendOnline();
 
+// MZGram's own code, Spy mode section. Independent of ghost mode; reuses
+// the SendOnline() suppression point.
+extern const char kOptionSpyHideOnlineStatus[];
+
 // MZGram's own code. While ghost mode is suppressing read receipts,
 // replying to or reacting to a specific message is an explicit
 // interaction, so that one message is marked read on the server

@@ -491,6 +491,20 @@ void BuildMZGramSection(SectionBuilder &builder) {
 	builder.addSubsectionTitle(Text("Message history"));
 	AddOptionToggle(
 		builder,
+		u"mzgram/spy-hide-online-status"_q,
+		"Hide own online status",
+		kOptionSpyHideOnlineStatus,
+		{ u"spy"_q, u"online"_q, u"last seen"_q });
+	builder.addSkip();
+	builder.addDividerText(Text("Always reports offline to the server, "
+		"independent of Ghost mode. Reuses the same mechanism as Ghost "
+		"mode's \"send online status\" exception, exposed here as its "
+		"own switch since Spy mode users may want this without turning "
+		"on read receipt/typing suppression."));
+
+	builder.addSkip();
+	AddOptionToggle(
+		builder,
 		u"mzgram/anti-recall"_q,
 		"Keep deleted messages",
 		kOptionAntiRecall,
