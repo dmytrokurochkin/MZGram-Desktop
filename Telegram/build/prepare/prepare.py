@@ -465,6 +465,13 @@ mac:
     git checkout 7387476bb3b7200d3b044015696cb3c28f78593c
 """)
 
+# MZGram: own fix for CI flakiness. The first pacman -Syu below upgrades
+# pacman/msys2-runtime/bash themselves and self-terminates the process to
+# apply that ("all MSYS2 processes... will be closed"). Running the next
+# pacman immediately after could hit a database sync that had not settled
+# yet, failing with "target not found" for packages that do exist (seen in
+# CI for mingw-w64-x86_64-diffutils) -- a short pause plus a forced full
+# re-sync (-Syy, not just -Sy) avoids trusting a stale/incomplete index.
 stage('msys64', """
 win:
     SET PATH=%THIRDPARTY_DIR%\\msys64\\usr\\bin;%PATH%
@@ -476,7 +483,8 @@ win:
     del msys64.exe
 
     bash -c "pacman-key --init; pacman-key --populate; pacman -Syu --noconfirm"
-    pacman -Syu --noconfirm ^
+    timeout /t 10 /nobreak >nul
+    pacman -Syyu --noconfirm ^
         make ^
         mingw-w64-x86_64-diffutils ^
         mingw-w64-x86_64-gperf ^
