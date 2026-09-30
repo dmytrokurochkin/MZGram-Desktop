@@ -472,6 +472,11 @@ mac:
 # yet, failing with "target not found" for packages that do exist (seen in
 # CI for mingw-w64-x86_64-diffutils) -- a short pause plus a forced full
 # re-sync (-Syy, not just -Sy) avoids trusting a stale/incomplete index.
+# The pause must call Windows' own timeout.exe by full path: PATH now has
+# msys64\usr\bin first (set a few lines below), so a bare "timeout" call
+# resolves to msys2/coreutils' timeout instead and fails immediately on
+# Windows-style flags ("invalid time interval '/t'") -- the CLI's own
+# review of the actual failing job log caught this exact case.
 stage('msys64', """
 win:
     SET PATH=%THIRDPARTY_DIR%\\msys64\\usr\\bin;%PATH%
@@ -483,7 +488,7 @@ win:
     del msys64.exe
 
     bash -c "pacman-key --init; pacman-key --populate; pacman -Syu --noconfirm"
-    timeout /t 10 /nobreak >nul
+    %SystemRoot%\System32\timeout.exe /t 10 /nobreak >nul
     pacman -Syyu --noconfirm ^
         make ^
         mingw-w64-x86_64-diffutils ^
