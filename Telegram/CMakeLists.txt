@@ -43,6 +43,7 @@ include(cmake/generate_appstream_changelog.cmake)
 
 if (DESKTOP_APP_TEST_APPS)
     include(cmake/tests.cmake)
+    include(cmake/mzgram_tests.cmake)
 endif()
 
 if (WIN32)
@@ -1515,6 +1516,8 @@ PRIVATE
     mzgram/mzgram_message_store.h
     mzgram/mzgram_options.cpp
     mzgram/mzgram_options.h
+    mzgram/mzgram_text_filters.cpp
+    mzgram/mzgram_text_filters.h
     mzgram/mzgram_qr_scan.cpp
     mzgram/mzgram_qr_scan.h
     mzgram/mzgram_settings.cpp

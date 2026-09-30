@@ -166,9 +166,16 @@ jobs:
           -D CMAKE_CONFIGURATION_TYPES=Debug ^
           -D CMAKE_MSVC_DEBUG_INFORMATION_FORMAT= ^
           -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON ^
-          -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON
+          -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON ^
+          -D DESKTOP_APP_TEST_APPS=ON
 
           cmake --build ..\out --config Debug --parallel
+
+      # mzgram_tests is a headless console app (see cmake/mzgram_tests.cmake):
+      # no window, prints PASS/FAIL per case, exits non-zero on any failure.
+      - name: Run MZGram unit tests.
+        run: |
+          %TBUILD%\%REPO_NAME%\out\Debug\mzgram_tests.exe
 
       - name: Collect artifact.
         run: |

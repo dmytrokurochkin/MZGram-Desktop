@@ -81,14 +81,6 @@ base::options::toggle OptionDisableSponsoredMessages({
 		"requested or shown.",
 });
 
-// MZGram's own code (AyuGram4A has no equivalent on either platform).
-base::options::toggle OptionStripZalgoText({
-	.id = kOptionStripZalgoText,
-	.name = "Zalgo filter",
-	.description = "Removes stacked Unicode combining marks (Zalgo-style "
-		"corrupted text) from names and chat titles shown to you.",
-});
-
 // MZGram's own code (AyuGram4A has no equivalent on either platform). Not
 // gated on ghost mode being on already -- this is what offers turning it on.
 base::options::toggle OptionOfferGhostModeBeforeStories({
@@ -254,7 +246,6 @@ const char kOptionGhostAutoDelaySend[] = "mzgram-ghost-auto-delay-send";
 const char kOptionGhostSilentSend[] = "mzgram-ghost-silent-send";
 const char kOptionOfferGhostModeBeforeStories[] = "mzgram-offer-ghost-mode-before-stories";
 const char kOptionDisableSponsoredMessages[] = "mzgram-disable-sponsored-messages";
-const char kOptionStripZalgoText[] = "mzgram-strip-zalgo-text";
 const char kOptionAntiRecall[] = "mzgram-anti-recall";
 const char kOptionEditHistory[] = "mzgram-edit-history";
 const char kOptionKeepSelfDestructing[] = "mzgram-keep-self-destructing";
@@ -317,27 +308,6 @@ bool OfferGhostModeBeforeStories() {
 
 bool DisableSponsoredMessages() {
 	return OptionDisableSponsoredMessages.value();
-}
-
-bool StripZalgoText() {
-	return OptionStripZalgoText.value();
-}
-
-QString StripZalgo(const QString &text) {
-	if (!StripZalgoText() || text.isEmpty()) {
-		return text;
-	}
-	auto result = QString();
-	result.reserve(text.size());
-	for (const auto &ch : text) {
-		const auto category = ch.category();
-		if (category != QChar::Mark_NonSpacing
-			&& category != QChar::Mark_SpacingCombining
-			&& category != QChar::Mark_Enclosing) {
-			result.append(ch);
-		}
-	}
-	return result;
 }
 
 TextWithEntities StripZalgoMessageText(TextWithEntities text) {

@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #pragma once
 
 #include "data/data_msg_id.h"
+#include "mzgram/mzgram_text_filters.h"
 #include "ui/text/text_entity.h"
 
 class QTime;
@@ -127,11 +128,10 @@ extern const char kOptionMediaPreviewOnChatPreview[];
 extern const char kOptionDisableSponsoredMessages[];
 [[nodiscard]] bool DisableSponsoredMessages();
 
-// MZGram's own code. Strips Zalgo-style combining-mark text corruption
-// from display names shown to the user.
-extern const char kOptionStripZalgoText[];
-[[nodiscard]] bool StripZalgoText();
-[[nodiscard]] QString StripZalgo(const QString &text);
+// kOptionStripZalgoText/StripZalgoText/StripZalgo live in
+// mzgram_text_filters.h, included above (kept dependency-light on purpose
+// for a headless unit test). This one needs TextWithEntities/lib_ui, so it
+// stays here instead.
 // Strips Zalgo only when there are no entities: entity offsets are fixed
 // against the original server-sent text, so shortening the text first
 // would misalign any formatting/mention spans applied on top of it.
