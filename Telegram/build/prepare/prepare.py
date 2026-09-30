@@ -467,50 +467,40 @@ mac:
 
 # MZGram: own fix for CI flakiness. Every stage's win: commands are written
 # into ONE command.bat and run as a SINGLE cmd.exe process (see run() /
-# subprocess.run(batPath, ...) above). CHERE_INVOKING=enabled_from_arguments
-# and MSYS2_PATH_TYPE=inherit make pacman treat that invoking cmd.exe itself
-# as part of the MSYS2 process tree, so when "pacman -Syu" upgrades
-# pacman/msys2-runtime/bash it self-terminates to apply that ("all MSYS2
-# processes... including this terminal will be closed") -- and kills
-# command.bat's own process, not some child of it. Everything after that
-# line in the stage then never runs and the stage fails immediately (seen
-# in CI: "SUCCESS: The process with PID .... has been terminated." then
-# "ERROR: Input redirection is not supported" then the stage fails right
-# after -- confirmed by reading the live failing job log). The message
-# ("PID <N> has been terminated", singular) matches killing one specific
-# PID, not a tree-wide sweep -- consistent with pacman's self-restart
-# killing its own direct parent shell specifically, not every ancestor.
+# subprocess.run(batPath, ...) above). The original "pacman -Syu" here was
+# a FULL system upgrade (-u/--sysupgrade), which also replaces pacman,
+# msys2-runtime and bash themselves -- msys2-runtime then closes "all
+# MSYS2 processes including this terminal" to apply that live, which
+# turned out to kill command.bat's own process, not some child of it, no
+# matter how the call was wrapped:
+#   - inline "bash -c ..." (original): command.bat died directly.
+#   - "start /wait cmd /c ..." (commit c67eb16997): failed differently and
+#     earlier -- cmd's built-in start always tries to allocate a new
+#     console, and start.exe itself refuses when its own stdin is already
+#     redirected (true here: Python's subprocess.run(batPath, shell=True,
+#     ...) does not attach a real console).
+#   - plain "cmd /c ..." (commit 2539c2169e): still killed command.bat --
+#     confirmed by reading that run's job log (36780818991): "SUCCESS:
+#     The process with PID 8276 has been terminated." followed immediately
+#     by the same "ERROR: Input redirection is not supported" and the
+#     whole stage dying, with no extra console/process-tree layer helping
+#     at all. Whatever decides "this terminal" is evidently not simple
+#     parent-PID walking (an extra cmd /c hop did not save it), so trying
+#     a third process-wrapping variant would be guessing at undocumented
+#     internals rather than fixing anything.
 #
-# First fix attempt used "start /wait cmd /c ...": this FAILED differently
-# and earlier ("ERROR: Input redirection is not supported" appeared
-# immediately, before pacman-key even ran) -- cmd's built-in start always
-# tries to allocate a new console, which start.exe itself refuses to do
-# when its own stdin is already redirected (true here: Python's
-# subprocess.run(batPath, shell=True, ...) does not attach a real
-# console). Confirmed by reading that run's job log too.
-#
-# Fix: run each pacman call inside a plain "cmd /c ..." child instead of
-# inline -- no start, no new console, so no stdin-redirection restriction,
-# while still being a genuinely separate process one hop away from
-# command.bat's own cmd.exe. When pacman kills its direct parent shell, it
-# closes that inner cmd.exe, not command.bat.
-#
-# The self-update call is also followed by "& ver>nul" on the SAME line.
-# winFailOnEach (below in this file) auto-appends its own
-# "if %errorlevel% neq 0 exit /b %errorlevel%" after every line, and a
-# forcibly-killed child's own exit code is very unlikely to be a clean 0 --
-# without this, our own safety-net check would abort the stage right here
-# even once process isolation itself is working, mistaking an expected
-# self-restart for a real failure. "ver>nul" is a builtin that always
-# succeeds, so it resets the line's errorlevel to 0 after the self-update
-# call regardless of the exit status of whatever it killed; the SECOND
-# call (the real package install, which nothing should kill anymore) is
-# deliberately left without this, so a genuine failure there still aborts
-# the stage. The short pause after self-update plus a forced full re-sync
-# (-Syy, not just -Sy) for the install call avoids trusting a database
-# sync that had not settled yet (seen in CI: "target not found" for
-# packages that do exist, e.g. mingw-w64-x86_64-diffutils). This string is
-# raw (r\"\"\") so none of its backslashes are Python escapes.
+# Root fix: stop asking for a full sysupgrade at all. "-u" is what pulls
+# in pacman/msys2-runtime/bash and triggers the self-restart; a plain
+# "-Sy" (sync/refresh the package database only, no "-u") never touches
+# already-installed packages, so it cannot trigger it. That refresh is all
+# the original comment actually needed to fix the real problem it named
+# ("target not found" for packages that do exist, e.g.
+# mingw-w64-x86_64-diffutils, from a stale/never-synced database on a
+# fresh install) -- the "full upgrade first" part was never required for
+# that, only assumed. With no self-restart in play, the extra isolation
+# wrapper, the settling pause, and the errorlevel-masking trick from the
+# last two attempts are no longer needed either. This string is raw
+# (r\"\"\") so none of its backslashes are Python escapes.
 stage('msys64', r"""
 win:
     SET PATH=%THIRDPARTY_DIR%\msys64\usr\bin;%PATH%
@@ -521,9 +511,8 @@ win:
     msys64.exe
     del msys64.exe
 
-    cmd /c bash -c "pacman-key --init; pacman-key --populate; pacman -Syu --noconfirm" & ver>nul
-    %SystemRoot%\System32\timeout.exe /t 10 /nobreak >nul
-    cmd /c bash -c "pacman -Syyu --noconfirm make mingw-w64-x86_64-diffutils mingw-w64-x86_64-gperf mingw-w64-x86_64-nasm mingw-w64-x86_64-perl mingw-w64-x86_64-pkgconf"
+    bash -c "pacman-key --init; pacman-key --populate; pacman -Sy --noconfirm"
+    pacman -S --noconfirm make mingw-w64-x86_64-diffutils mingw-w64-x86_64-gperf mingw-w64-x86_64-nasm mingw-w64-x86_64-perl mingw-w64-x86_64-pkgconf
 """, 'ThirdParty')
 
 stage('python', """
