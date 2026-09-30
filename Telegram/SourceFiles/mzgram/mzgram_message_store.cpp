@@ -528,6 +528,23 @@ QString MessageStore::mediaFolder(uint64 account, uint64 peer) const {
 		+ u"tdata/mzgram/media/%1/%2/"_q.arg(account).arg(peer);
 }
 
+void MessageStore::wipeAll() {
+	if (!ensureOpen()) {
+		return;
+	}
+	auto query = QSqlQuery(_db);
+	for (const auto table : {
+			u"deleted_messages"_q,
+			u"edit_history"_q,
+			u"messages"_q }) {
+		if (!query.exec(u"DELETE FROM "_q + table)) {
+			LogFailure("wipeAll", query);
+		}
+	}
+	_deleted.clear();
+	QDir(cWorkingDir() + u"tdata/mzgram/media/"_q).removeRecursively();
+}
+
 QString MessageStore::setting(const QString &key) {
 	if (!ensureOpen()) {
 		return QString();

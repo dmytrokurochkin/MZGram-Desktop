@@ -100,6 +100,12 @@ public:
 
 	[[nodiscard]] QString mediaFolder(uint64 account, uint64 peer) const;
 
+	// Full wipe for the settings screen's "clear archive" action: every
+	// archived row (messages, edits, deletions) plus every copied media
+	// file on disk, for every account and every peer. Leaves the tracked
+	// chats allowlist and the media size limit setting untouched.
+	void wipeAll();
+
 private:
 	struct PendingRaw {
 		MessageKey key;

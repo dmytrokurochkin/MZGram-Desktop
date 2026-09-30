@@ -486,6 +486,30 @@ void BuildMZGramSection(SectionBuilder &builder) {
 	builder.addDividerText(Text("In these chats photos, voice messages, "
 		"round videos and view-once media are saved as they arrive. Videos "
 		"and files are saved up to the size limit."));
+
+	builder.addSkip();
+	builder.addButton({
+		.id = u"mzgram/wipe-archive"_q,
+		.title = Text("Clear archive"),
+		.st = &st::settingsAttentionButton,
+		.onClick = [=] {
+			controller->show(Ui::MakeConfirmBox({
+				.text = QString("This permanently deletes the whole local "
+					"archive of deleted and edited messages, including "
+					"saved media. This cannot be undone. Continue?"),
+				.confirmed = [=] {
+					MessageStore::Instance().wipeAll();
+				},
+				.confirmText = tr::lng_box_delete(),
+				.confirmStyle = &st::attentionBoxButton,
+			}));
+		},
+		.keywords = { u"clear"_q, u"wipe"_q, u"delete"_q, u"archive"_q },
+	});
+	builder.addSkip();
+	builder.addDividerText(Text("Deletes every archived message and "
+		"saved media file for every tracked chat. Does not remove the "
+		"tracked chats list or the media size limit setting above."));
 }
 
 class MZGramSection : public Section<MZGramSection> {
