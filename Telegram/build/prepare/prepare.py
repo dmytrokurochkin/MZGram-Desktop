@@ -488,7 +488,7 @@ win:
     del msys64.exe
 
     bash -c "pacman-key --init; pacman-key --populate; pacman -Syu --noconfirm"
-    %SystemRoot%\System32\timeout.exe /t 10 /nobreak >nul
+    %SystemRoot%\\System32\\timeout.exe /t 10 /nobreak >nul
     pacman -Syyu --noconfirm ^
         make ^
         mingw-w64-x86_64-diffutils ^
