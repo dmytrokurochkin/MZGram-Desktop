@@ -33,6 +33,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
 #include "main/main_domain.h"
+#include "mzgram/mzgram_options.h"
 #include "main/main_app_config.h"
 #include "mtproto/mtproto_config.h"
 #include "core/application.h"
@@ -320,9 +321,13 @@ Main::Account &PeerData::account() const {
 }
 
 void PeerData::updateNameDelayed(
-		const QString &newName,
+		const QString &rawNewName,
 		const QString &newNameOrPhone,
 		const QString &newUsername) {
+	// MZGram: own code, Zalgo filter. Stripped once here, at the single
+	// place every peer's cached display name gets updated, rather than on
+	// every PeerData::name() read.
+	const auto newName = MZGram::StripZalgo(rawNewName);
 	if (_name == newName && _nameVersion > 1) {
 		if (isUser()) {
 			if (asUser()->nameOrPhone == newNameOrPhone

@@ -23,6 +23,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_element.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
+#include "mzgram/mzgram_options.h"
 #include "ui/chat/sponsored_message_bar.h"
 #include "ui/text/text_utilities.h" // tr::rich.
 
@@ -302,6 +303,10 @@ HistoryItem *SponsoredMessages::injectItem(
 }
 
 bool SponsoredMessages::canHaveFor(not_null<History*> history) const {
+	// MZGram: own code, ported concept from AyuGram4A (AyuConfig.disableAds).
+	if (MZGram::DisableSponsoredMessages()) {
+		return false;
+	}
 	if (history->peer->isChannel()) {
 		return true;
 	} else if (const auto user = history->peer->asUser()) {
@@ -311,6 +316,9 @@ bool SponsoredMessages::canHaveFor(not_null<History*> history) const {
 }
 
 bool SponsoredMessages::canHaveFor(not_null<HistoryItem*> item) const {
+	if (MZGram::DisableSponsoredMessages()) {
+		return false;
+	}
 	return item->history()->peer->isBroadcast()
 		&& item->isRegular();
 }

@@ -118,4 +118,14 @@ extern const char kOptionOpenIn[];
 extern const char kOptionMediaPreviewOnChatPreview[];
 [[nodiscard]] bool MediaPreviewOnChatPreview();
 
+// Ported concept from AyuGram4A (AyuConfig.disableAds).
+extern const char kOptionDisableSponsoredMessages[];
+[[nodiscard]] bool DisableSponsoredMessages();
+
+// MZGram's own code. Strips Zalgo-style combining-mark text corruption
+// from display names shown to the user.
+extern const char kOptionStripZalgoText[];
+[[nodiscard]] bool StripZalgoText();
+[[nodiscard]] QString StripZalgo(const QString &text);
+
 } // namespace MZGram

@@ -256,6 +256,31 @@ void BuildMZGramSection(SectionBuilder &builder) {
 	const auto session = builder.session();
 
 	builder.addSkip();
+	builder.addSubsectionTitle(Text("General"));
+	AddOptionToggle(
+		builder,
+		u"mzgram/disable-sponsored-messages"_q,
+		"Disable sponsored messages",
+		kOptionDisableSponsoredMessages,
+		{ u"sponsored"_q, u"ads"_q, u"advertisement"_q });
+	builder.addSkip();
+	builder.addDividerText(Text("Stops sponsored (ad) messages in "
+		"channels from being requested or shown. Ported concept from "
+		"AyuGram4A."));
+
+	builder.addSkip();
+	AddOptionToggle(
+		builder,
+		u"mzgram/strip-zalgo-text"_q,
+		"Zalgo filter",
+		kOptionStripZalgoText,
+		{ u"zalgo"_q, u"corrupted"_q, u"text"_q });
+	builder.addSkip();
+	builder.addDividerText(Text("Removes stacked Unicode combining marks "
+		"(Zalgo-style corrupted text) from names and chat titles shown "
+		"to you. MZGram's own code, mirroring the Android version."));
+
+	builder.addSkip();
 	builder.addSubsectionTitle(Text("Appearance"));
 	AddOptionToggle(
 		builder,
