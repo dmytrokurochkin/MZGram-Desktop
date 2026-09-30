@@ -141,6 +141,48 @@ void MediaLimitBox(not_null<Ui::GenericBox*> box) {
 	});
 }
 
+void TotalMediaCapBox(not_null<Ui::GenericBox*> box) {
+	const auto megabytes = MZGram::MessageStore::Instance().totalMediaCap()
+		/ kMegabyte;
+	box->setTitle(Text("Total media size cap"));
+	box->addRow(object_ptr<Ui::FlatLabel>(
+		box,
+		Text("Caps everything saved across all tracked chats combined. "
+			"When exceeded, the oldest saved media files are deleted "
+			"first. Enter 0 for no limit."),
+		st::boxLabel));
+	const auto wrap = box->addRow(object_ptr<Ui::FixedHeightWidget>(
+		box,
+		st::defaultInputField.heightMin));
+	const auto input = Ui::CreateChild<Ui::NumberInput>(
+		wrap,
+		st::defaultInputField,
+		Text("Megabytes"),
+		QString::number(megabytes),
+		1024 * 1024);
+	wrap->widthValue() | rpl::on_next([=](int width) {
+		input->move(0, 0);
+		input->resize(width, input->height());
+		wrap->resize(width, input->height());
+	}, wrap->lifetime());
+	const auto save = [=] {
+		const auto value = input->getLastText().toLongLong();
+		MZGram::MessageStore::Instance().setTotalMediaCap(
+			value * kMegabyte);
+		box->closeBox();
+	};
+	QObject::connect(input, &Ui::MaskedInputField::submitted, [=] {
+		save();
+	});
+	box->setFocusCallback([=] {
+		input->setFocusFast();
+	});
+	box->addButton(tr::lng_settings_save(), save);
+	box->addButton(tr::lng_cancel(), [=] {
+		box->closeBox();
+	});
+}
+
 void ShowAddChatBox(
 		not_null<Window::SessionController*> controller,
 		not_null<Main::Session*> session) {
@@ -487,6 +529,22 @@ void BuildMZGramSection(SectionBuilder &builder) {
 		},
 		.keywords = { u"size"_q, u"limit"_q, u"media"_q, u"video"_q },
 	});
+	builder.addButton({
+		.id = u"mzgram/total-media-cap"_q,
+		.title = Text("Total media size cap"),
+		.st = &st::settingsButtonNoIcon,
+		.label = MessageStore::Instance().totalMediaCapValue(
+		) | rpl::map(LimitText),
+		.onClick = [=] {
+			controller->show(Box(TotalMediaCapBox));
+		},
+		.keywords = { u"size"_q, u"cap"_q, u"media"_q, u"total"_q },
+	});
+	builder.addSkip();
+	builder.addDividerText(Text("Total media size cap applies across all "
+		"tracked chats combined; the oldest saved media is deleted first "
+		"when it is exceeded."));
+
 	builder.addSkip();
 	builder.addDividerText(Text("In these chats photos, voice messages, "
 		"round videos and view-once media are saved as they arrive. Videos "

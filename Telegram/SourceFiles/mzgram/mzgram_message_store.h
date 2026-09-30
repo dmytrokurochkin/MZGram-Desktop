@@ -100,6 +100,14 @@ public:
 
 	[[nodiscard]] QString mediaFolder(uint64 account, uint64 peer) const;
 
+	// Total cap across the whole media folder (every account, every
+	// tracked chat), in bytes, 0 for no limit. Enforced right after each
+	// media file is saved (see setMediaPath): the oldest files are deleted
+	// first until back under the cap.
+	[[nodiscard]] int64 totalMediaCap();
+	[[nodiscard]] rpl::producer<int64> totalMediaCapValue();
+	void setTotalMediaCap(int64 bytes);
+
 	// Full wipe for the settings screen's "clear archive" action: every
 	// archived row (messages, edits, deletions) plus every copied media
 	// file on disk, for every account and every peer. Leaves the tracked
@@ -132,11 +140,13 @@ private:
 	void markKeyDeleted(const MessageKey &key, qint64 now);
 	[[nodiscard]] QString setting(const QString &key);
 	void setSetting(const QString &key, const QString &value);
+	void enforceMediaCap();
 
 	QSqlDatabase _db;
 	std::set<MessageKey> _deleted;
 	std::set<std::pair<uint64, uint64>> _tracked;
 	rpl::event_stream<> _trackedChanges;
+	rpl::variable<int64> _totalMediaCap;
 	rpl::variable<int64> _mediaSizeLimit;
 	std::vector<PendingRaw> _pendingRaw;
 	bool _flushScheduled = false;

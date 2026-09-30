@@ -13,6 +13,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <QtCore/QDir>
 #include <QtCore/QFile>
+#include <QtCore/QFileInfo>
 #include <QtCore/QtPlugin>
 #include <QtSql/QSqlError>
 #include <QtSql/QSqlQuery>
@@ -24,9 +25,14 @@ namespace MZGram {
 namespace {
 
 constexpr auto kDefaultMediaSizeLimit = int64(50) * 1024 * 1024;
+constexpr auto kDefaultTotalMediaCap = int64(300) * 1024 * 1024;
 
 [[nodiscard]] QString MediaSizeLimitKey() {
 	return u"media_size_limit"_q;
+}
+
+[[nodiscard]] QString TotalMediaCapKey() {
+	return u"total_media_cap"_q;
 }
 
 // SQLite INTEGER is signed; the bit pattern survives the round trip.
@@ -164,6 +170,10 @@ void MessageStore::loadCaches() {
 	auto ok = false;
 	const auto limit = setting(MediaSizeLimitKey()).toLongLong(&ok);
 	_mediaSizeLimit = ok ? limit : kDefaultMediaSizeLimit;
+
+	auto capOk = false;
+	const auto cap = setting(TotalMediaCapKey()).toLongLong(&capOk);
+	_totalMediaCap = capOk ? cap : kDefaultTotalMediaCap;
 }
 
 bool MessageStore::isTracked(uint64 account, uint64 peer) {
@@ -299,6 +309,7 @@ void MessageStore::setMediaPath(const MessageKey &key, const QString &path) {
 	if (!query.exec()) {
 		LogFailure("saving a media path", query);
 	}
+	enforceMediaCap();
 }
 
 QString MessageStore::mediaPath(const MessageKey &key) {
@@ -521,6 +532,69 @@ void MessageStore::setMediaSizeLimit(int64 bytes) {
 	const auto value = std::max(bytes, int64(0));
 	setSetting(MediaSizeLimitKey(), QString::number(value));
 	_mediaSizeLimit = value;
+}
+
+int64 MessageStore::totalMediaCap() {
+	return ensureOpen() ? _totalMediaCap.current() : kDefaultTotalMediaCap;
+}
+
+rpl::producer<int64> MessageStore::totalMediaCapValue() {
+	if (!ensureOpen()) {
+		return rpl::single(kDefaultTotalMediaCap);
+	}
+	return _totalMediaCap.value();
+}
+
+void MessageStore::setTotalMediaCap(int64 bytes) {
+	if (!ensureOpen()) {
+		return;
+	}
+	const auto value = std::max(bytes, int64(0));
+	setSetting(TotalMediaCapKey(), QString::number(value));
+	_totalMediaCap = value;
+}
+
+// Oldest-first eviction across the whole mzgram media folder (every
+// account, every tracked chat combined), so disk usage stays under the
+// configured cap regardless of which chat is currently growing. Only the
+// media file on disk is removed -- the row/text stays, matching how the
+// per-file size limit above already results in a text-only row.
+void MessageStore::enforceMediaCap() {
+	const auto cap = _totalMediaCap.current();
+	if (cap <= 0) {
+		return;
+	}
+	auto files = std::vector<QFileInfo>();
+	auto total = int64(0);
+	auto collect = [&](const QString &path, auto &&self) -> void {
+		auto dir = QDir(path);
+		const auto entries = dir.entryInfoList(
+			QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot);
+		for (const auto &entry : entries) {
+			if (entry.isDir()) {
+				self(entry.filePath(), self);
+			} else {
+				files.push_back(entry);
+				total += entry.size();
+			}
+		}
+	};
+	collect(cWorkingDir() + u"tdata/mzgram/media/"_q, collect);
+	if (total <= cap) {
+		return;
+	}
+	ranges::sort(files, [](const QFileInfo &a, const QFileInfo &b) {
+		return a.lastModified() < b.lastModified();
+	});
+	for (const auto &file : files) {
+		if (total <= cap) {
+			break;
+		}
+		const auto size = file.size();
+		if (QFile::remove(file.filePath())) {
+			total -= size;
+		}
+	}
 }
 
 QString MessageStore::mediaFolder(uint64 account, uint64 peer) const {
