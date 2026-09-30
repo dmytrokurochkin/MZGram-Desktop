@@ -465,21 +465,30 @@ mac:
     git checkout 7387476bb3b7200d3b044015696cb3c28f78593c
 """)
 
-# MZGram: own fix for CI flakiness. The first pacman -Syu below upgrades
-# pacman/msys2-runtime/bash themselves and self-terminates the process to
-# apply that ("all MSYS2 processes... will be closed"). Running the next
-# pacman immediately after could hit a database sync that had not settled
-# yet, failing with "target not found" for packages that do exist (seen in
-# CI for mingw-w64-x86_64-diffutils) -- a short pause plus a forced full
-# re-sync (-Syy, not just -Sy) avoids trusting a stale/incomplete index.
-# The pause must call Windows' own timeout.exe by full path: PATH now has
-# msys64\usr\bin first (set a few lines below), so a bare "timeout" call
-# resolves to msys2/coreutils' timeout instead and fails immediately on
-# Windows-style flags ("invalid time interval '/t'") -- the CLI's own
-# review of the actual failing job log caught this exact case.
-stage('msys64', """
+# MZGram: own fix for CI flakiness. Every stage's win: commands are written
+# into ONE command.bat and run as a SINGLE cmd.exe process (see run() /
+# subprocess.run(batPath, ...) above). CHERE_INVOKING=enabled_from_arguments
+# and MSYS2_PATH_TYPE=inherit make pacman treat that invoking cmd.exe itself
+# as part of the MSYS2 process tree, so when "pacman -Syu" upgrades
+# pacman/msys2-runtime/bash it self-terminates to apply that ("all MSYS2
+# processes... including this terminal will be closed") -- and kills
+# command.bat's own process, not some child of it. Everything after that
+# line in the stage then never runs and the stage fails immediately (seen
+# in CI: "SUCCESS: The process with PID .... has been terminated." then
+# "ERROR: Input redirection is not supported" then the stage fails right
+# after -- confirmed by reading the live failing job log). The fix: run
+# each pacman call inside its own disposable child process via
+# "start /wait cmd /c ...", so it is THAT child terminal pacman closes,
+# never the master command.bat process; control returns to command.bat
+# once the child exits, with its exit code preserved for the errorlevel
+# check below. The short pause after self-update plus a forced full
+# re-sync (-Syy, not just -Sy) for the install call avoids trusting a
+# database sync that had not settled yet (seen in CI: "target not found"
+# for packages that do exist, e.g. mingw-w64-x86_64-diffutils). This
+# string is raw (r\"\"\") so none of its backslashes are Python escapes.
+stage('msys64', r"""
 win:
-    SET PATH=%THIRDPARTY_DIR%\\msys64\\usr\\bin;%PATH%
+    SET PATH=%THIRDPARTY_DIR%\msys64\usr\bin;%PATH%
     SET CHERE_INVOKING=enabled_from_arguments
     SET MSYS2_PATH_TYPE=inherit
 
@@ -487,15 +496,9 @@ win:
     msys64.exe
     del msys64.exe
 
-    bash -c "pacman-key --init; pacman-key --populate; pacman -Syu --noconfirm"
-    %SystemRoot%\\System32\\timeout.exe /t 10 /nobreak >nul
-    pacman -Syyu --noconfirm ^
-        make ^
-        mingw-w64-x86_64-diffutils ^
-        mingw-w64-x86_64-gperf ^
-        mingw-w64-x86_64-nasm ^
-        mingw-w64-x86_64-perl ^
-        mingw-w64-x86_64-pkgconf
+    start "" /wait cmd /c bash -c "pacman-key --init; pacman-key --populate; pacman -Syu --noconfirm"
+    %SystemRoot%\System32\timeout.exe /t 10 /nobreak >nul
+    start "" /wait cmd /c bash -c "pacman -Syyu --noconfirm make mingw-w64-x86_64-diffutils mingw-w64-x86_64-gperf mingw-w64-x86_64-nasm mingw-w64-x86_64-perl mingw-w64-x86_64-pkgconf"
 """, 'ThirdParty')
 
 stage('python', """
