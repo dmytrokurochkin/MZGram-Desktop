@@ -491,16 +491,27 @@ mac:
 #
 # Root fix: stop asking for a full sysupgrade at all. "-u" is what pulls
 # in pacman/msys2-runtime/bash and triggers the self-restart; a plain
-# "-Sy" (sync/refresh the package database only, no "-u") never touches
-# already-installed packages, so it cannot trigger it. That refresh is all
-# the original comment actually needed to fix the real problem it named
-# ("target not found" for packages that do exist, e.g.
-# mingw-w64-x86_64-diffutils, from a stale/never-synced database on a
-# fresh install) -- the "full upgrade first" part was never required for
-# that, only assumed. With no self-restart in play, the extra isolation
-# wrapper, the settling pause, and the errorlevel-masking trick from the
-# last two attempts are no longer needed either. This string is raw
-# (r\"\"\") so none of its backslashes are Python escapes.
+# "-Sy"/"-Syy" (sync/refresh the package database only, no "-u") never
+# touches already-installed packages, so it cannot trigger it. With no
+# self-restart in play, the extra isolation wrapper, the settling pause,
+# and the errorlevel-masking trick from the last two attempts are no
+# longer needed either. This string is raw (r\"\"\") so none of its
+# backslashes are Python escapes.
+#
+# "-Sy" alone (single y) was tried first (commit b58bef6719) and got
+# further than any previous attempt -- confirmed by reading run
+# 36782284467's job log: no self-restart at all this time, the fix above
+# works. But it then failed with exactly the ORIGINAL problem this file's
+# very first version of this comment described: "error: target not
+# found: mingw-w64-x86_64-diffutils", straight after "Synchronizing
+# package databases... <repo> downloading..." for all 6 repos with no
+# separate per-repo completion logged. A single "-y" on a freshly
+# extracted install can apparently treat the bundled/stale database
+# timestamp as already current and skip the real download -- which is
+# exactly why the very first version of this fix used "-Syy" (the double
+# "y" forces the refresh even if pacman thinks it already has it), not
+# plain "-Sy". That forced-refresh need was real; only the "-u" alongside
+# it (which is what caused the self-restart) was not.
 stage('msys64', r"""
 win:
     SET PATH=%THIRDPARTY_DIR%\msys64\usr\bin;%PATH%
@@ -511,7 +522,7 @@ win:
     msys64.exe
     del msys64.exe
 
-    bash -c "pacman-key --init; pacman-key --populate; pacman -Sy --noconfirm"
+    bash -c "pacman-key --init; pacman-key --populate; pacman -Syy --noconfirm"
     pacman -S --noconfirm make mingw-w64-x86_64-diffutils mingw-w64-x86_64-gperf mingw-w64-x86_64-nasm mingw-w64-x86_64-perl mingw-w64-x86_64-pkgconf
 """, 'ThirdParty')
 
