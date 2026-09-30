@@ -528,6 +528,27 @@ QString MessageStore::mediaFolder(uint64 account, uint64 peer) const {
 		+ u"tdata/mzgram/media/%1/%2/"_q.arg(account).arg(peer);
 }
 
+QString MessageStore::databasePath() const {
+	return cWorkingDir() + u"tdata/mzgram_messages.db"_q;
+}
+
+void MessageStore::closeForFileOp() {
+	if (_opened) {
+		_db.close();
+		_opened = false;
+	}
+}
+
+void MessageStore::reopenAfterFileReplace() {
+	closeForFileOp();
+	_deleted.clear();
+	_tracked.clear();
+	if (ensureOpen()) {
+		loadCaches();
+	}
+	_trackedChanges.fire({});
+}
+
 void MessageStore::wipeAll() {
 	if (!ensureOpen()) {
 		return;

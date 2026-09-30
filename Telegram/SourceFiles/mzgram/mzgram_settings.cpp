@@ -10,6 +10,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/options.h"
 #include "boxes/peer_list_box.h"
 #include "boxes/peer_list_controllers.h"
+#include "core/application.h"
+#include "core/file_utilities.h"
 #include "data/data_peer.h"
 #include "data/data_session.h"
 #include "data/data_thread.h"
@@ -22,6 +24,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "settings/settings_common_session.h"
 #include "ui/boxes/confirm_box.h"
 #include "ui/layers/generic_box.h"
+#include "ui/toast/toast.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/fields/number_input.h"
 #include "ui/widgets/labels.h"
@@ -31,6 +34,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_layers.h"
 #include "styles/style_settings.h"
 #include "styles/style_widgets.h"
+
+#include <QtCore/QFile>
 
 namespace Settings {
 namespace {
@@ -486,6 +491,76 @@ void BuildMZGramSection(SectionBuilder &builder) {
 	builder.addDividerText(Text("In these chats photos, voice messages, "
 		"round videos and view-once media are saved as they arrive. Videos "
 		"and files are saved up to the size limit."));
+
+	builder.addSkip();
+	builder.addButton({
+		.id = u"mzgram/export-archive"_q,
+		.title = Text("Export archive"),
+		.st = &st::settingsButtonNoIcon,
+		.onClick = [=] {
+			MessageStore::Instance().closeForFileOp();
+			FileDialog::GetWritePath(
+				Core::App().getFileDialogParent(),
+				"Export MZGram archive",
+				"SQLite database (*.db)",
+				"mzgram_archive_export.db",
+				[=](QString &&result) {
+					if (result.isEmpty()) {
+						return;
+					}
+					QFile::remove(result);
+					if (QFile::copy(MessageStore::Instance().databasePath(), result)) {
+						Ui::Toast::Show("Archive exported.");
+					} else {
+						Ui::Toast::Show("Could not export the archive.");
+					}
+				});
+		},
+		.keywords = { u"export"_q, u"archive"_q, u"backup"_q },
+	});
+	builder.addButton({
+		.id = u"mzgram/import-archive"_q,
+		.title = Text("Import archive"),
+		.st = &st::settingsButtonNoIcon,
+		.onClick = [=] {
+			controller->show(Ui::MakeConfirmBox({
+				.text = QString("This replaces the current local archive "
+					"with a previously exported file. This cannot be "
+					"undone. Continue?"),
+				.confirmed = crl::guard(controller, [=] {
+					FileDialog::GetOpenPath(
+						Core::App().getFileDialogParent(),
+						"Import MZGram archive",
+						"SQLite database (*.db)",
+						[=](const FileDialog::OpenResult &result) {
+							if (result.paths.isEmpty()) {
+								return;
+							}
+							MessageStore::Instance().closeForFileOp();
+							const auto path = MessageStore::Instance()
+								.databasePath();
+							QFile::remove(path);
+							if (QFile::copy(result.paths.front(), path)) {
+								MessageStore::Instance()
+									.reopenAfterFileReplace();
+								Ui::Toast::Show("Archive imported.");
+							} else {
+								Ui::Toast::Show(
+									"Could not import the archive.");
+							}
+						});
+				}),
+				.confirmText = QString("Import"),
+				.confirmStyle = &st::attentionBoxButton,
+			}));
+		},
+		.keywords = { u"import"_q, u"archive"_q, u"restore"_q },
+	});
+	builder.addSkip();
+	builder.addDividerText(Text("Export saves the archive database as a "
+		"file you choose where to put. Import replaces the current "
+		"archive with a previously exported file (media files are not "
+		"included in either)."));
 
 	builder.addSkip();
 	builder.addButton({

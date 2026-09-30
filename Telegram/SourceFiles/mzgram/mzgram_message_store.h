@@ -106,6 +106,15 @@ public:
 	// chats allowlist and the media size limit setting untouched.
 	void wipeAll();
 
+	// Export/import for the settings screen. The export is the raw SQLite
+	// file itself, not a separate format. Callers must call
+	// closeForFileOp() before copying the file (export) or overwriting it
+	// (import), and reopenAfterFileReplace() after an import so in-memory
+	// caches match the newly-swapped-in file without a restart.
+	[[nodiscard]] QString databasePath() const;
+	void closeForFileOp();
+	void reopenAfterFileReplace();
+
 private:
 	struct PendingRaw {
 		MessageKey key;
