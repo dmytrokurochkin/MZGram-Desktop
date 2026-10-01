@@ -37,6 +37,13 @@ extern const char kOptionMarkMessages[];
 // the SendOnline() suppression point.
 extern const char kOptionSpyHideOnlineStatus[];
 
+// MZGram's own code, Spy mode section. Reverse direction of the above: hides
+// OTHER users' online/last-seen text from you, a pure local display
+// suppression (there is no server privacy control over what others' own
+// settings reveal to you). Gated in Data::OnlineText/OnlineTextFull.
+extern const char kOptionSpyHideOthersOnlineStatus[];
+[[nodiscard]] bool HideOthersOnlineStatus();
+
 // MZGram's own code. While ghost mode is suppressing read receipts,
 // replying to or reacting to a specific message is an explicit
 // interaction, so that one message is marked read on the server

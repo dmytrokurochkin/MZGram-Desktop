@@ -505,6 +505,19 @@ void BuildMZGramSection(SectionBuilder &builder) {
 	builder.addSkip();
 	AddOptionToggle(
 		builder,
+		u"mzgram/spy-hide-others-online-status"_q,
+		"Hide others' online status",
+		kOptionSpyHideOthersOnlineStatus,
+		{ u"spy"_q, u"online"_q, u"last seen"_q, u"others"_q });
+	builder.addSkip();
+	builder.addDividerText(Text("Shows \"offline\" instead of other users' "
+		"real online/last seen text, everywhere it is shown to you. Local "
+		"to this device only; does not change what others see about you, "
+		"and does not hide the online dot in the chat list."));
+
+	builder.addSkip();
+	AddOptionToggle(
+		builder,
 		u"mzgram/anti-recall"_q,
 		"Keep deleted messages",
 		kOptionAntiRecall,

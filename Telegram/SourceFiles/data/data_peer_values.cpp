@@ -19,6 +19,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_app_config.h"
 #include "ui/image/image_prepare.h"
 #include "base/unixtime.h"
+#include "mzgram/mzgram_options.h"
 
 namespace Data {
 namespace {
@@ -501,12 +502,25 @@ QString OnlineText(not_null<UserData*> user, TimeId now) {
 	if (const auto special = OnlineTextSpecial(user)) {
 		return *special;
 	}
+	// MZGram's own code. Hides other users' online/last-seen text -- the
+	// reverse of Spy mode's "hide own online status". Never applies to
+	// yourself, and reuses lng_status_offline, the same text this function
+	// already returns for a genuinely long-ago status, so the hidden case
+	// looks the same as an ordinary one. Does not cover the separate
+	// online-dot indicator in dialogs_row.cpp and others (OnlineTextActive/
+	// IsUserOnline), computed independently of this text -- see the commit
+	// this shipped in.
+	if (!user->isSelf() && MZGram::HideOthersOnlineStatus()) {
+		return tr::lng_status_offline(tr::now);
+	}
 	return OnlineText(user->lastseen(), now);
 }
 
 QString OnlineTextFull(not_null<UserData*> user, TimeId now) {
 	if (const auto special = OnlineTextSpecial(user)) {
 		return *special;
+	} else if (!user->isSelf() && MZGram::HideOthersOnlineStatus()) {
+		return tr::lng_status_offline(tr::now);
 	} else if (const auto common = OnlineTextCommon(user->lastseen(), now)) {
 		return *common;
 	}

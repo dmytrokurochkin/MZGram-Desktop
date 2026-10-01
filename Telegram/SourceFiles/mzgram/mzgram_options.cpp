@@ -57,6 +57,15 @@ base::options::toggle OptionSpyHideOnlineStatus({
 	.description = "Always report offline, regardless of Ghost mode",
 });
 
+// MZGram's own code. Reverse direction: hides other users' online/last-seen
+// text from you. Does not cover the separate online-dot indicator.
+base::options::toggle OptionSpyHideOthersOnlineStatus({
+	.id = kOptionSpyHideOthersOnlineStatus,
+	.name = "Spy mode: hide others' online status",
+	.description = "Shows \"offline\" instead of other users' real "
+		"online/last seen text",
+});
+
 // MZGram's own code (AyuGram4A has no equivalent on either platform).
 base::options::toggle OptionGhostAutoDelaySend({
 	.id = kOptionGhostAutoDelaySend,
@@ -270,6 +279,8 @@ const char kOptionOpenIn[] = "mzgram-open-in";
 const char kOptionMediaPreviewOnChatPreview[] =
 	"mzgram-media-preview-on-chat-preview";
 const char kOptionSpyHideOnlineStatus[] = "mzgram-spy-hide-online-status";
+const char kOptionSpyHideOthersOnlineStatus[] =
+	"mzgram-spy-hide-others-online-status";
 
 bool GhostMode() {
 	return OptionGhostMode.value();
@@ -288,6 +299,10 @@ bool SendOnline() {
 		return false;
 	}
 	return !GhostMode() || OptionSendOnline.value();
+}
+
+bool HideOthersOnlineStatus() {
+	return OptionSpyHideOthersOnlineStatus.value();
 }
 
 bool GhostAutoDelaySend() {
