@@ -6,6 +6,7 @@ For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "data/data_chat.h"
+#include "mzgram/mzgram_protected_content.h"
 
 #include "core/application.h"
 #include "data/data_user.h"
@@ -64,7 +65,13 @@ ChatAdminRightsInfo ChatData::defaultAdminRights(not_null<UserData*> user) {
 		| (isCreator ? Flag::AddAdmins : Flag(0)));
 }
 
+// MZGram: "Forward and save protected content" lifts the restriction in the
+// app; the server's rule stays in allowsForwardingOnServer().
 bool ChatData::allowsForwarding() const {
+	return MZGram::AllowsForwarding(allowsForwardingOnServer());
+}
+
+bool ChatData::allowsForwardingOnServer() const {
 	return !(flags() & Flag::NoForwards);
 }
 

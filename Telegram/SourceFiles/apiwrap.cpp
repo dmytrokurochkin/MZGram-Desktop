@@ -86,6 +86,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
 #include "main/main_account.h"
+#include "mzgram/mzgram_protected_copy.h"
 #include "ui/boxes/confirm_box.h"
 #include "ui/boxes/emoji_stake_box.h"
 #include "ui/controls/ton_common.h"
@@ -3838,6 +3839,9 @@ void ApiWrap::forwardMessages(
 			++i;
 		}
 	}
+	// MZGram: protected messages go out as copies, see
+	// mzgram_protected_content.h.
+	MZGram::SendProtectedCopies(this, draft, action);
 	if (draft.items.empty()) {
 		if (successCallback) {
 			successCallback();

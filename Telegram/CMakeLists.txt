@@ -1519,6 +1519,10 @@ PRIVATE
     mzgram/mzgram_message_store.h
     mzgram/mzgram_options.cpp
     mzgram/mzgram_options.h
+    mzgram/mzgram_protected_content.cpp
+    mzgram/mzgram_protected_content.h
+    mzgram/mzgram_protected_copy.cpp
+    mzgram/mzgram_protected_copy.h
     mzgram/mzgram_text_filters.cpp
     mzgram/mzgram_text_filters.h
     mzgram/mzgram_qr_scan.cpp

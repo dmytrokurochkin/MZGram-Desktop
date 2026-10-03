@@ -178,6 +178,18 @@ const std::vector<Phrase> kPhrases = {
 	{ "show_save_message", "Show \"Save message\" in the message menu", "Показувати «Зберегти повідомлення» в меню повідомлення" },
 	{ "show_set_reminder", "Show \"Set a reminder\" in the message menu", "Показувати «Встановити нагадування» в меню повідомлення" },
 	{ "show_open_in", "Show \"Open in...\" for downloaded files", "Показувати «Відкрити в…» для завантажених файлів" },
+	{ "save_protected_content", "Forward and save protected content", "Пересилати і зберігати захищений вміст" },
+	{ "save_protected_content_info",
+		"In chats and channels whose owner restricted saving content, you "
+		"can forward, save and copy messages and media and take "
+		"screenshots, like anywhere else. Telegram does not forward such "
+		"messages, so they are sent as new messages without the original "
+		"sender; media not downloaded yet is downloaded first.",
+		"У чатах і каналах, де власник обмежив збереження вмісту, ви "
+		"можете пересилати, зберігати й копіювати повідомлення і медіа та "
+		"робити скріншоти, як і деінде. Telegram не пересилає такі "
+		"повідомлення, тож вони надсилаються як нові, без початкового "
+		"автора; ще не завантажене медіа спершу завантажується." },
 	{ "message_menu_info",
 		"Repeat sends the same message to this chat again. Message details "
 		"shows its id, dates, views and file. Scan for QR code decodes an "

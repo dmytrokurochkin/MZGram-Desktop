@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "base/basic_types.h"
 #include "mzgram/mzgram_lang.h"
+#include "mzgram/mzgram_protected_content.h"
 #include "mzgram/mzgram_text_filters.h"
 
 #include <QtCore/QDirIterator>
@@ -178,6 +179,151 @@ void TestEveryUsedKeyIsInTheTable() {
 		missing.join(u", "_q).toStdString().c_str());
 }
 
+
+// Settings > MZGram > Message menu > "Forward and save protected content".
+
+void SetProtectedContentOption(bool enabled) {
+	base::options::lookup<bool>(
+		MZGram::kOptionSaveProtectedContent).set(enabled);
+}
+
+// The app's checks keep the restriction with the switch off and lift it
+// with the switch on; chats without it are never restricted.
+void TestProtectedContentFollowsTheSwitch() {
+	SetProtectedContentOption(false);
+	const auto off = !MZGram::AllowsForwarding(false)
+		&& MZGram::ForbidsForward(true)
+		&& !MZGram::SendAsCopy(true);
+	SetProtectedContentOption(true);
+	const auto on = MZGram::AllowsForwarding(false)
+		&& !MZGram::ForbidsForward(true)
+		&& MZGram::SendAsCopy(true);
+	const auto open = MZGram::AllowsForwarding(true)
+		&& !MZGram::ForbidsForward(false)
+		&& !MZGram::SendAsCopy(false);
+	SetProtectedContentOption(false);
+	const auto openOff = MZGram::AllowsForwarding(true)
+		&& !MZGram::ForbidsForward(false)
+		&& !MZGram::SendAsCopy(false);
+	Check(
+		off && on && open && openOff,
+		"protected content checks follow the switch",
+		!off
+			? "switch off does not restrict"
+			: !on
+			? "switch on still restricts"
+			: "unprotected chat restricted");
+}
+
+// Forwarding a protected message sends a copy: its text, or its file
+// uploaded again with the text as caption; a file not downloaded yet is
+// downloaded first.
+void TestProtectedCopyPlan() {
+	using namespace MZGram;
+	using Media = CopyMedia;
+	using Kind = CopyKind;
+	struct Case {
+		const char *what;
+		CopySource source;
+		CopyPlan plan;
+	};
+	const auto cases = std::vector<Case>{
+		{ "text",
+			{ .media = Media::None, .hasText = true },
+			{ .kind = Kind::Text } },
+		{ "empty",
+			{ .media = Media::None },
+			{ .kind = Kind::Skip } },
+		{ "photo with caption",
+			{ .media = Media::Photo, .hasText = true, .fileOnDisk = true },
+			{ .kind = Kind::Photo, .caption = true } },
+		{ "photo not downloaded",
+			{ .media = Media::Photo },
+			{ .kind = Kind::Photo, .download = true } },
+		{ "photo, captions dropped",
+			{
+				.media = Media::Photo,
+				.hasText = true,
+				.fileOnDisk = true,
+				.dropCaption = true,
+			},
+			{ .kind = Kind::Photo } },
+		{ "voice",
+			{ .media = Media::Voice, .hasText = true, .fileOnDisk = true },
+			{ .kind = Kind::Voice } },
+		{ "round not downloaded",
+			{ .media = Media::Round },
+			{ .kind = Kind::Round, .download = true } },
+		{ "file not downloaded",
+			{ .media = Media::File, .hasText = true },
+			{ .kind = Kind::File, .download = true, .caption = true } },
+		{ "poll with text",
+			{ .media = Media::Other, .hasText = true },
+			{ .kind = Kind::Text } },
+		{ "poll",
+			{ .media = Media::Other },
+			{ .kind = Kind::Skip } },
+	};
+	auto problems = QStringList();
+	for (const auto &[what, source, plan] : cases) {
+		const auto result = PlanCopy(source);
+		if (result.kind != plan.kind
+			|| result.download != plan.download
+			|| result.caption != plan.caption) {
+			problems.push_back(QString::fromUtf8(what));
+		}
+	}
+	Check(
+		problems.isEmpty(),
+		"protected messages are copied with their text and file",
+		problems.join(u", "_q).toStdString().c_str());
+}
+
+// The app's checks and forwarding go through the switch.
+void TestProtectedContentIsWired() {
+	const auto read = [](const char *path) {
+		auto file = QFile(QString::fromUtf8(MZGRAM_SOURCE_DIR) + '/' + path);
+		return file.open(QIODevice::ReadOnly)
+			? QString::fromUtf8(file.readAll())
+			: QString();
+	};
+	const auto peer = u"MZGram::AllowsForwarding(allowsForwardingOnServer())"_q;
+	const auto wired = std::vector<std::pair<const char*, QString>>{
+		{ "data/data_channel.cpp", peer },
+		{ "data/data_chat.cpp", peer },
+		{ "data/data_user.cpp", peer },
+		{
+			"history/history_item.cpp",
+			u"MZGram::ForbidsForward(forbidsForwardOnServer())"_q,
+		},
+		{
+			"data/data_peer_values.cpp",
+			u"rpl::map(MZGram::AllowsForwarding)"_q,
+		},
+		{ "mzgram/mzgram_settings.cpp", u"kOptionSaveProtectedContent"_q },
+	};
+	auto missing = QStringList();
+	for (const auto &[path, text] : wired) {
+		if (!read(path).contains(text)) {
+			missing.push_back(QString::fromUtf8(path));
+		}
+	}
+	// Copies are sent before forwardMessages forwards the rest.
+	const auto api = read("apiwrap.cpp");
+	const auto start = api.indexOf(u"void ApiWrap::forwardMessages("_q);
+	const auto copies = api.indexOf(
+		u"MZGram::SendProtectedCopies(this, draft, action);"_q,
+		start);
+	const auto forward = api.indexOf(u"CollectForwardRanges("_q, start);
+	if (start < 0 || copies < 0 || forward < 0 || copies > forward) {
+		missing.push_back(u"apiwrap.cpp"_q);
+	}
+	Check(
+		missing.isEmpty(),
+		"protected content checks and forwarding use the switch",
+		missing.join(u", "_q).toStdString().c_str());
+}
+
 } // namespace
 
 int main() {
@@ -189,6 +335,9 @@ int main() {
 		TestEveryPhraseInBothLanguages,
 		TestTranslatePicksTheLanguage,
 		TestEveryUsedKeyIsInTheTable,
+		TestProtectedContentFollowsTheSwitch,
+		TestProtectedCopyPlan,
+		TestProtectedContentIsWired,
 	};
 	for (const auto &test : tests) {
 		test();

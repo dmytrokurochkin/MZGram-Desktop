@@ -150,6 +150,8 @@ inline auto PeerFullFlagValue(
 	not_null<PeerData*> peer);
 [[nodiscard]] rpl::producer<bool> AllowsForwardingValue(
 	not_null<PeerData*> peer);
+[[nodiscard]] rpl::producer<bool> AllowsForwardingOnServerValue(
+	not_null<PeerData*> peer);
 [[nodiscard]] rpl::producer<bool> PeerPremiumValue(not_null<PeerData*> peer);
 [[nodiscard]] rpl::producer<bool> AmPremiumValue(
 	not_null<Main::Session*> session);

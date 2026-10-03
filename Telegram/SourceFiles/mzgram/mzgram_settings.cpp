@@ -21,6 +21,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "mzgram/mzgram_lang.h"
 #include "mzgram/mzgram_message_store.h"
 #include "mzgram/mzgram_options.h"
+#include "mzgram/mzgram_protected_content.h"
 #include "settings/settings_builder.h"
 #include "settings/settings_common_session.h"
 #include "ui/boxes/confirm_box.h"
@@ -539,6 +540,15 @@ void BuildMZGramSection(SectionBuilder &builder) {
 		{ u"open"_q, u"file"_q, u"video"_q });
 	builder.addSkip();
 	builder.addDividerText(Text("message_menu_info"));
+	builder.addSkip();
+	AddOptionToggle(
+		builder,
+		u"mzgram/save-protected-content"_q,
+		"save_protected_content",
+		kOptionSaveProtectedContent,
+		{ u"protected"_q, u"forward"_q, u"save"_q, u"copy"_q, u"screenshot"_q });
+	builder.addSkip();
+	builder.addDividerText(Text("save_protected_content_info"));
 
 	// Media and calls.
 	builder.addSkip();

@@ -1749,6 +1749,17 @@ bool PeerData::allowsForwarding() const {
 	return false;
 }
 
+bool PeerData::allowsForwardingOnServer() const {
+	if (const auto user = asUser()) {
+		return user->allowsForwardingOnServer();
+	} else if (const auto channel = asChannel()) {
+		return channel->allowsForwardingOnServer();
+	} else if (const auto chat = asChat()) {
+		return chat->allowsForwardingOnServer();
+	}
+	return false;
+}
+
 Data::RestrictionCheckResult PeerData::amRestricted(
 		ChatRestriction right) const {
 	using Result = Data::RestrictionCheckResult;

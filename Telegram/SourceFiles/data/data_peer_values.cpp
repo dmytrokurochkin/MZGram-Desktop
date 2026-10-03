@@ -6,6 +6,7 @@ For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "data/data_peer_values.h"
+#include "mzgram/mzgram_protected_content.h"
 
 #include "lang/lang_keys.h"
 #include "data/data_channel.h"
@@ -378,7 +379,15 @@ rpl::producer<bool> CanPinMessagesValue(not_null<PeerData*> peer) {
 	Unexpected("Peer type in CanPinMessagesValue.");
 }
 
+// MZGram: follows "Forward and save protected content", see
+// PeerData::allowsForwarding.
 rpl::producer<bool> AllowsForwardingValue(not_null<PeerData*> peer) {
+	return AllowsForwardingOnServerValue(
+		peer
+	) | rpl::map(MZGram::AllowsForwarding);
+}
+
+rpl::producer<bool> AllowsForwardingOnServerValue(not_null<PeerData*> peer) {
 	if (const auto user = peer->asUser()) {
 		return rpl::combine(
 			PeerFlagValue(user, UserDataFlag::NoForwardsMyEnabled),

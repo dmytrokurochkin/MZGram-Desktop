@@ -6,6 +6,7 @@ For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "data/data_user.h"
+#include "mzgram/mzgram_protected_content.h"
 
 #include "api/api_credits.h"
 #include "api/api_global_privacy.h"
@@ -664,7 +665,13 @@ bool UserData::readDatesPrivate() const {
 	return (flags() & UserDataFlag::ReadDatesPrivate);
 }
 
+// MZGram: "Forward and save protected content" lifts the restriction in the
+// app; the server's rule stays in allowsForwardingOnServer().
 bool UserData::allowsForwarding() const {
+	return MZGram::AllowsForwarding(allowsForwardingOnServer());
+}
+
+bool UserData::allowsForwardingOnServer() const {
 	return !(flags() & Flag::NoForwardsMyEnabled)
 		&& !(flags() & Flag::NoForwardsPeerEnabled);
 }

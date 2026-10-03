@@ -103,6 +103,7 @@ public:
 
 	// Like in ChannelData.
 	[[nodiscard]] bool allowsForwarding() const;
+	[[nodiscard]] bool allowsForwardingOnServer() const;
 	[[nodiscard]] bool canEditInformation() const;
 	[[nodiscard]] bool canEditPermissions() const;
 	[[nodiscard]] bool canEditUsername() const;

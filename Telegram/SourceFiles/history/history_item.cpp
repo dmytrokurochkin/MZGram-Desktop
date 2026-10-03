@@ -20,6 +20,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "mzgram/mzgram_anti_recall.h"
 #include "mzgram/mzgram_archive.h"
 #include "mzgram/mzgram_options.h"
+#include "mzgram/mzgram_protected_content.h"
 #include "history/history_item_helpers.h"
 #include "history/history_unread_things.h"
 #include "history/history.h"
@@ -3266,7 +3267,13 @@ bool HistoryItem::canStopPoll() const {
 	return canBeEdited() && isRegular();
 }
 
+// MZGram: "Forward and save protected content" lifts the restriction in the
+// app; the server's rule stays in forbidsForwardOnServer().
 bool HistoryItem::forbidsForward() const {
+	return MZGram::ForbidsForward(forbidsForwardOnServer());
+}
+
+bool HistoryItem::forbidsForwardOnServer() const {
 	return (_flags & MessageFlag::NoForwards);
 }
 

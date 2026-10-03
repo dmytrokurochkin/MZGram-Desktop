@@ -483,6 +483,7 @@ public:
 	[[nodiscard]] bool canBeEdited() const;
 	[[nodiscard]] bool canStopPoll() const;
 	[[nodiscard]] bool forbidsForward() const;
+	[[nodiscard]] bool forbidsForwardOnServer() const;
 	[[nodiscard]] bool forbidsSaving() const;
 	[[nodiscard]] bool allowsSendNow() const;
 	[[nodiscard]] bool allowsReschedule() const;
