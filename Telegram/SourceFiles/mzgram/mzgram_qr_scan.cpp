@@ -6,6 +6,7 @@ For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "mzgram/mzgram_qr_scan.h"
+#include "mzgram/mzgram_lang.h"
 
 #include "data/data_photo.h"
 #include "data/data_photo_media.h"
@@ -78,13 +79,13 @@ void ShowQrResultBox(
 		not_null<Window::SessionController*> controller,
 		const QString &text) {
 	controller->show(Box([=](not_null<Ui::GenericBox*> box) {
-		box->setTitle(rpl::single(u"QR code"_q));
+		box->setTitle(MZGram::Tr("qr_code"));
 		box->setWidth(st::boxWideWidth);
 		box->addRow(object_ptr<Ui::FlatLabel>(
 			box,
 			rpl::single(text),
 			st::boxLabel));
-		box->addButton(rpl::single(u"Copy"_q), [=] {
+		box->addButton(MZGram::Tr("copy"), [=] {
 			QGuiApplication::clipboard()->setText(text);
 			box->closeBox();
 		});
@@ -94,10 +95,10 @@ void ShowQrResultBox(
 
 void ShowNoQrCodeFoundBox(not_null<Window::SessionController*> controller) {
 	controller->show(Box([=](not_null<Ui::GenericBox*> box) {
-		box->setTitle(rpl::single(u"QR code"_q));
+		box->setTitle(MZGram::Tr("qr_code"));
 		box->addRow(object_ptr<Ui::FlatLabel>(
 			box,
-			rpl::single(u"No QR code was found in this photo."_q),
+			MZGram::Tr("no_qr_code"),
 			st::boxLabel));
 		box->addButton(tr::lng_box_ok(), [=] { box->closeBox(); });
 	}));
@@ -120,7 +121,7 @@ void AddScanQrCodeAction(
 	if (photo->isNull() || !media || !media->loaded()) {
 		return;
 	}
-	menu->addAction(u"Scan for QR code"_q, [=] {
+	menu->addAction(MZGram::TrNow("scan_qr"), [=] {
 		const auto media = photo->activeMediaView();
 		const auto image = media
 			? media->image(Data::PhotoSize::Large)

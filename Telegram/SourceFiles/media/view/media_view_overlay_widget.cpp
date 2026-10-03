@@ -100,6 +100,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/qt_signal_producer.h"
 #include "base/event_filter.h"
 #include "mzgram/mzgram_options.h"
+#include "mzgram/mzgram_lang.h"
 #include "main/main_account.h"
 #include "main/main_domain.h" // Domain::activeSessionValue.
 #include "main/main_session.h"
@@ -4545,8 +4546,7 @@ void OverlayWidget::show(OpenRequest request) {
 		&& !MZGram::GhostMode()) {
 		if (const auto window = findWindow()) {
 			window->show(Ui::MakeConfirmBox({
-				.text = QString("Ghost mode is off. Viewing this story "
-					"will mark it as seen. Turn ghost mode on first?"),
+				.text = MZGram::TrNow("ghost_stories_question"),
 				.confirmed = crl::guard(_widget, [=] {
 					MZGram::EnableGhostMode();
 					_mzgramSkipGhostModePrompt = true;
@@ -4556,8 +4556,8 @@ void OverlayWidget::show(OpenRequest request) {
 					_mzgramSkipGhostModePrompt = true;
 					show(request);
 				}),
-				.confirmText = QString("Enable and view"),
-				.cancelText = QString("View anyway"),
+				.confirmText = MZGram::TrNow("enable_and_view"),
+				.cancelText = MZGram::TrNow("view_anyway"),
 			}), Ui::LayerOption::CloseOther);
 			return;
 		}

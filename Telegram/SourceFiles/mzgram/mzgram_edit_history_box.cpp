@@ -6,6 +6,7 @@ For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "mzgram/mzgram_edit_history_box.h"
+#include "mzgram/mzgram_lang.h"
 
 #include "base/unixtime.h"
 #include "lang/lang_keys.h"
@@ -29,7 +30,7 @@ void EditHistoryBox(
 		MessageKey key,
 		QString currentText) {
 	// Strings are hardcoded until MZGram has its own lang keys.
-	box->setTitle(rpl::single(u"Edit history"_q));
+	box->setTitle(MZGram::Tr("edit_history"));
 	box->setWidth(st::boxWideWidth);
 	box->addButton(tr::lng_box_ok(), [=] { box->closeBox(); });
 
@@ -42,18 +43,18 @@ void EditHistoryBox(
 
 	const auto versions = MessageStore::Instance().edits(key);
 	if (versions.empty()) {
-		addLabel(u"No earlier versions were recorded for this message."_q);
+		addLabel(MZGram::TrNow("no_earlier_versions"));
 		return;
 	}
 	// Each row is stamped with the moment that version stopped being current,
 	// which is the only time the client observes; the server never reports
 	// when an intermediate version was first written.
 	for (const auto &version : versions) {
-		addLabel(u"Replaced "_q + FormatWhen(version.replacedAt));
-		addLabel(version.text.isEmpty() ? u"(empty)"_q : version.text);
+		addLabel(MZGram::TrNow("replaced_at").arg(FormatWhen(version.replacedAt)));
+		addLabel(version.text.isEmpty() ? MZGram::TrNow("empty_text") : version.text);
 	}
-	addLabel(u"Current"_q);
-	addLabel(currentText.isEmpty() ? u"(empty)"_q : currentText);
+	addLabel(MZGram::TrNow("current_version"));
+	addLabel(currentText.isEmpty() ? MZGram::TrNow("empty_text") : currentText);
 }
 
 } // namespace MZGram

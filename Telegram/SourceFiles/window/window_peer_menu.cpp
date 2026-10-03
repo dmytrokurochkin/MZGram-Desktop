@@ -79,6 +79,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history.h"
 #include "mzgram/mzgram_archive.h"
 #include "mzgram/mzgram_options.h"
+#include "mzgram/mzgram_lang.h"
 #include "history/history_item_helpers.h" // GetErrorForSending.
 #include "history/history_item_components.h"
 #include "history/view/controls/history_view_forward_panel.h"
@@ -1862,13 +1863,13 @@ void Filler::addMZGramKeepMessages() {
 	const auto controller = _controller;
 	_addAction(
 		(tracked
-			? u"Stop saving deleted messages"_q
-			: u"Save deleted messages"_q),
+			? MZGram::TrNow("stop_saving_deleted_in_chat")
+			: MZGram::TrNow("save_deleted_in_chat")),
 		[=] {
 			MZGram::SetTracked(peer, !tracked);
 			controller->showToast(tracked
-				? u"Deleted messages are no longer saved in this chat."_q
-				: u"Deleted messages in this chat will be saved."_q);
+				? MZGram::TrNow("saving_stopped")
+				: MZGram::TrNow("saving_started"));
 		},
 		&st::menuIconStealth);
 }

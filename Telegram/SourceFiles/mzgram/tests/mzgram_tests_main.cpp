@@ -5,8 +5,14 @@ a fork of Telegram Desktop.
 For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
+#include "base/basic_types.h"
+#include "mzgram/mzgram_lang.h"
 #include "mzgram/mzgram_text_filters.h"
 
+#include <QtCore/QDirIterator>
+#include <QtCore/QFile>
+#include <QtCore/QRegularExpression>
+#include <QtCore/QSet>
 #include <QtCore/QString>
 
 #include "base/options.h"
@@ -76,6 +82,102 @@ void TestStripHandlesEmpty() {
 		result.toStdString().c_str());
 }
 
+// Every MZGram text is in English and Ukrainian, with the same %1, %2.
+void TestEveryPhraseInBothLanguages() {
+	// Read the same in both languages.
+	const auto same = QSet<QString>{ u"settings_title"_q, u"details_id"_q };
+	const auto placeholders = [](const QString &text) {
+		auto result = QStringList();
+		auto i = QRegularExpression(u"%[0-9]"_q).globalMatch(text);
+		while (i.hasNext()) {
+			result.push_back(i.next().captured());
+		}
+		result.sort();
+		return result;
+	};
+	auto keys = QSet<QString>();
+	auto problems = QStringList();
+	for (const auto &phrase : MZGram::Phrases()) {
+		const auto key = QString::fromUtf8(phrase.key);
+		const auto english = QString::fromUtf8(phrase.english);
+		const auto ukrainian = QString::fromUtf8(phrase.ukrainian);
+		if (keys.contains(key)) {
+			problems.push_back(key + u": twice"_q);
+		}
+		keys.insert(key);
+		if (english.trimmed().isEmpty() || ukrainian.trimmed().isEmpty()) {
+			problems.push_back(key + u": empty"_q);
+		} else if (english == ukrainian && !same.contains(key)) {
+			problems.push_back(key + u": not translated"_q);
+		}
+		if (placeholders(english) != placeholders(ukrainian)) {
+			problems.push_back(key + u": placeholders differ"_q);
+		}
+	}
+	std::printf("string table: %d phrases\n", int(keys.size()));
+	Check(
+		problems.isEmpty() && keys.size() > 100,
+		"every MZGram phrase is in English and Ukrainian",
+		problems.join(u", "_q).toStdString().c_str());
+}
+
+// The app's language picks the text.
+void TestTranslatePicksTheLanguage() {
+	Check(
+		MZGram::Translate("section_archive", false) == u"Archive"_q
+			&& MZGram::Translate("section_archive", true)
+				== QString::fromUtf8("Архів"),
+		"Translate returns English or Ukrainian",
+		MZGram::Translate("section_archive", true).toStdString().c_str());
+}
+
+// Every key the sources ask for is in the table: MZGram::Tr("..."),
+// MZGram::TrNow("..."), and the settings screen's Text("...") and switch
+// titles.
+void TestEveryUsedKeyIsInTheTable() {
+	auto keys = QSet<QString>();
+	for (const auto &phrase : MZGram::Phrases()) {
+		keys.insert(QString::fromUtf8(phrase.key));
+	}
+	const auto patterns = {
+		QRegularExpression(u"\\bTr(?:Now)?\\(\"([a-z0-9_]+)\"\\)"_q),
+		QRegularExpression(u"\\bText\\(\"([a-z0-9_]+)\"\\)"_q),
+		QRegularExpression(u"_q,\\s*\"([a-z0-9_]+)\",\\s*kOption"_q),
+	};
+	auto used = 0;
+	auto missing = QStringList();
+	auto files = QDirIterator(
+		QString::fromUtf8(MZGRAM_SOURCE_DIR),
+		{ u"*.cpp"_q },
+		QDir::Files,
+		QDirIterator::Subdirectories);
+	while (files.hasNext()) {
+		auto file = QFile(files.next());
+		if (!file.open(QIODevice::ReadOnly)) {
+			continue;
+		}
+		const auto text = QString::fromUtf8(file.readAll());
+		if (!text.contains(u"mzgram/mzgram_lang.h"_q)) {
+			continue;
+		}
+		for (const auto &pattern : patterns) {
+			auto i = pattern.globalMatch(text);
+			while (i.hasNext()) {
+				const auto key = i.next().captured(1);
+				++used;
+				if (!keys.contains(key)) {
+					missing.push_back(key);
+				}
+			}
+		}
+	}
+	std::printf("keys used in the sources: %d\n", used);
+	Check(
+		missing.isEmpty() && used > 100,
+		"every key the sources use is in the string table",
+		missing.join(u", "_q).toStdString().c_str());
+}
+
 } // namespace
 
 int main() {
@@ -84,6 +186,9 @@ int main() {
 		TestStripRemovesCombiningMarksWhenOn,
 		TestStripLeavesPlainTextUnchanged,
 		TestStripHandlesEmpty,
+		TestEveryPhraseInBothLanguages,
+		TestTranslatePicksTheLanguage,
+		TestEveryUsedKeyIsInTheTable,
 	};
 	for (const auto &test : tests) {
 		test();

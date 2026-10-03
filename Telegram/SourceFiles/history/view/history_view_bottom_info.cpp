@@ -20,6 +20,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history_item_components.h"
 #include "mzgram/mzgram_anti_recall.h"
 #include "mzgram/mzgram_options.h"
+#include "mzgram/mzgram_lang.h"
 #include "history/history_item_helpers.h"
 #include "history/history_item.h"
 #include "history/history.h"
@@ -502,9 +503,8 @@ void BottomInfo::layoutDateText() {
 		: QString();
 	const auto author = _data.author;
 	const auto prefix = !author.isEmpty() ? u", "_q : QString();
-	// Hardcoded until MZGram has its own lang keys.
 	const auto deleted = (_data.flags & Data::Flag::Deleted)
-		? u"deleted "_q
+		? (MZGram::TrNow("deleted_mark") + ' ')
 		: QString();
 	const auto dateText = editedPrimary
 		? FormatEditedDate(_data.date, _data.editedDate)

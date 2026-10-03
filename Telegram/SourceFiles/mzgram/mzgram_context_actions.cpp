@@ -6,6 +6,7 @@ For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "mzgram/mzgram_context_actions.h"
+#include "mzgram/mzgram_lang.h"
 
 #include "api/api_common.h"
 #include "apiwrap.h"
@@ -120,7 +121,7 @@ void AddRepeatMessageAction(
 	const auto history = item->history();
 	const auto itemId = item->fullId();
 	const auto session = &history->session();
-	menu->addAction(u"Repeat"_q, [=] {
+	menu->addAction(MZGram::TrNow("repeat"), [=] {
 		const auto current = session->data().message(itemId);
 		if (!current) {
 			return;
@@ -154,13 +155,13 @@ void AddMessageDetailsAction(
 	}
 	const auto itemId = item->fullId();
 	const auto owner = &item->history()->owner();
-	menu->addAction(u"Message details"_q, [=] {
+	menu->addAction(MZGram::TrNow("message_details"), [=] {
 		const auto item = owner->message(itemId);
 		if (!item) {
 			return;
 		}
 		controller->show(Box([=](not_null<Ui::GenericBox*> box) {
-			box->setTitle(rpl::single(u"Message details"_q));
+			box->setTitle(MZGram::Tr("message_details"));
 			box->setWidth(st::boxWideWidth);
 			box->addButton(tr::lng_box_ok(), [=] { box->closeBox(); });
 
@@ -180,30 +181,30 @@ void AddMessageDetailsAction(
 				&& !forwarded->story
 				&& forwarded->psaType.isEmpty();
 
-			addRow(u"ID"_q, QString::number(item->id.bare));
-			addRow(u"Date"_q, FormatMoment(item->date()));
+			addRow(MZGram::TrNow("details_id"), QString::number(item->id.bare));
+			addRow(MZGram::TrNow("details_date"), FormatMoment(item->date()));
 			if (edited) {
-				addRow(u"Edited"_q, FormatMoment(edited->date));
+				addRow(MZGram::TrNow("details_edited"), FormatMoment(edited->date));
 			}
 			if (isForwarded) {
 				addRow(
-					u"Originally sent"_q,
+					MZGram::TrNow("details_originally_sent"),
 					FormatMoment(forwarded->originalDate));
 			}
 			if (item->hasViews() && item->viewsCount() > 0) {
-				addRow(u"Views"_q, QString::number(item->viewsCount()));
+				addRow(MZGram::TrNow("details_views"), QString::number(item->viewsCount()));
 			}
 
 			if (const auto media = item->media()) {
 				const auto size = MediaByteSize(media);
 				if (size > 0) {
-					addRow(u"File size"_q, Ui::FormatSizeText(size));
+					addRow(MZGram::TrNow("details_file_size"), Ui::FormatSizeText(size));
 				}
-				addRow(u"MIME type"_q, MediaMime(media));
+				addRow(MZGram::TrNow("details_mime_type"), MediaMime(media));
 				if (const auto document = media->document()) {
-					addRow(u"File name"_q, document->filename());
+					addRow(MZGram::TrNow("details_file_name"), document->filename());
 				}
-				addRow(u"Resolution"_q, MediaResolution(media));
+				addRow(MZGram::TrNow("details_resolution"), MediaResolution(media));
 			}
 		}));
 	}, &st::menuIconInfo);
@@ -229,7 +230,7 @@ void AddSaveMessageAction(
 	}
 	const auto itemId = item->fullId();
 	const auto session = &history->session();
-	menu->addAction(u"Save message"_q, [=] {
+	menu->addAction(MZGram::TrNow("save_message"), [=] {
 		const auto current = session->data().message(itemId);
 		if (!current) {
 			return;
@@ -269,7 +270,7 @@ void AddSetReminderAction(
 	}
 	const auto itemId = item->fullId();
 	const auto session = &history->session();
-	menu->addAction(u"Set a reminder"_q, [=] {
+	menu->addAction(MZGram::TrNow("set_reminder"), [=] {
 		const auto submit = [=](Api::SendOptions options) {
 			const auto current = session->data().message(itemId);
 			if (!current) {
@@ -309,7 +310,7 @@ void AddOpenInAction(
 	if (filepath.isEmpty()) {
 		return;
 	}
-	menu->addAction(u"Open in..."_q, [=] {
+	menu->addAction(MZGram::TrNow("open_in"), [=] {
 		File::OpenWith(filepath);
 	}, &st::menuIconFile);
 }

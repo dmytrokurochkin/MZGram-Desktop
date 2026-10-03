@@ -6,6 +6,7 @@ For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "mzgram/mzgram_anti_recall.h"
+#include "mzgram/mzgram_lang.h"
 
 #include "data/data_peer.h"
 #include "data/data_session.h"
@@ -88,7 +89,7 @@ void AddEditHistoryAction(
 	const auto key = KeyFor(item);
 	const auto owner = &item->history()->owner();
 	const auto itemId = item->fullId();
-	menu->addAction(u"Edit history"_q, [=] {
+	menu->addAction(MZGram::TrNow("edit_history"), [=] {
 		const auto item = owner->message(itemId);
 		const auto current = item ? item->originalText().text : QString();
 		controller->show(Box(EditHistoryBox, key, current));

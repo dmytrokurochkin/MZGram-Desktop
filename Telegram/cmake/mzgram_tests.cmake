@@ -5,7 +5,8 @@
 # https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #
 # Headless unit tests for MZGram's own logic that has no session/history/
-# network dependency (currently just the Zalgo filter). Deliberately not a
+# network dependency: the Zalgo filter and the English and Ukrainian string
+# table. Deliberately not a
 # GUI app like test_text below it: no QApplication, prints PASS/FAIL lines
 # and exits non-zero on the first failure, so it can be run in CI with
 # nothing more than the built binary.
@@ -19,9 +20,17 @@ target_include_directories(mzgram_tests PRIVATE ${src_loc})
 
 nice_target_sources(mzgram_tests ${src_loc}
 PRIVATE
+    mzgram/mzgram_lang.h
+    mzgram/mzgram_lang_table.cpp
     mzgram/mzgram_text_filters.cpp
     mzgram/mzgram_text_filters.h
     mzgram/tests/mzgram_tests_main.cpp
+)
+
+# The string table test checks every key the sources use.
+target_compile_definitions(mzgram_tests
+PRIVATE
+    MZGRAM_SOURCE_DIR="${src_loc}"
 )
 
 target_link_libraries(mzgram_tests

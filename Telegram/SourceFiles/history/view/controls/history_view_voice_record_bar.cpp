@@ -12,6 +12,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/random.h"
 #include "base/unixtime.h"
 #include "mzgram/mzgram_options.h"
+#include "mzgram/mzgram_lang.h"
 #include "ui/boxes/confirm_box.h"
 #include "calls/calls_instance.h"
 #include "chat_helpers/compose/compose_show.h"
@@ -3023,7 +3024,7 @@ void VoiceRecordBar::stopRecording(StopType type, bool ttlBeforeHide) {
 							});
 						if (MZGram::RoundConfirmation()) {
 							_show->showBox(Ui::MakeConfirmBox({
-								.text = u"Send this video message?"_q,
+								.text = MZGram::TrNow("send_video_message_question"),
 								.confirmed = std::move(sendRoundCallback),
 								.confirmText = tr::lng_send_button(),
 							}));
@@ -3068,7 +3069,7 @@ void VoiceRecordBar::stopRecording(StopType type, bool ttlBeforeHide) {
 				});
 			if (MZGram::VoiceConfirmation()) {
 				_show->showBox(Ui::MakeConfirmBox({
-					.text = u"Send this voice message?"_q,
+					.text = MZGram::TrNow("send_voice_message_question"),
 					.confirmed = std::move(sendVoiceCallback),
 					.confirmText = tr::lng_send_button(),
 				}));
@@ -3161,8 +3162,8 @@ void VoiceRecordBar::requestToSendWithOptions(Api::SendOptions options) {
 		if (confirmationNeeded) {
 			_show->showBox(Ui::MakeConfirmBox({
 				.text = (video
-					? u"Send this video message?"_q
-					: u"Send this voice message?"_q),
+					? MZGram::TrNow("send_video_message_question")
+					: MZGram::TrNow("send_voice_message_question")),
 				.confirmed = std::move(sendVoiceCallback),
 				.confirmText = tr::lng_send_button(),
 			}));
