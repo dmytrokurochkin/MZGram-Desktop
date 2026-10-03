@@ -23,8 +23,7 @@ namespace MZGram {
 // MZGram's own code, mirroring the QR-code scanning feature already
 // present in Telegram for Android (which uses zxing there). Decodes a QR
 // code found in a photo that is already downloaded to this device, fully
-// offline, using the bundled quirc library. Not present in AyuGram
-// Desktop, which has no equivalent feature.
+// offline, using the bundled quirc library.
 void AddScanQrCodeAction(
 	not_null<Ui::PopupMenu*> menu,
 	not_null<PhotoData*> photo,

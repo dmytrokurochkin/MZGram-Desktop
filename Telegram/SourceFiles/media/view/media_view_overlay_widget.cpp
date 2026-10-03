@@ -744,8 +744,7 @@ OverlayWidget::OverlayWidget()
 	const auto mouseButton = [](not_null<QEvent*> e) {
 		return static_cast<QMouseEvent*>(e.get())->button();
 	};
-	// Ported from AyuGram4A ui/PhotoViewer.java (autoPauseVideo), mirrored
-	// here for Desktop: AyuGram Desktop has no equivalent of its own.
+	// MZGram: auto pause video, as on MZGram Android.
 	const auto mzgramAutoPause = [=](bool shouldPause, bool *pausedByUs) {
 		if (!MZGram::AutoPauseVideo() || !_streamed) {
 			return;

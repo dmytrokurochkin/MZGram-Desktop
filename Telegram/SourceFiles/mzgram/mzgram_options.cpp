@@ -57,7 +57,6 @@ base::options::toggle OptionSpyHideOnlineStatus({
 	.description = "Always report offline, regardless of Ghost mode",
 });
 
-// MZGram's own code (AyuGram4A has no equivalent on either platform).
 base::options::toggle OptionGhostAutoDelaySend({
 	.id = kOptionGhostAutoDelaySend,
 	.name = "Ghost mode: delay sending messages",
@@ -65,7 +64,6 @@ base::options::toggle OptionGhostAutoDelaySend({
 		"sending it. Not recommended on an unreliable connection.",
 });
 
-// MZGram's own code (AyuGram4A has no equivalent on either platform).
 base::options::toggle OptionGhostSilentSend({
 	.id = kOptionGhostSilentSend,
 	.name = "Ghost mode: send without sound",
@@ -73,7 +71,6 @@ base::options::toggle OptionGhostSilentSend({
 		"sound for the recipient.",
 });
 
-// Ported concept from AyuGram4A (AyuConfig.disableAds).
 base::options::toggle OptionDisableSponsoredMessages({
 	.id = kOptionDisableSponsoredMessages,
 	.name = "Disable sponsored messages",
@@ -81,8 +78,7 @@ base::options::toggle OptionDisableSponsoredMessages({
 		"requested or shown.",
 });
 
-// MZGram's own code (AyuGram4A has no equivalent on either platform). Not
-// gated on ghost mode being on already -- this is what offers turning it on.
+// Not gated on ghost mode being on already -- this is what offers turning it on.
 base::options::toggle OptionOfferGhostModeBeforeStories({
 	.id = kOptionOfferGhostModeBeforeStories,
 	.name = "Offer ghost mode before Stories",
@@ -117,38 +113,31 @@ base::options::toggle OptionMarkMessages({
 	.defaultValue = true,
 });
 
-// Ported from AyuGram Desktop dev (ayu/ayu_settings.h, showMessageSeconds).
 base::options::toggle OptionMessageSeconds({
 	.id = kOptionMessageSeconds,
 	.name = "Message time with seconds",
 	.description = "Show seconds in message bubble timestamps",
 });
 
-// Ported from AyuGram Desktop dev (ayu/ayu_settings.h, disableStories).
 base::options::toggle OptionDisableStories({
 	.id = kOptionDisableStories,
 	.name = "Hide Stories",
 	.description = "Hide the stories strip in the chat list and profiles",
 });
 
-// Ported from AyuGram Desktop dev
-// (ayu/ayu_settings.h, disableGreetingSticker).
 base::options::toggle OptionDisableGreetingSticker({
 	.id = kOptionDisableGreetingSticker,
 	.name = "Disable greeting sticker",
 	.description = "Hide the hello sticker in new empty private chats",
 });
 
-// Ported from AyuGram Desktop dev (ayu/ayu_settings.h, channelBottomButton,
-// the Hidden variant; MuteUnmute/DiscussWithFallback are not ported).
 base::options::toggle OptionHideChannelBottomButton({
 	.id = kOptionHideChannelBottomButton,
 	.name = "Hide channel bottom button",
 	.description = "Hide the mute/unmute bar in channels you cannot post to",
 });
 
-// MZGram's own code (AyuGram Desktop has no equivalent), mirroring the
-// autoPauseVideo option already ported to MZGram Android from Nekogram.
+// Mirrors the autoPauseVideo option of MZGram Android.
 base::options::toggle OptionAutoPauseVideo({
 	.id = kOptionAutoPauseVideo,
 	.name = "Auto pause video",
@@ -156,8 +145,6 @@ base::options::toggle OptionAutoPauseVideo({
 		"or loses focus",
 });
 
-// Ported from AyuGram Desktop dev
-// (ayu/ayu_settings.h, voiceConfirmation, roundConfirmation).
 base::options::toggle OptionVoiceConfirmation({
 	.id = kOptionVoiceConfirmation,
 	.name = "Confirm before sending voice messages",
@@ -170,24 +157,19 @@ base::options::toggle OptionRoundConfirmation({
 	.description = "Ask for confirmation before sending a round video",
 });
 
-// Ported from AyuGram Desktop dev
-// (ayu/ui/context_menu/context_menu.cpp, AddRepeatMessageAction).
 base::options::toggle OptionRepeatMessage({
 	.id = kOptionRepeatMessage,
 	.name = "Show \"Repeat\" in the message menu",
 	.description = "Resend a message's content to the same chat",
 });
 
-// Ported from AyuGram Desktop dev
-// (ayu/ui/context_menu/context_menu.cpp, AddMessageDetailsAction).
 base::options::toggle OptionMessageDetails({
 	.id = kOptionMessageDetails,
 	.name = "Show \"Message details\" in the message menu",
 	.description = "Show the message id, dates and media info",
 });
 
-// MZGram's own code (AyuGram Desktop has no equivalent), mirroring the QR
-// scanning feature already present in Telegram for Android. Decodes a QR
+// Mirrors the QR scanning feature already present in Telegram for Android. Decodes a QR
 // code from an already-downloaded photo entirely offline, using the
 // bundled quirc library (see mzgram/quirc).
 base::options::toggle OptionScanQrCode({
@@ -196,39 +178,34 @@ base::options::toggle OptionScanQrCode({
 	.description = "Decode a QR code from a downloaded photo, offline",
 });
 
-// Ported from MZGram Android (openArchiveOnPull, itself ported from
-// Nekogram's DialogsActivity.java). AyuGram Desktop has no equivalent.
+// As on MZGram Android (openArchiveOnPull).
 base::options::toggle OptionOpenArchiveOnPull({
 	.id = kOptionOpenArchiveOnPull,
 	.name = "Open Archive on pull down",
 	.description = "Pulling the chat list down past the Archive row opens it",
 });
 
-// Ported from MZGram Android (showAddToSavedMessages, itself ported from
-// Nekogram). AyuGram Desktop has no equivalent.
+// As on MZGram Android (showAddToSavedMessages).
 base::options::toggle OptionSaveMessage({
 	.id = kOptionSaveMessage,
 	.name = "Show \"Save message\" in the message menu",
 	.description = "Forward a message to Saved Messages in one click",
 });
 
-// Ported from MZGram Android (showSetReminder, itself ported from
-// Nekogram). AyuGram Desktop has no equivalent.
+// As on MZGram Android (showSetReminder).
 base::options::toggle OptionSetReminder({
 	.id = kOptionSetReminder,
 	.name = "Show \"Set a reminder\" in the message menu",
 	.description = "Forward a message to Saved Messages, scheduled for later",
 });
 
-// Ported from MZGram Android (showOpenIn, itself ported from Nekogram).
-// AyuGram Desktop has no equivalent.
+// As on MZGram Android (showOpenIn).
 base::options::toggle OptionOpenIn({
 	.id = kOptionOpenIn,
 	.name = "Show \"Open in...\" for downloaded files",
 	.description = "Adds the OS \"Open with\" dialog to the file menu",
 });
 
-// MZGram's own code, no Nekogram/AyuGram equivalent found.
 base::options::toggle OptionMediaPreviewOnChatPreview({
 	.id = kOptionMediaPreviewOnChatPreview,
 	.name = "Media preview instead of Chat Preview",
@@ -361,8 +338,6 @@ bool MessageSeconds() {
 	return OptionMessageSeconds.value();
 }
 
-// Ported from AyuGram Desktop dev
-// (ayu/utils/telegram_helpers.cpp, formatMessageTime).
 QString FormatMessageTime(const QTime &time) {
 	if (!MessageSeconds()) {
 		return QLocale().toString(time, QLocale::ShortFormat);

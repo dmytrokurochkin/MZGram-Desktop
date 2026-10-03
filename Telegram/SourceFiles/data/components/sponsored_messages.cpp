@@ -303,7 +303,7 @@ HistoryItem *SponsoredMessages::injectItem(
 }
 
 bool SponsoredMessages::canHaveFor(not_null<History*> history) const {
-	// MZGram: own code, ported concept from AyuGram4A (AyuConfig.disableAds).
+	// MZGram: Settings > MZGram > Disable sponsored messages.
 	if (MZGram::DisableSponsoredMessages()) {
 		return false;
 	}

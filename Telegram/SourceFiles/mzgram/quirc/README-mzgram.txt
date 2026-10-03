@@ -5,6 +5,5 @@ only), unmodified, for MZGram's local QR-code scanning feature (phase 7,
 item 4.6: decode a QR code already present in a downloaded chat photo,
 entirely on-device, no network access).
 
-License: ISC, see LICENSE-quirc.txt. Not part of AyuGram Desktop; Telegram
-Android's own QR scanning feature (which uses zxing) is mirrored in spirit,
-not in code.
+License: ISC, see LICENSE-quirc.txt. Telegram Android's own QR scanning
+feature (which uses zxing) is mirrored in spirit, not in code.

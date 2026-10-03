@@ -6720,8 +6720,7 @@ bool HistoryWidget::isChoosingTheme() const {
 }
 
 bool HistoryWidget::isMuteUnmute() const {
-	// Ported from AyuGram Desktop dev (ayu/ayu_settings.h,
-	// channelBottomButton, the Hidden variant).
+	// MZGram: Settings > MZGram > Hide channel bottom button.
 	if (MZGram::HideChannelBottomButton()) {
 		return false;
 	}

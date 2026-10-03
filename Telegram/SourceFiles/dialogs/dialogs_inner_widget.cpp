@@ -120,7 +120,7 @@ constexpr auto kPreviewPostsLimit = 3;
 	return uint64(reinterpret_cast<quintptr>(entry));
 }
 
-// MZGram: own code, no Nekogram/AyuGram equivalent. When the row's last
+// MZGram: when the row's last
 // message is a photo or video, open it directly through the existing
 // media viewer instead of scheduling the Chat Preview peek. Round video
 // messages are left to Chat Preview, matching the Android version.

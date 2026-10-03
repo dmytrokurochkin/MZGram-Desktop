@@ -467,8 +467,7 @@ Widget::Widget(
 	_scrollToTop->raise();
 	_lockUnlock->toggle(false, anim::type::instant);
 
-	// MZGram: ported concept from Nekogram Android (openArchiveOnPull).
-	// Watched separately from the stories overscroll pipeline above, so it
+	// MZGram: open the Archive on pull down. Watched separately from the stories overscroll pipeline above, so it
 	// keeps working even when stories are hidden or DisableStories is on.
 	_scroll->positionValue(
 	) | rpl::on_next([=](Ui::ElasticScrollPosition position) {

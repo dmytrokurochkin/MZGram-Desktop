@@ -15,7 +15,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 namespace MZGram {
 namespace {
 
-// MZGram's own code (AyuGram4A has no equivalent on either platform).
 base::options::toggle OptionStripZalgoText({
 	.id = kOptionStripZalgoText,
 	.name = "Zalgo filter",

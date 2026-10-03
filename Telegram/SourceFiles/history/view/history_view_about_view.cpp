@@ -270,8 +270,7 @@ auto GenerateChatIntro(
 				st::defaultTextStyle,
 				links));
 		};
-		// Ported from AyuGram Desktop dev (ayu/ayu_settings.h,
-		// disableGreetingSticker), applied to GenerateChatIntro.
+		// MZGram: no greeting sticker, applied to GenerateChatIntro.
 		const auto disableGreeting = MZGram::DisableGreetingSticker();
 		const auto title = data.customPhrases()
 			? data.title

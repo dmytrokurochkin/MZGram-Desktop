@@ -3008,8 +3008,7 @@ void VoiceRecordBar::stopRecording(StopType type, bool ttlBeforeHide) {
 								? std::numeric_limits<int>::max()
 								: 0),
 						};
-						// Ported from AyuGram Desktop dev (ayu/ayu_settings.h,
-						// roundConfirmation).
+						// MZGram: confirm before sending a round video.
 						auto sendRoundCallback = crl::guard(
 							this,
 							[=](Fn<void()> &&close) {
@@ -3054,8 +3053,7 @@ void VoiceRecordBar::stopRecording(StopType type, bool ttlBeforeHide) {
 					? std::numeric_limits<int>::max()
 					: 0),
 			};
-			// Ported from AyuGram Desktop dev (ayu/ayu_settings.h,
-			// voiceConfirmation).
+			// MZGram: confirm before sending a voice message.
 			auto sendVoiceCallback = crl::guard(
 				this,
 				[=](Fn<void()> &&close) {
@@ -3142,8 +3140,7 @@ void VoiceRecordBar::requestToSendWithOptions(Api::SendOptions options) {
 			_listen->applyTrimBeforeSend();
 		}
 		const auto video = !_data.minithumbs.isNull();
-		// Ported from AyuGram Desktop dev (ayu/ayu_settings.h,
-		// voiceConfirmation, roundConfirmation).
+		// MZGram: confirm before sending a voice message or round video.
 		auto sendVoiceCallback = crl::guard(
 			this,
 			[=](Fn<void()> &&close) {
