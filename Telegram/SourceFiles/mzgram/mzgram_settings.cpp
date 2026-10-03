@@ -18,6 +18,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
 #include "mzgram/mzgram_archive.h"
+#include "mzgram/mzgram_lang.h"
 #include "mzgram/mzgram_message_store.h"
 #include "mzgram/mzgram_options.h"
 #include "settings/settings_builder.h"
@@ -44,18 +45,18 @@ using namespace Builder;
 
 constexpr auto kMegabyte = int64(1024) * 1024;
 
-// Strings stay in this file rather than in lang.strings: that file generates
-// a header nearly every source includes, so each new key would rebuild the
-// whole client. The cost is that this section is not in settings search.
+// Texts come from MZGram's own table (mzgram_lang.h), in the app's
+// language, not from lang.strings. The cost is that this section is not in
+// settings search.
 
-[[nodiscard]] rpl::producer<QString> Text(const char *text) {
-	return rpl::single(QString::fromUtf8(text));
+[[nodiscard]] rpl::producer<QString> Text(const char *key) {
+	return MZGram::Tr(key);
 }
 
 [[nodiscard]] QString LimitText(int64 bytes) {
 	return (bytes > 0)
-		? (QString::number(bytes / kMegabyte) + u" MB"_q)
-		: u"No limit"_q;
+		? MZGram::TrNow("megabytes_value").arg(bytes / kMegabyte)
+		: MZGram::TrNow("no_limit");
 }
 
 [[nodiscard]] rpl::producer<bool> OptionValue(const char id[]) {
@@ -74,13 +75,13 @@ constexpr auto kMegabyte = int64(1024) * 1024;
 void AddOptionToggle(
 		SectionBuilder &builder,
 		const QString &id,
-		const char *title,
+		const char *titleKey,
 		const char optionId[],
 		QStringList keywords,
 		rpl::producer<bool> shown = nullptr) {
 	const auto button = builder.addButton({
 		.id = id,
-		.title = Text(title),
+		.title = Text(titleKey),
 		.st = &st::settingsButtonNoIcon,
 		.toggled = OptionValue(optionId),
 		.keywords = std::move(keywords),
@@ -101,12 +102,10 @@ void AddOptionToggle(
 void MediaLimitBox(not_null<Ui::GenericBox*> box) {
 	const auto megabytes = MZGram::MessageStore::Instance().mediaSizeLimit()
 		/ kMegabyte;
-	box->setTitle(Text("Media size limit"));
+	box->setTitle(Text("media_size_limit"));
 	box->addRow(object_ptr<Ui::FlatLabel>(
 		box,
-		Text("Videos and files larger than this are not saved. Photos, "
-			"voice messages, round videos and view-once media are always "
-			"saved. Enter 0 for no limit."),
+		Text("media_size_limit_info"),
 		st::boxLabel));
 	// NumberInput is not an RpWidget, so addRow cannot take it directly.
 	const auto wrap = box->addRow(object_ptr<Ui::FixedHeightWidget>(
@@ -115,7 +114,7 @@ void MediaLimitBox(not_null<Ui::GenericBox*> box) {
 	const auto input = Ui::CreateChild<Ui::NumberInput>(
 		wrap,
 		st::defaultInputField,
-		Text("Megabytes"),
+		Text("megabytes"),
 		QString::number(megabytes),
 		1024 * 1024);
 	wrap->widthValue() | rpl::on_next([=](int width) {
@@ -144,12 +143,10 @@ void MediaLimitBox(not_null<Ui::GenericBox*> box) {
 void TotalMediaCapBox(not_null<Ui::GenericBox*> box) {
 	const auto megabytes = MZGram::MessageStore::Instance().totalMediaCap()
 		/ kMegabyte;
-	box->setTitle(Text("Total media size cap"));
+	box->setTitle(Text("total_media_cap"));
 	box->addRow(object_ptr<Ui::FlatLabel>(
 		box,
-		Text("Caps everything saved across all tracked chats combined. "
-			"When exceeded, the oldest saved media files are deleted "
-			"first. Enter 0 for no limit."),
+		Text("total_media_cap_info"),
 		st::boxLabel));
 	const auto wrap = box->addRow(object_ptr<Ui::FixedHeightWidget>(
 		box,
@@ -157,7 +154,7 @@ void TotalMediaCapBox(not_null<Ui::GenericBox*> box) {
 	const auto input = Ui::CreateChild<Ui::NumberInput>(
 		wrap,
 		st::defaultInputField,
-		Text("Megabytes"),
+		Text("megabytes"),
 		QString::number(megabytes),
 		1024 * 1024);
 	wrap->widthValue() | rpl::on_next([=](int width) {
@@ -219,7 +216,7 @@ void FillTrackedChats(
 		list->add(
 			object_ptr<Ui::FlatLabel>(
 				list,
-				Text("No chats yet. Add one here or from a chat menu."),
+				Text("no_tracked_chats"),
 				st::defaultFlatLabel),
 			st::settingsButtonNoIcon.padding);
 	}
@@ -228,15 +225,14 @@ void FillTrackedChats(
 			PeerId(PeerIdHelper(peerValue)));
 		const auto name = peer
 			? peer->name()
-			: (u"Chat "_q + QString::number(peerValue));
+			: MZGram::TrNow("chat_number").arg(peerValue);
 		const auto button = list->add(object_ptr<Ui::SettingsButton>(
 			list,
 			rpl::single(name),
 			st::settingsButtonNoIcon));
 		button->setClickedCallback([=] {
 			controller->show(Ui::MakeConfirmBox({
-				.text = u"Stop saving deleted messages in %1? "
-					"Messages saved so far stay."_q.arg(name),
+				.text = MZGram::TrNow("stop_tracking_confirm").arg(name),
 				.confirmed = [=](Fn<void()> close) {
 					MZGram::MessageStore::Instance().setTracked(
 						account,
@@ -255,289 +251,42 @@ void BuildMZGramSection(SectionBuilder &builder) {
 
 	const auto session = builder.session();
 
+	// Archive.
 	builder.addSkip();
-	builder.addSubsectionTitle(Text("General"));
-	AddOptionToggle(
-		builder,
-		u"mzgram/disable-sponsored-messages"_q,
-		"Disable sponsored messages",
-		kOptionDisableSponsoredMessages,
-		{ u"sponsored"_q, u"ads"_q, u"advertisement"_q });
-	builder.addSkip();
-	builder.addDividerText(Text("Stops sponsored (ad) messages in "
-		"channels from being requested or shown. Ported concept from "
-		"AyuGram4A."));
-
-	builder.addSkip();
-	AddOptionToggle(
-		builder,
-		u"mzgram/strip-zalgo-text"_q,
-		"Zalgo filter",
-		kOptionStripZalgoText,
-		{ u"zalgo"_q, u"corrupted"_q, u"text"_q });
-	builder.addSkip();
-	builder.addDividerText(Text("Removes stacked Unicode combining marks "
-		"(Zalgo-style corrupted text) from names and chat titles shown "
-		"to you. MZGram's own code, mirroring the Android version."));
-
-	builder.addSkip();
-	builder.addSubsectionTitle(Text("Appearance"));
-	AddOptionToggle(
-		builder,
-		u"mzgram/message-seconds"_q,
-		"Show seconds in message time",
-		kOptionMessageSeconds,
-		{ u"seconds"_q, u"time"_q, u"clock"_q });
-	AddOptionToggle(
-		builder,
-		u"mzgram/disable-stories"_q,
-		"Hide Stories",
-		kOptionDisableStories,
-		{ u"stories"_q, u"hide"_q });
-	AddOptionToggle(
-		builder,
-		u"mzgram/disable-greeting-sticker"_q,
-		"Disable greeting sticker",
-		kOptionDisableGreetingSticker,
-		{ u"greeting"_q, u"sticker"_q, u"hello"_q });
-	AddOptionToggle(
-		builder,
-		u"mzgram/hide-channel-bottom-button"_q,
-		"Hide channel bottom button",
-		kOptionHideChannelBottomButton,
-		{ u"channel"_q, u"mute"_q, u"unmute"_q, u"button"_q });
-	builder.addSkip();
-	builder.addDividerText(Text("Ported from AyuGram Desktop."));
-
-	builder.addSkip();
-	AddOptionToggle(
-		builder,
-		u"mzgram/open-archive-on-pull"_q,
-		"Open Archive on pull down",
-		kOptionOpenArchiveOnPull,
-		{ u"archive"_q, u"pull"_q, u"overscroll"_q });
-	builder.addSkip();
-	builder.addDividerText(Text("Pulling the chat list down past the Archive "
-		"row opens it, mirroring MZGram Android. MZGram's own code: "
-		"AyuGram Desktop has no equivalent."));
-
-	builder.addSkip();
-	AddOptionToggle(
-		builder,
-		u"mzgram/media-preview-on-chat-preview"_q,
-		"Media preview instead of Chat Preview",
-		kOptionMediaPreviewOnChatPreview,
-		{ u"media"_q, u"preview"_q, u"chat preview"_q, u"photo"_q, u"video"_q });
-	builder.addSkip();
-	builder.addDividerText(Text("Press-and-hold a chat's avatar normally "
-		"opens the Chat Preview peek. When the last message is a photo or "
-		"video, this shows it directly instead. MZGram's own code, "
-		"mirroring the Android version."));
-
-	builder.addSkip();
-	builder.addSubsectionTitle(Text("Chat"));
-	AddOptionToggle(
-		builder,
-		u"mzgram/auto-pause-video"_q,
-		"Auto pause video",
-		kOptionAutoPauseVideo,
-		{ u"video"_q, u"pause"_q, u"focus"_q, u"minimize"_q });
-	AddOptionToggle(
-		builder,
-		u"mzgram/voice-confirmation"_q,
-		"Confirm before sending voice messages",
-		kOptionVoiceConfirmation,
-		{ u"voice"_q, u"confirm"_q });
-	AddOptionToggle(
-		builder,
-		u"mzgram/round-confirmation"_q,
-		"Confirm before sending round videos",
-		kOptionRoundConfirmation,
-		{ u"round"_q, u"video"_q, u"confirm"_q });
-	builder.addSkip();
-	builder.addDividerText(Text("Pauses the video viewer when the window is "
-		"minimized or loses focus (MZGram's own code, mirroring the "
-		"Android version). Voice and round confirmation are ported from "
-		"AyuGram Desktop."));
-
-	builder.addSkip();
-	builder.addSubsectionTitle(Text("Context menu"));
-	AddOptionToggle(
-		builder,
-		u"mzgram/repeat-message"_q,
-		"Show \"Repeat\" in the message menu",
-		kOptionRepeatMessage,
-		{ u"repeat"_q, u"resend"_q });
-	AddOptionToggle(
-		builder,
-		u"mzgram/message-details"_q,
-		"Show \"Message details\" in the message menu",
-		kOptionMessageDetails,
-		{ u"details"_q, u"id"_q, u"views"_q });
-	AddOptionToggle(
-		builder,
-		u"mzgram/scan-qr-code"_q,
-		"Show \"Scan for QR code\" on photos",
-		kOptionScanQrCode,
-		{ u"qr"_q, u"scan"_q, u"code"_q });
-	AddOptionToggle(
-		builder,
-		u"mzgram/save-message"_q,
-		"Show \"Save message\" in the message menu",
-		kOptionSaveMessage,
-		{ u"save"_q, u"saved messages"_q, u"forward"_q });
-	AddOptionToggle(
-		builder,
-		u"mzgram/set-reminder"_q,
-		"Show \"Set a reminder\" in the message menu",
-		kOptionSetReminder,
-		{ u"reminder"_q, u"schedule"_q, u"saved messages"_q });
-	AddOptionToggle(
-		builder,
-		u"mzgram/open-in"_q,
-		"Show \"Open in...\" for downloaded files",
-		kOptionOpenIn,
-		{ u"open"_q, u"file"_q, u"video"_q });
-	builder.addSkip();
-	builder.addDividerText(Text("Repeat and Message details are ported from "
-		"AyuGram Desktop. Scan for QR code, Save message, Set a reminder and "
-		"Open in... are MZGram's own code, mirroring the Android version: QR "
-		"scanning decodes an already-downloaded photo entirely offline, Save "
-		"message forwards to Saved Messages in one click, Set a reminder "
-		"forwards there scheduled for a chosen time, and Open in... shows "
-		"the OS \"Open with\" dialog for a downloaded file."));
-
-	builder.addSkip();
-	builder.addSubsectionTitle(Text("Ghost mode"));
-	AddOptionToggle(
-		builder,
-		u"mzgram/ghost-mode"_q,
-		"Ghost mode",
-		kOptionGhostMode,
-		{ u"ghost"_q, u"invisible"_q, u"stealth"_q });
-
-	// The exceptions only mean something while ghost mode is on.
-	AddOptionToggle(
-		builder,
-		u"mzgram/ghost-read"_q,
-		"Send read receipts",
-		kOptionSendReadReceipts,
-		{ u"ghost"_q, u"read"_q, u"receipts"_q },
-		OptionValue(kOptionGhostMode));
-	AddOptionToggle(
-		builder,
-		u"mzgram/ghost-typing"_q,
-		"Send typing status",
-		kOptionSendTyping,
-		{ u"ghost"_q, u"typing"_q, u"recording"_q },
-		OptionValue(kOptionGhostMode));
-	AddOptionToggle(
-		builder,
-		u"mzgram/ghost-online"_q,
-		"Send online status",
-		kOptionSendOnline,
-		{ u"ghost"_q, u"online"_q, u"last seen"_q },
-		OptionValue(kOptionGhostMode));
-	builder.addSkip();
-	builder.addDividerText(Text("Ghost mode hides your read receipts, "
-		"typing and online status. The switches above let some of them "
-		"through."));
-
-	builder.addSkip();
-	AddOptionToggle(
-		builder,
-		u"mzgram/ghost-auto-delay-send"_q,
-		"Delay sending messages",
-		kOptionGhostAutoDelaySend,
-		{ u"delay"_q, u"send"_q, u"online"_q },
-		OptionValue(kOptionGhostMode));
-	builder.addSkip();
-	builder.addDividerText(Text("Holds an outgoing message (about 12 "
-		"seconds, longer for photos/videos/files) before actually sending "
-		"it, so composing and sending right away does not make you look "
-		"online. Not recommended on an unreliable connection: a delayed "
-		"message can still be waiting to send if the app closes or the "
-		"network drops in the meantime. MZGram's own code, mirroring the "
-		"Android version."));
-
-	builder.addSkip();
-	AddOptionToggle(
-		builder,
-		u"mzgram/ghost-silent-send"_q,
-		"Send without sound",
-		kOptionGhostSilentSend,
-		{ u"silent"_q, u"sound"_q, u"notification"_q },
-		OptionValue(kOptionGhostMode));
-	builder.addSkip();
-	builder.addDividerText(Text("Sends every outgoing message without a "
-		"notification sound for the recipient, regardless of the "
-		"per-message \"send without sound\" choice. MZGram's own code, "
-		"mirroring the Android version."));
-
-	builder.addSkip();
-	AddOptionToggle(
-		builder,
-		u"mzgram/offer-ghost-mode-before-stories"_q,
-		"Offer ghost mode before Stories",
-		kOptionOfferGhostModeBeforeStories,
-		{ u"ghost"_q, u"stories"_q, u"seen"_q });
-	builder.addSkip();
-	builder.addDividerText(Text("Before opening a story for the first "
-		"time (not when swiping to the next one), asks whether to turn "
-		"ghost mode on first, so viewing it does not mark it as seen. "
-		"MZGram's own code, mirroring the Android version."));
-
-	builder.addSkip();
-	builder.addSubsectionTitle(Text("Message history"));
-	AddOptionToggle(
-		builder,
-		u"mzgram/spy-hide-online-status"_q,
-		"Hide own online status",
-		kOptionSpyHideOnlineStatus,
-		{ u"spy"_q, u"online"_q, u"last seen"_q });
-	builder.addSkip();
-	builder.addDividerText(Text("Always reports offline to the server, "
-		"independent of Ghost mode. Reuses the same mechanism as Ghost "
-		"mode's \"send online status\" exception, exposed here as its "
-		"own switch since Spy mode users may want this without turning "
-		"on read receipt/typing suppression."));
-
-	builder.addSkip();
+	builder.addSubsectionTitle(Text("section_archive"));
 	AddOptionToggle(
 		builder,
 		u"mzgram/anti-recall"_q,
-		"Keep deleted messages",
+		"keep_deleted",
 		kOptionAntiRecall,
 		{ u"anti-recall"_q, u"deleted"_q, u"messages"_q });
 	AddOptionToggle(
 		builder,
 		u"mzgram/edit-history"_q,
-		"Keep edit history",
+		"keep_edit_history",
 		kOptionEditHistory,
 		{ u"edit"_q, u"history"_q, u"edited"_q });
 	AddOptionToggle(
 		builder,
 		u"mzgram/keep-self-destructing"_q,
-		"Keep view-once media",
+		"keep_view_once",
 		kOptionKeepSelfDestructing,
 		{ u"view once"_q, u"self-destruct"_q, u"timer"_q, u"media"_q });
 	AddOptionToggle(
 		builder,
 		u"mzgram/mark-messages"_q,
-		"Mark deleted and edited messages",
+		"mark_messages",
 		kOptionMarkMessages,
 		{ u"dim"_q, u"pencil"_q, u"deleted"_q, u"edited"_q });
 	builder.addSkip();
-	builder.addDividerText(Text("Works only in the chats below. Messages "
-		"and media are saved on this device, in an unencrypted database, "
-		"and stay after a restart."));
+	builder.addDividerText(Text("archive_info"));
 
 	builder.addSkip();
-	builder.addSubsectionTitle(Text("Chats"));
+	builder.addSubsectionTitle(Text("tracked_chats"));
 	const auto controller = builder.controller();
 	builder.addButton({
 		.id = u"mzgram/add-chat"_q,
-		.title = Text("Add chat"),
+		.title = Text("add_chat"),
 		.st = &st::settingsButtonNoIcon,
 		.onClick = [=] {
 			ShowAddChatBox(controller, session);
@@ -559,7 +308,7 @@ void BuildMZGramSection(SectionBuilder &builder) {
 	});
 	builder.addButton({
 		.id = u"mzgram/media-limit"_q,
-		.title = Text("Media size limit"),
+		.title = Text("media_size_limit"),
 		.st = &st::settingsButtonNoIcon,
 		.label = MessageStore::Instance().mediaSizeLimitValue(
 		) | rpl::map(LimitText),
@@ -570,7 +319,7 @@ void BuildMZGramSection(SectionBuilder &builder) {
 	});
 	builder.addButton({
 		.id = u"mzgram/total-media-cap"_q,
-		.title = Text("Total media size cap"),
+		.title = Text("total_media_cap"),
 		.st = &st::settingsButtonNoIcon,
 		.label = MessageStore::Instance().totalMediaCapValue(
 		) | rpl::map(LimitText),
@@ -580,26 +329,22 @@ void BuildMZGramSection(SectionBuilder &builder) {
 		.keywords = { u"size"_q, u"cap"_q, u"media"_q, u"total"_q },
 	});
 	builder.addSkip();
-	builder.addDividerText(Text("Total media size cap applies across all "
-		"tracked chats combined; the oldest saved media is deleted first "
-		"when it is exceeded."));
+	builder.addDividerText(Text("total_media_cap_note"));
 
 	builder.addSkip();
-	builder.addDividerText(Text("In these chats photos, voice messages, "
-		"round videos and view-once media are saved as they arrive. Videos "
-		"and files are saved up to the size limit."));
+	builder.addDividerText(Text("saved_media_note"));
 
 	builder.addSkip();
 	builder.addButton({
 		.id = u"mzgram/export-archive"_q,
-		.title = Text("Export archive"),
+		.title = Text("export_archive"),
 		.st = &st::settingsButtonNoIcon,
 		.onClick = [=] {
 			MessageStore::Instance().closeForFileOp();
 			FileDialog::GetWritePath(
 				Core::App().getFileDialogParent(),
-				"Export MZGram archive",
-				"SQLite database (*.db)",
+				MZGram::TrNow("export_archive_title"),
+				MZGram::TrNow("sqlite_database_filter"),
 				"mzgram_archive_export.db",
 				[=](QString &&result) {
 					if (result.isEmpty()) {
@@ -607,9 +352,9 @@ void BuildMZGramSection(SectionBuilder &builder) {
 					}
 					QFile::remove(result);
 					if (QFile::copy(MessageStore::Instance().databasePath(), result)) {
-						Ui::Toast::Show("Archive exported.");
+						Ui::Toast::Show(MZGram::TrNow("archive_exported"));
 					} else {
-						Ui::Toast::Show("Could not export the archive.");
+						Ui::Toast::Show(MZGram::TrNow("archive_export_failed"));
 					}
 				});
 		},
@@ -617,18 +362,16 @@ void BuildMZGramSection(SectionBuilder &builder) {
 	});
 	builder.addButton({
 		.id = u"mzgram/import-archive"_q,
-		.title = Text("Import archive"),
+		.title = Text("import_archive"),
 		.st = &st::settingsButtonNoIcon,
 		.onClick = [=] {
 			controller->show(Ui::MakeConfirmBox({
-				.text = QString("This replaces the current local archive "
-					"with a previously exported file. This cannot be "
-					"undone. Continue?"),
+				.text = MZGram::TrNow("import_archive_confirm"),
 				.confirmed = crl::guard(controller, [=] {
 					FileDialog::GetOpenPath(
 						Core::App().getFileDialogParent(),
-						"Import MZGram archive",
-						"SQLite database (*.db)",
+						MZGram::TrNow("import_archive_title"),
+						MZGram::TrNow("sqlite_database_filter"),
 						[=](const FileDialog::OpenResult &result) {
 							if (result.paths.isEmpty()) {
 								return;
@@ -640,35 +383,30 @@ void BuildMZGramSection(SectionBuilder &builder) {
 							if (QFile::copy(result.paths.front(), path)) {
 								MessageStore::Instance()
 									.reopenAfterFileReplace();
-								Ui::Toast::Show("Archive imported.");
+								Ui::Toast::Show(MZGram::TrNow("archive_imported"));
 							} else {
 								Ui::Toast::Show(
-									"Could not import the archive.");
+									MZGram::TrNow("archive_import_failed"));
 							}
 						});
 				}),
-				.confirmText = QString("Import"),
+				.confirmText = MZGram::TrNow("import"),
 				.confirmStyle = &st::attentionBoxButton,
 			}));
 		},
 		.keywords = { u"import"_q, u"archive"_q, u"restore"_q },
 	});
 	builder.addSkip();
-	builder.addDividerText(Text("Export saves the archive database as a "
-		"file you choose where to put. Import replaces the current "
-		"archive with a previously exported file (media files are not "
-		"included in either)."));
+	builder.addDividerText(Text("export_import_info"));
 
 	builder.addSkip();
 	builder.addButton({
 		.id = u"mzgram/wipe-archive"_q,
-		.title = Text("Clear archive"),
+		.title = Text("clear_archive"),
 		.st = &st::settingsAttentionButton,
 		.onClick = [=] {
 			controller->show(Ui::MakeConfirmBox({
-				.text = QString("This permanently deletes the whole local "
-					"archive of deleted and edited messages, including "
-					"saved media. This cannot be undone. Continue?"),
+				.text = MZGram::TrNow("clear_archive_confirm"),
 				.confirmed = [=] {
 					MessageStore::Instance().wipeAll();
 				},
@@ -679,9 +417,224 @@ void BuildMZGramSection(SectionBuilder &builder) {
 		.keywords = { u"clear"_q, u"wipe"_q, u"delete"_q, u"archive"_q },
 	});
 	builder.addSkip();
-	builder.addDividerText(Text("Deletes every archived message and "
-		"saved media file for every tracked chat. Does not remove the "
-		"tracked chats list or the media size limit setting above."));
+	builder.addDividerText(Text("clear_archive_info"));
+
+	// Privacy.
+	builder.addSkip();
+	builder.addSubsectionTitle(Text("section_privacy"));
+	AddOptionToggle(
+		builder,
+		u"mzgram/spy-hide-online-status"_q,
+		"hide_own_online",
+		kOptionSpyHideOnlineStatus,
+		{ u"spy"_q, u"online"_q, u"last seen"_q });
+	builder.addSkip();
+	builder.addDividerText(Text("hide_own_online_info"));
+
+	// Ghost Mode.
+	builder.addSkip();
+	builder.addSubsectionTitle(Text("section_ghost_mode"));
+	AddOptionToggle(
+		builder,
+		u"mzgram/ghost-mode"_q,
+		"ghost_mode",
+		kOptionGhostMode,
+		{ u"ghost"_q, u"invisible"_q, u"stealth"_q });
+
+	// The exceptions only mean something while ghost mode is on.
+	AddOptionToggle(
+		builder,
+		u"mzgram/ghost-read"_q,
+		"send_read_receipts",
+		kOptionSendReadReceipts,
+		{ u"ghost"_q, u"read"_q, u"receipts"_q },
+		OptionValue(kOptionGhostMode));
+	AddOptionToggle(
+		builder,
+		u"mzgram/ghost-typing"_q,
+		"send_typing",
+		kOptionSendTyping,
+		{ u"ghost"_q, u"typing"_q, u"recording"_q },
+		OptionValue(kOptionGhostMode));
+	AddOptionToggle(
+		builder,
+		u"mzgram/ghost-online"_q,
+		"send_online",
+		kOptionSendOnline,
+		{ u"ghost"_q, u"online"_q, u"last seen"_q },
+		OptionValue(kOptionGhostMode));
+	builder.addSkip();
+	builder.addDividerText(Text("ghost_mode_info"));
+
+	builder.addSkip();
+	AddOptionToggle(
+		builder,
+		u"mzgram/ghost-auto-delay-send"_q,
+		"delay_sending",
+		kOptionGhostAutoDelaySend,
+		{ u"delay"_q, u"send"_q, u"online"_q },
+		OptionValue(kOptionGhostMode));
+	builder.addSkip();
+	builder.addDividerText(Text("delay_sending_info"));
+
+	builder.addSkip();
+	AddOptionToggle(
+		builder,
+		u"mzgram/ghost-silent-send"_q,
+		"send_without_sound",
+		kOptionGhostSilentSend,
+		{ u"silent"_q, u"sound"_q, u"notification"_q },
+		OptionValue(kOptionGhostMode));
+	builder.addSkip();
+	builder.addDividerText(Text("send_without_sound_info"));
+
+	builder.addSkip();
+	AddOptionToggle(
+		builder,
+		u"mzgram/offer-ghost-mode-before-stories"_q,
+		"offer_ghost_stories",
+		kOptionOfferGhostModeBeforeStories,
+		{ u"ghost"_q, u"stories"_q, u"seen"_q });
+	builder.addSkip();
+	builder.addDividerText(Text("offer_ghost_stories_info"));
+
+	// Message menu.
+	builder.addSkip();
+	builder.addSubsectionTitle(Text("section_message_menu"));
+	AddOptionToggle(
+		builder,
+		u"mzgram/repeat-message"_q,
+		"show_repeat",
+		kOptionRepeatMessage,
+		{ u"repeat"_q, u"resend"_q });
+	AddOptionToggle(
+		builder,
+		u"mzgram/message-details"_q,
+		"show_details",
+		kOptionMessageDetails,
+		{ u"details"_q, u"id"_q, u"views"_q });
+	AddOptionToggle(
+		builder,
+		u"mzgram/scan-qr-code"_q,
+		"show_scan_qr",
+		kOptionScanQrCode,
+		{ u"qr"_q, u"scan"_q, u"code"_q });
+	AddOptionToggle(
+		builder,
+		u"mzgram/save-message"_q,
+		"show_save_message",
+		kOptionSaveMessage,
+		{ u"save"_q, u"saved messages"_q, u"forward"_q });
+	AddOptionToggle(
+		builder,
+		u"mzgram/set-reminder"_q,
+		"show_set_reminder",
+		kOptionSetReminder,
+		{ u"reminder"_q, u"schedule"_q, u"saved messages"_q });
+	AddOptionToggle(
+		builder,
+		u"mzgram/open-in"_q,
+		"show_open_in",
+		kOptionOpenIn,
+		{ u"open"_q, u"file"_q, u"video"_q });
+	builder.addSkip();
+	builder.addDividerText(Text("message_menu_info"));
+
+	// Media and calls.
+	builder.addSkip();
+	builder.addSubsectionTitle(Text("section_media_calls"));
+	AddOptionToggle(
+		builder,
+		u"mzgram/auto-pause-video"_q,
+		"auto_pause_video",
+		kOptionAutoPauseVideo,
+		{ u"video"_q, u"pause"_q, u"focus"_q, u"minimize"_q });
+	AddOptionToggle(
+		builder,
+		u"mzgram/voice-confirmation"_q,
+		"confirm_voice",
+		kOptionVoiceConfirmation,
+		{ u"voice"_q, u"confirm"_q });
+	AddOptionToggle(
+		builder,
+		u"mzgram/round-confirmation"_q,
+		"confirm_round",
+		kOptionRoundConfirmation,
+		{ u"round"_q, u"video"_q, u"confirm"_q });
+	builder.addSkip();
+	builder.addDividerText(Text("media_calls_info"));
+
+	builder.addSkip();
+	AddOptionToggle(
+		builder,
+		u"mzgram/media-preview-on-chat-preview"_q,
+		"media_preview",
+		kOptionMediaPreviewOnChatPreview,
+		{ u"media"_q, u"preview"_q, u"chat preview"_q, u"photo"_q, u"video"_q });
+	builder.addSkip();
+	builder.addDividerText(Text("media_preview_info"));
+
+	// Interface.
+	builder.addSkip();
+	builder.addSubsectionTitle(Text("section_interface"));
+	AddOptionToggle(
+		builder,
+		u"mzgram/message-seconds"_q,
+		"message_seconds",
+		kOptionMessageSeconds,
+		{ u"seconds"_q, u"time"_q, u"clock"_q });
+	AddOptionToggle(
+		builder,
+		u"mzgram/disable-stories"_q,
+		"hide_stories",
+		kOptionDisableStories,
+		{ u"stories"_q, u"hide"_q });
+	AddOptionToggle(
+		builder,
+		u"mzgram/disable-greeting-sticker"_q,
+		"disable_greeting_sticker",
+		kOptionDisableGreetingSticker,
+		{ u"greeting"_q, u"sticker"_q, u"hello"_q });
+	AddOptionToggle(
+		builder,
+		u"mzgram/hide-channel-bottom-button"_q,
+		"hide_channel_button",
+		kOptionHideChannelBottomButton,
+		{ u"channel"_q, u"mute"_q, u"unmute"_q, u"button"_q });
+	builder.addSkip();
+	builder.addDividerText(Text("interface_info"));
+
+	builder.addSkip();
+	AddOptionToggle(
+		builder,
+		u"mzgram/open-archive-on-pull"_q,
+		"open_archive_on_pull",
+		kOptionOpenArchiveOnPull,
+		{ u"archive"_q, u"pull"_q, u"overscroll"_q });
+	builder.addSkip();
+	builder.addDividerText(Text("open_archive_on_pull_info"));
+
+	// Ads and filters.
+	builder.addSkip();
+	builder.addSubsectionTitle(Text("section_ads_filters"));
+	AddOptionToggle(
+		builder,
+		u"mzgram/disable-sponsored-messages"_q,
+		"disable_sponsored",
+		kOptionDisableSponsoredMessages,
+		{ u"sponsored"_q, u"ads"_q, u"advertisement"_q });
+	builder.addSkip();
+	builder.addDividerText(Text("disable_sponsored_info"));
+
+	builder.addSkip();
+	AddOptionToggle(
+		builder,
+		u"mzgram/strip-zalgo-text"_q,
+		"zalgo_filter",
+		kOptionStripZalgoText,
+		{ u"zalgo"_q, u"corrupted"_q, u"text"_q });
+	builder.addSkip();
+	builder.addDividerText(Text("zalgo_filter_info"));
 }
 
 class MZGramSection : public Section<MZGramSection> {
@@ -705,7 +658,7 @@ MZGramSection::MZGramSection(
 }
 
 rpl::producer<QString> MZGramSection::title() {
-	return Text("MZGram");
+	return Text("settings_title");
 }
 
 void MZGramSection::setupContent() {
