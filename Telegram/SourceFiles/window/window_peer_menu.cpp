@@ -351,7 +351,6 @@ private:
 	void addBoostChat();
 	void addToggleFee();
 	void addSetPersonalChannel();
-	void addMZGramKeepMessages();
 
 	[[nodiscard]] bool skipCreateActions() const;
 	[[nodiscard]] SendMenu::Details createSendMenuDetails() const;
@@ -1847,33 +1846,6 @@ void Filler::fillCommunityChatsListActions() {
 	}
 }
 
-// MZGram: picks the chats where deleted messages, edit history and
-// view-once media are kept. Hidden while none of those features is on.
-void Filler::addMZGramKeepMessages() {
-	const auto history = _request.key.history();
-	if (!history || _topic || _sublist || _folder) {
-		return;
-	} else if (!MZGram::AntiRecall()
-		&& !MZGram::EditHistory()
-		&& !MZGram::KeepSelfDestructing()) {
-		return;
-	}
-	const auto peer = history->peer;
-	const auto tracked = MZGram::IsTracked(peer);
-	const auto controller = _controller;
-	_addAction(
-		(tracked
-			? MZGram::TrNow("stop_saving_deleted_in_chat")
-			: MZGram::TrNow("save_deleted_in_chat")),
-		[=] {
-			MZGram::SetTracked(peer, !tracked);
-			controller->showToast(tracked
-				? MZGram::TrNow("saving_stopped")
-				: MZGram::TrNow("saving_started"));
-		},
-		&st::menuIconStealth);
-}
-
 void Filler::fillChatsListActions() {
 	const auto channel = _peer ? _peer->asChannel() : nullptr;
 	if (channel && channel->isCommunity()) {
@@ -1936,7 +1908,6 @@ void Filler::fillContextMenuActions() {
 	}
 	addToggleMuteSubmenu(false);
 	addToggleUnreadMark();
-	addMZGramKeepMessages();
 	addToggleTopicClosed();
 	addToggleFolder();
 	if (const auto user = _peer->asUser()) {
@@ -1955,7 +1926,6 @@ void Filler::fillHistoryActions() {
 	addToggleMuteSubmenu(true);
 	addCreateTopic();
 	addInfo();
-	addMZGramKeepMessages();
 	addViewAsTopics();
 	addManageChat();
 	addStoryArchive();

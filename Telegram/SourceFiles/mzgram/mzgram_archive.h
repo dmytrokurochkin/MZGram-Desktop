@@ -19,13 +19,12 @@ class Session;
 
 namespace MZGram {
 
-// The chats the user picked in the chat menu or in Settings > MZGram.
-// Anti-recall, edit history and view-once keeping work only there.
-[[nodiscard]] bool IsTracked(not_null<PeerData*> peer);
-void SetTracked(not_null<PeerData*> peer, bool tracked);
+// Every private chat, group, channel and secret chat is saved while
+// "Save deleted and edited messages" is on (mzgram_archive_rules.h).
+[[nodiscard]] bool SavesChat(not_null<PeerData*> peer);
 
 // Called for every message the server sends, from History::createItem and
-// Data::Session::updateEditedMessage. Stores the ones of tracked chats and
+// Data::Session::updateEditedMessage. Stores other people's messages and
 // saves their media to disk.
 void CaptureMessage(not_null<HistoryItem*> item, const MTPMessage &message);
 

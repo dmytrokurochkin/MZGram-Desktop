@@ -1506,6 +1506,8 @@ PRIVATE
     mzgram/mzgram_anti_recall.h
     mzgram/mzgram_archive.cpp
     mzgram/mzgram_archive.h
+    mzgram/mzgram_archive_rules.cpp
+    mzgram/mzgram_archive_rules.h
     mzgram/mzgram_context_actions.cpp
     mzgram/mzgram_context_actions.h
     mzgram/mzgram_edit_history_box.cpp

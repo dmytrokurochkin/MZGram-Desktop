@@ -6,6 +6,7 @@ For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "base/basic_types.h"
+#include "mzgram/mzgram_archive_rules.h"
 #include "mzgram/mzgram_lang.h"
 #include "mzgram/mzgram_protected_content.h"
 #include "mzgram/mzgram_text_filters.h"
@@ -324,6 +325,88 @@ void TestProtectedContentIsWired() {
 		missing.join(u", "_q).toStdString().c_str());
 }
 
+
+// Settings > MZGram > Archive > "Save deleted and edited messages".
+
+// On by default, for every chat: other people's messages are kept, the
+// owner's own and service messages never are, and nothing with it off.
+void TestArchiveRules() {
+	auto &option = base::options::lookup<bool>(
+		MZGram::kOptionSaveDeletedAndEdited);
+	const auto byDefault = option.value();
+	const auto others = MZGram::KeepsMessage(false, false);
+	const auto own = MZGram::KeepsMessage(false, true);
+	const auto service = MZGram::KeepsMessage(true, false);
+	option.set(false);
+	const auto off = MZGram::KeepsMessage(false, false);
+	option.set(true);
+	Check(
+		byDefault && others && !own && !service && !off,
+		"archive keeps other people's messages, on by default",
+		!byDefault
+			? "off by default"
+			: !others
+			? "other people's message not kept"
+			: own
+			? "own message kept"
+			: service
+			? "service message kept"
+			: "kept with the switch off");
+}
+
+// No list of chats any more: nothing in the sources picks chats, and the
+// archive asks the rules above.
+void TestArchiveIsForEveryChat() {
+	const auto read = [](const char *path) {
+		auto file = QFile(QString::fromUtf8(MZGRAM_SOURCE_DIR) + '/' + path);
+		return file.open(QIODevice::ReadOnly)
+			? QString::fromUtf8(file.readAll())
+			: QString();
+	};
+	auto problems = QStringList();
+	const auto gone = {
+		u"IsTracked("_q,
+		u"SetTracked("_q,
+		u"trackedPeers("_q,
+		u"addMZGramKeepMessages"_q,
+		u"\"tracked_chats\""_q,
+	};
+	for (const auto path : {
+			"mzgram/mzgram_archive.cpp",
+			"mzgram/mzgram_anti_recall.cpp",
+			"mzgram/mzgram_settings.cpp",
+			"mzgram/mzgram_lang_table.cpp",
+			"window/window_peer_menu.cpp",
+			"history/history_item.cpp",
+		}) {
+		const auto text = read(path);
+		if (text.isEmpty()) {
+			problems.push_back(QString::fromUtf8(path) + u": not read"_q);
+		}
+		for (const auto &word : gone) {
+			if (text.contains(word)) {
+				problems.push_back(QString::fromUtf8(path) + u": "_q + word);
+			}
+		}
+	}
+	if (!read("mzgram/mzgram_anti_recall.cpp").contains(
+			u"KeepsMessage(item->isService(), item->out())"_q)) {
+		problems.push_back(u"anti-recall does not ask KeepsMessage"_q);
+	}
+	if (!read("mzgram/mzgram_archive.cpp").contains(
+			u"KeepsMessage(false, message.c_message().is_out())"_q)) {
+		problems.push_back(u"capture does not ask KeepsMessage"_q);
+	}
+	if (!read("mzgram/mzgram_settings.cpp").contains(
+			u"kOptionSaveDeletedAndEdited"_q)) {
+		problems.push_back(u"no switch in settings"_q);
+	}
+	Check(
+		problems.isEmpty(),
+		"archive works in every chat, with no chat list",
+		problems.join(u", "_q).toStdString().c_str());
+}
+
 } // namespace
 
 int main() {
@@ -338,6 +421,8 @@ int main() {
 		TestProtectedContentFollowsTheSwitch,
 		TestProtectedCopyPlan,
 		TestProtectedContentIsWired,
+		TestArchiveRules,
+		TestArchiveIsForEveryChat,
 	};
 	for (const auto &test : tests) {
 		test();

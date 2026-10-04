@@ -25,7 +25,8 @@ namespace MZGram {
 namespace {
 
 constexpr auto kDefaultMediaSizeLimit = int64(50) * 1024 * 1024;
-constexpr auto kDefaultTotalMediaCap = int64(300) * 1024 * 1024;
+// No cap on the total unless the user sets one.
+constexpr auto kDefaultTotalMediaCap = int64(0);
 
 [[nodiscard]] QString MediaSizeLimitKey() {
 	return u"media_size_limit"_q;
@@ -83,7 +84,7 @@ bool MessageStore::ensureOpen() {
 
 	auto query = QSqlQuery(_db);
 	const auto schema = {
-		// Raw messages get written on every history load of a tracked chat.
+		// Raw messages get written on every history load.
 		u"PRAGMA journal_mode = WAL"_q,
 		u"PRAGMA synchronous = NORMAL"_q,
 		u"CREATE TABLE IF NOT EXISTS deleted_messages ("
@@ -116,6 +117,8 @@ bool MessageStore::ensureOpen() {
 			"PRIMARY KEY (account, peer, msg))"_q,
 		u"CREATE INDEX IF NOT EXISTS messages_deleted "
 			"ON messages (account, peer, deleted_at)"_q,
+		// No longer read: every chat is saved now. Kept so databases from
+		// earlier versions open unchanged.
 		u"CREATE TABLE IF NOT EXISTS tracked_chats ("
 			"account INTEGER NOT NULL, "
 			"peer INTEGER NOT NULL, "
@@ -157,16 +160,6 @@ void MessageStore::loadCaches() {
 	readDeleted(u"SELECT account, peer, msg FROM messages "
 		"WHERE deleted_at IS NOT NULL"_q);
 
-	if (query.exec(u"SELECT account, peer FROM tracked_chats"_q)) {
-		while (query.next()) {
-			_tracked.emplace(
-				FromSql(query.value(0).toLongLong()),
-				FromSql(query.value(1).toLongLong()));
-		}
-	} else {
-		LogFailure("loading tracked chats", query);
-	}
-
 	auto ok = false;
 	const auto limit = setting(MediaSizeLimitKey()).toLongLong(&ok);
 	_mediaSizeLimit = ok ? limit : kDefaultMediaSizeLimit;
@@ -174,54 +167,6 @@ void MessageStore::loadCaches() {
 	auto capOk = false;
 	const auto cap = setting(TotalMediaCapKey()).toLongLong(&capOk);
 	_totalMediaCap = capOk ? cap : kDefaultTotalMediaCap;
-}
-
-bool MessageStore::isTracked(uint64 account, uint64 peer) {
-	return ensureOpen() && _tracked.contains({ account, peer });
-}
-
-void MessageStore::setTracked(uint64 account, uint64 peer, bool tracked) {
-	if (!ensureOpen() || (isTracked(account, peer) == tracked)) {
-		return;
-	}
-	auto query = QSqlQuery(_db);
-	if (tracked) {
-		query.prepare(u"INSERT OR REPLACE INTO tracked_chats "
-			"(account, peer, added_at) "
-			"VALUES (:account, :peer, :added_at)"_q);
-		query.bindValue(u":added_at"_q, qint64(base::unixtime::now()));
-	} else {
-		query.prepare(u"DELETE FROM tracked_chats "
-			"WHERE account = :account AND peer = :peer"_q);
-	}
-	query.bindValue(u":account"_q, ToSql(account));
-	query.bindValue(u":peer"_q, ToSql(peer));
-	if (!query.exec()) {
-		LogFailure("updating tracked chats", query);
-		return;
-	}
-	if (tracked) {
-		_tracked.emplace(account, peer);
-	} else {
-		_tracked.erase({ account, peer });
-	}
-	_trackedChanges.fire({});
-}
-
-std::vector<uint64> MessageStore::trackedPeers(uint64 account) {
-	auto result = std::vector<uint64>();
-	if (ensureOpen()) {
-		for (const auto &[trackedAccount, peer] : _tracked) {
-			if (trackedAccount == account) {
-				result.push_back(peer);
-			}
-		}
-	}
-	return result;
-}
-
-rpl::producer<> MessageStore::trackedChanges() const {
-	return _trackedChanges.events();
 }
 
 void MessageStore::storeRaw(
@@ -555,7 +500,7 @@ void MessageStore::setTotalMediaCap(int64 bytes) {
 }
 
 // Oldest-first eviction across the whole mzgram media folder (every
-// account, every tracked chat combined), so disk usage stays under the
+// account, every chat combined), so disk usage stays under the
 // configured cap regardless of which chat is currently growing. Only the
 // media file on disk is removed -- the row/text stays, matching how the
 // per-file size limit above already results in a text-only row.
@@ -616,11 +561,9 @@ void MessageStore::closeForFileOp() {
 void MessageStore::reopenAfterFileReplace() {
 	closeForFileOp();
 	_deleted.clear();
-	_tracked.clear();
 	if (ensureOpen()) {
 		loadCaches();
 	}
-	_trackedChanges.fire({});
 }
 
 void MessageStore::wipeAll() {

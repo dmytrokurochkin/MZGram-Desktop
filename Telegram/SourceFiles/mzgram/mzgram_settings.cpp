@@ -8,16 +8,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "mzgram/mzgram_settings.h"
 
 #include "base/options.h"
-#include "boxes/peer_list_box.h"
-#include "boxes/peer_list_controllers.h"
 #include "core/application.h"
 #include "core/file_utilities.h"
 #include "data/data_peer.h"
 #include "data/data_session.h"
-#include "data/data_thread.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
 #include "mzgram/mzgram_archive.h"
+#include "mzgram/mzgram_archive_rules.h"
 #include "mzgram/mzgram_lang.h"
 #include "mzgram/mzgram_message_store.h"
 #include "mzgram/mzgram_options.h"
@@ -181,98 +179,24 @@ void TotalMediaCapBox(not_null<Ui::GenericBox*> box) {
 	});
 }
 
-void ShowAddChatBox(
-		not_null<Window::SessionController*> controller,
-		not_null<Main::Session*> session) {
-	const auto weak = std::make_shared<base::weak_qptr<Ui::BoxContent>>();
-	auto chosen = [=](not_null<Data::Thread*> thread) {
-		MZGram::SetTracked(thread->peer(), true);
-		if (const auto strong = weak->get()) {
-			strong->closeBox();
-		}
-	};
-	auto initBox = [](not_null<PeerListBox*> box) {
-		box->addButton(tr::lng_cancel(), [=] {
-			box->closeBox();
-		});
-	};
-	*weak = controller->show(Box<PeerListBox>(
-		std::make_unique<ChooseRecipientBoxController>(ChooseRecipientArgs{
-			.session = session,
-			.callback = std::move(chosen),
-		}),
-		std::move(initBox)));
-}
-
-void FillTrackedChats(
-		not_null<Ui::VerticalLayout*> list,
-		not_null<Window::SessionController*> controller,
-		not_null<Main::Session*> session) {
-	while (list->count()) {
-		delete list->widgetAt(0);
-	}
-	const auto account = session->uniqueId();
-	const auto peers = MZGram::MessageStore::Instance().trackedPeers(account);
-	if (peers.empty()) {
-		list->add(
-			object_ptr<Ui::FlatLabel>(
-				list,
-				Text("no_tracked_chats"),
-				st::defaultFlatLabel),
-			st::settingsButtonNoIcon.padding);
-	}
-	for (const auto peerValue : peers) {
-		const auto peer = session->data().peerLoaded(
-			PeerId(PeerIdHelper(peerValue)));
-		const auto name = peer
-			? peer->name()
-			: MZGram::TrNow("chat_number").arg(peerValue);
-		const auto button = list->add(object_ptr<Ui::SettingsButton>(
-			list,
-			rpl::single(name),
-			st::settingsButtonNoIcon));
-		button->setClickedCallback([=] {
-			controller->show(Ui::MakeConfirmBox({
-				.text = MZGram::TrNow("stop_tracking_confirm").arg(name),
-				.confirmed = [=](Fn<void()> close) {
-					MZGram::MessageStore::Instance().setTracked(
-						account,
-						peerValue,
-						false);
-					close();
-				},
-				.confirmText = tr::lng_box_remove(),
-			}));
-		});
-	}
-}
-
 void BuildMZGramSection(SectionBuilder &builder) {
 	using namespace MZGram;
-
-	const auto session = builder.session();
 
 	// Archive.
 	builder.addSkip();
 	builder.addSubsectionTitle(Text("section_archive"));
 	AddOptionToggle(
 		builder,
-		u"mzgram/anti-recall"_q,
-		"keep_deleted",
-		kOptionAntiRecall,
-		{ u"anti-recall"_q, u"deleted"_q, u"messages"_q });
-	AddOptionToggle(
-		builder,
-		u"mzgram/edit-history"_q,
-		"keep_edit_history",
-		kOptionEditHistory,
-		{ u"edit"_q, u"history"_q, u"edited"_q });
-	AddOptionToggle(
-		builder,
-		u"mzgram/keep-self-destructing"_q,
-		"keep_view_once",
-		kOptionKeepSelfDestructing,
-		{ u"view once"_q, u"self-destruct"_q, u"timer"_q, u"media"_q });
+		u"mzgram/save-deleted-and-edited"_q,
+		"save_deleted_and_edited",
+		kOptionSaveDeletedAndEdited,
+		{
+			u"anti-recall"_q,
+			u"deleted"_q,
+			u"edited"_q,
+			u"history"_q,
+			u"view once"_q,
+		});
 	AddOptionToggle(
 		builder,
 		u"mzgram/mark-messages"_q,
@@ -283,30 +207,7 @@ void BuildMZGramSection(SectionBuilder &builder) {
 	builder.addDividerText(Text("archive_info"));
 
 	builder.addSkip();
-	builder.addSubsectionTitle(Text("tracked_chats"));
 	const auto controller = builder.controller();
-	builder.addButton({
-		.id = u"mzgram/add-chat"_q,
-		.title = Text("add_chat"),
-		.st = &st::settingsButtonNoIcon,
-		.onClick = [=] {
-			ShowAddChatBox(controller, session);
-		},
-		.keywords = { u"chats"_q, u"groups"_q, u"channels"_q, u"add"_q },
-	});
-	builder.add([=](const WidgetContext &ctx) {
-		const auto list = ctx.container->add(
-			object_ptr<Ui::VerticalLayout>(ctx.container));
-		const auto controller = ctx.controller;
-		const auto fill = [=] {
-			FillTrackedChats(list, controller, session);
-			list->resizeToWidth(ctx.container->width());
-		};
-		fill();
-		MessageStore::Instance().trackedChanges(
-		) | rpl::on_next(fill, list->lifetime());
-		return SectionBuilder::WidgetToAdd{};
-	});
 	builder.addButton({
 		.id = u"mzgram/media-limit"_q,
 		.title = Text("media_size_limit"),

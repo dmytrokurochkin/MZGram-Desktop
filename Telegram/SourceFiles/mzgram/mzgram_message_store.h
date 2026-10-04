@@ -46,13 +46,7 @@ class MessageStore final {
 public:
 	[[nodiscard]] static MessageStore &Instance();
 
-	// The chats the user picked. Messages are kept only there.
-	[[nodiscard]] bool isTracked(uint64 account, uint64 peer);
-	void setTracked(uint64 account, uint64 peer, bool tracked);
-	[[nodiscard]] std::vector<uint64> trackedPeers(uint64 account);
-	[[nodiscard]] rpl::producer<> trackedChanges() const;
-
-	// Messages of tracked chats exactly as the server sent them, so a deleted
+	// Other people's messages exactly as the server sent them, so a deleted
 	// one can be rebuilt after a restart. Writes are batched per event loop.
 	// replaceExisting is false when the new copy lost media the old one has.
 	void storeRaw(
@@ -101,7 +95,7 @@ public:
 	[[nodiscard]] QString mediaFolder(uint64 account, uint64 peer) const;
 
 	// Total cap across the whole media folder (every account, every
-	// tracked chat), in bytes, 0 for no limit. Enforced right after each
+	// chat), in bytes, 0 for no limit. Enforced right after each
 	// media file is saved (see setMediaPath): the oldest files are deleted
 	// first until back under the cap.
 	[[nodiscard]] int64 totalMediaCap();
@@ -110,8 +104,8 @@ public:
 
 	// Full wipe for the settings screen's "clear archive" action: every
 	// archived row (messages, edits, deletions) plus every copied media
-	// file on disk, for every account and every peer. Leaves the tracked
-	// chats allowlist and the media size limit setting untouched.
+	// file on disk, for every account and every peer. Leaves the media
+	// size limit settings untouched.
 	void wipeAll();
 
 	// Export/import for the settings screen. The export is the raw SQLite
@@ -144,8 +138,6 @@ private:
 
 	QSqlDatabase _db;
 	std::set<MessageKey> _deleted;
-	std::set<std::pair<uint64, uint64>> _tracked;
-	rpl::event_stream<> _trackedChanges;
 	rpl::variable<int64> _totalMediaCap;
 	rpl::variable<int64> _mediaSizeLimit;
 	std::vector<PendingRaw> _pendingRaw;

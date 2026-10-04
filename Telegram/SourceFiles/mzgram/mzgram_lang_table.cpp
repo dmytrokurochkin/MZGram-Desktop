@@ -28,26 +28,21 @@ const std::vector<Phrase> kPhrases = {
 	{ "section_ads_filters", "Ads and filters", "Реклама і фільтри" },
 
 	// Archive.
-	{ "keep_deleted", "Keep deleted messages", "Зберігати видалені повідомлення" },
-	{ "keep_edit_history", "Keep edit history", "Зберігати історію змін" },
-	{ "keep_view_once", "Keep view-once media", "Зберігати одноразові медіа" },
+	{ "save_deleted_and_edited",
+		"Save deleted and edited messages",
+		"Зберігати видалені й редаговані" },
 	{ "mark_messages", "Mark deleted and edited messages", "Позначати видалені та змінені повідомлення" },
 	{ "archive_info",
-		"Works only in the chats below. Messages and media are saved on "
-		"this device, in an unencrypted database, and stay after a restart.",
-		"Працює лише в чатах нижче. Повідомлення і медіа зберігаються на "
-		"цьому пристрої в незашифрованій базі і лишаються після "
-		"перезапуску." },
-	{ "tracked_chats", "Tracked chats", "Відстежувані чати" },
-	{ "add_chat", "Add chat", "Додати чат" },
-	{ "no_tracked_chats",
-		"No chats yet. Add one here or from a chat menu.",
-		"Чатів ще немає. Додайте чат тут або з меню чату." },
-	{ "chat_number", "Chat %1", "Чат %1" },
-	{ "stop_tracking_confirm",
-		"Stop saving deleted messages in %1? Messages saved so far stay.",
-		"Припинити зберігати видалені повідомлення в %1? Уже збережені "
-		"повідомлення лишаються." },
+		"In every private chat, group, channel and secret chat, other "
+		"people's deleted messages, earlier versions of their edited "
+		"messages and their view-once media are kept. Your own messages "
+		"are not. Everything is saved on this device, in an unencrypted "
+		"database, and stays after a restart.",
+		"У всіх приватних чатах, групах, каналах і секретних чатах "
+		"зберігаються чужі видалені повідомлення, попередні версії їхніх "
+		"відредагованих повідомлень і їхні одноразові медіа. Ваші власні "
+		"повідомлення не зберігаються. Усе зберігається на цьому пристрої "
+		"в незашифрованій базі і лишається після перезапуску." },
 	{ "media_size_limit", "Media size limit", "Обмеження розміру медіа" },
 	{ "media_size_limit_info",
 		"Videos and files larger than this are not saved. Photos, voice "
@@ -58,25 +53,26 @@ const std::vector<Phrase> kPhrases = {
 		"Введіть 0, щоб зняти обмеження." },
 	{ "total_media_cap", "Total media size cap", "Загальне обмеження медіа" },
 	{ "total_media_cap_info",
-		"Caps everything saved across all tracked chats combined. When "
-		"exceeded, the oldest saved media files are deleted first. Enter 0 "
-		"for no limit.",
-		"Обмежує все, що збережено в усіх відстежуваних чатах разом. Коли "
-		"його перевищено, спершу видаляються найстаріші збережені медіа. "
+		"Caps everything saved across all chats combined. When exceeded, "
+		"the oldest saved media files are deleted first. Enter 0 for no "
+		"limit.",
+		"Обмежує все, що збережено в усіх чатах разом. Коли його "
+		"перевищено, спершу видаляються найстаріші збережені медіа. "
 		"Введіть 0, щоб зняти обмеження." },
 	{ "megabytes", "Megabytes", "Мегабайти" },
 	{ "megabytes_value", "%1 MB", "%1 МБ" },
 	{ "no_limit", "No limit", "Без обмежень" },
 	{ "total_media_cap_note",
-		"Total media size cap applies across all tracked chats combined; "
-		"the oldest saved media is deleted first when it is exceeded.",
-		"Загальне обмеження медіа діє для всіх відстежуваних чатів разом; "
-		"коли його перевищено, спершу видаляються найстаріші медіа." },
+		"Total media size cap applies across all chats combined; the "
+		"oldest saved media is deleted first when it is exceeded. Off by "
+		"default.",
+		"Загальне обмеження медіа діє для всіх чатів разом; коли його "
+		"перевищено, спершу видаляються найстаріші медіа. Типово вимкнене." },
 	{ "saved_media_note",
-		"In these chats photos, voice messages, round videos and view-once "
-		"media are saved as they arrive. Videos and files are saved up to "
-		"the size limit.",
-		"У цих чатах фото, голосові, відеоповідомлення та одноразові медіа "
+		"Photos, voice messages, round videos and view-once media from "
+		"other people are saved as they arrive. Videos and files are saved "
+		"up to the size limit.",
+		"Чужі фото, голосові, відеоповідомлення та одноразові медіа "
 		"зберігаються, щойно надходять. Відео і файли зберігаються в межах "
 		"обмеження розміру." },
 	{ "export_archive", "Export archive", "Експортувати архів" },
@@ -110,12 +106,10 @@ const std::vector<Phrase> kPhrases = {
 		"повідомлень разом зі збереженими медіа. Цю дію не можна скасувати. "
 		"Продовжити?" },
 	{ "clear_archive_info",
-		"Deletes every archived message and saved media file for every "
-		"tracked chat. Does not remove the tracked chats list or the media "
-		"size limit setting above.",
-		"Видаляє всі збережені повідомлення і медіафайли в усіх "
-		"відстежуваних чатах. Не прибирає список відстежуваних чатів і "
-		"обмеження розміру медіа вище." },
+		"Deletes every archived message and saved media file in every "
+		"chat. Does not change the settings above.",
+		"Видаляє всі збережені повідомлення і медіафайли в усіх чатах. "
+		"Не змінює налаштування вище." },
 
 	// Privacy.
 	{ "hide_own_online", "Hide own online status", "Приховати свій статус у мережі" },
@@ -279,10 +273,6 @@ const std::vector<Phrase> kPhrases = {
 		"у стилі Zalgo) з імен і назв чатів, які ви бачите." },
 
 	// Chat menu.
-	{ "save_deleted_in_chat", "Save deleted messages", "Зберігати видалені повідомлення" },
-	{ "stop_saving_deleted_in_chat", "Stop saving deleted messages", "Не зберігати видалені повідомлення" },
-	{ "saving_started", "Deleted messages in this chat will be saved.", "Видалені повідомлення в цьому чаті зберігатимуться." },
-	{ "saving_stopped", "Deleted messages are no longer saved in this chat.", "Видалені повідомлення в цьому чаті більше не зберігаються." },
 
 	// Messages.
 	{ "deleted_mark", "deleted", "видалено" },

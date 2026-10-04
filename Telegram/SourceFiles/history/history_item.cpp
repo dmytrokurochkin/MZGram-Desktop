@@ -2872,7 +2872,9 @@ void HistoryItem::clearMediaAsExpired() {
 	unarmMediaDestroy();
 	// MZGram: every burn path (viewer close, voice playback end, timer, a
 	// read on another device) ends here, so one check keeps the media.
-	if (MZGram::KeepSelfDestructing() && MZGram::IsTracked(_history->peer)) {
+	if (MZGram::KeepSelfDestructing()
+		&& MZGram::SavesChat(_history->peer)
+		&& !out()) {
 		return;
 	}
 	auto &owner = _history->owner();

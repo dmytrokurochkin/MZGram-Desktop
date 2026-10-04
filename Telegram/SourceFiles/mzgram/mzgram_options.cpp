@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "mzgram/mzgram_options.h"
 
+#include "mzgram/mzgram_archive_rules.h"
+
 #include "apiwrap.h"
 #include "base/options.h"
 #include "data/data_channel.h"
@@ -84,25 +86,6 @@ base::options::toggle OptionOfferGhostModeBeforeStories({
 	.name = "Offer ghost mode before Stories",
 	.description = "Before opening a story for the first time, ask "
 		"whether to turn ghost mode on first.",
-});
-
-// Off by default: both keep other people's text on disk in plain SQLite.
-base::options::toggle OptionAntiRecall({
-	.id = kOptionAntiRecall,
-	.name = "Anti-recall",
-	.description = "Keep messages others delete, marked as deleted",
-});
-
-base::options::toggle OptionEditHistory({
-	.id = kOptionEditHistory,
-	.name = "Edit history",
-	.description = "Keep earlier versions of edited messages",
-});
-
-base::options::toggle OptionKeepSelfDestructing({
-	.id = kOptionKeepSelfDestructing,
-	.name = "Keep self-destructing media",
-	.description = "Keep view-once and timed media after it is opened",
 });
 
 // On by default: it only changes how messages are drawn.
@@ -223,9 +206,6 @@ const char kOptionGhostAutoDelaySend[] = "mzgram-ghost-auto-delay-send";
 const char kOptionGhostSilentSend[] = "mzgram-ghost-silent-send";
 const char kOptionOfferGhostModeBeforeStories[] = "mzgram-offer-ghost-mode-before-stories";
 const char kOptionDisableSponsoredMessages[] = "mzgram-disable-sponsored-messages";
-const char kOptionAntiRecall[] = "mzgram-anti-recall";
-const char kOptionEditHistory[] = "mzgram-edit-history";
-const char kOptionKeepSelfDestructing[] = "mzgram-keep-self-destructing";
 // The id keeps its first name so a saved choice survives the rename.
 const char kOptionMarkMessages[] = "mzgram-dim-marked";
 const char kOptionMessageSeconds[] = "mzgram-message-seconds";
@@ -318,16 +298,17 @@ void MarkMessageReadDueToInteraction(
 	}
 }
 
+// One switch for all three, see mzgram_archive_rules.h.
 bool AntiRecall() {
-	return OptionAntiRecall.value();
+	return SaveDeletedAndEdited();
 }
 
 bool EditHistory() {
-	return OptionEditHistory.value();
+	return SaveDeletedAndEdited();
 }
 
 bool KeepSelfDestructing() {
-	return OptionKeepSelfDestructing.value();
+	return SaveDeletedAndEdited();
 }
 
 bool MarkKeptMessages() {

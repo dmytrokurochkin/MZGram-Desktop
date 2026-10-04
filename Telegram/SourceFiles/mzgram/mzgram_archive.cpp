@@ -6,6 +6,7 @@ For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "mzgram/mzgram_archive.h"
+#include "mzgram/mzgram_archive_rules.h"
 
 #include "core/file_location.h"
 #include "data/data_document.h"
@@ -244,17 +245,8 @@ void QueueMediaSave(not_null<HistoryItem*> item, const MessageKey &key) {
 
 } // namespace
 
-bool IsTracked(not_null<PeerData*> peer) {
-	return MessageStore::Instance().isTracked(
-		peer->session().uniqueId(),
-		peer->id.value);
-}
-
-void SetTracked(not_null<PeerData*> peer, bool tracked) {
-	MessageStore::Instance().setTracked(
-		peer->session().uniqueId(),
-		peer->id.value,
-		tracked);
+bool SavesChat(not_null<PeerData*> peer) {
+	return SaveDeletedAndEdited();
 }
 
 void CaptureMessage(not_null<HistoryItem*> item, const MTPMessage &message) {
@@ -264,7 +256,9 @@ void CaptureMessage(not_null<HistoryItem*> item, const MTPMessage &message) {
 		return;
 	}
 	const auto history = item->history();
-	if (!IsTracked(history->peer)) {
+	// The owner's own messages are never kept.
+	if (!SavesChat(history->peer)
+		|| !KeepsMessage(false, message.c_message().is_out())) {
 		return;
 	}
 	const auto key = KeyFor(item);
@@ -284,7 +278,7 @@ const MTPMessage &PreferKeptCopy(
 		std::optional<MTPMessage> &storage) {
 	if (!KeepSelfDestructing()
 		|| !WouldShowExpired(message)
-		|| !IsTracked(history->peer)) {
+		|| !SavesChat(history->peer)) {
 		return message;
 	}
 	const auto kept = MessageStore::Instance().stored({
@@ -311,7 +305,7 @@ void RestoreSavedMedia(not_null<HistoryItem*> item) {
 		|| !Active()
 		|| !(media->photo() || media->document())
 		|| !(media->ttlSeconds() || IsPreservedDeleted(item))
-		|| !IsTracked(item->history()->peer)) {
+		|| !SavesChat(item->history()->peer)) {
 		return;
 	}
 	const auto path = SavedMediaPath(item);
@@ -346,7 +340,7 @@ bool KeepsMediaAgainst(
 		&& media
 		&& media->ttlSeconds()
 		&& WouldShowExpired(edition)
-		&& IsTracked(item->history()->peer)
+		&& SavesChat(item->history()->peer)
 		&& !SavedMediaPath(item).isEmpty();
 }
 
@@ -357,11 +351,10 @@ void RecordRemoteDeletion(
 	if (!AntiRecall()) {
 		return;
 	}
-	auto &store = MessageStore::Instance();
-	const auto account = session->uniqueId();
-	if (store.isTracked(account, peerId.value)) {
-		store.markDeleted(account, peerId.value, Ids(ids));
-	}
+	MessageStore::Instance().markDeleted(
+		session->uniqueId(),
+		peerId.value,
+		Ids(ids));
 }
 
 void RecordRemoteDeletion(
@@ -370,14 +363,14 @@ void RecordRemoteDeletion(
 	if (!AntiRecall()) {
 		return;
 	}
-	// Only tracked chats have stored rows, so no tracked check is needed.
+	// Only kept messages have stored rows, so no other check is needed.
 	MessageStore::Instance().markDeletedNonChannel(
 		session->uniqueId(),
 		Ids(ids));
 }
 
 void ForgetDeletedByUser(not_null<HistoryItem*> item) {
-	if (item->isRegular() && IsTracked(item->history()->peer)) {
+	if (item->isRegular()) {
 		MessageStore::Instance().forget(KeyFor(item));
 	}
 }
@@ -387,7 +380,7 @@ const QVector<MTPMessage> &MergePreserved(
 		const QVector<MTPMessage> &slice,
 		bool older,
 		QVector<MTPMessage> &storage) {
-	if (!AntiRecall() || !IsTracked(history->peer)) {
+	if (!AntiRecall() || !SavesChat(history->peer)) {
 		return slice;
 	}
 	constexpr auto kLowest = int64(0);

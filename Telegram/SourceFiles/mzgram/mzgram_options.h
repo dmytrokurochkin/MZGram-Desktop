@@ -21,9 +21,6 @@ extern const char kOptionGhostMode[];
 extern const char kOptionSendReadReceipts[];
 extern const char kOptionSendTyping[];
 extern const char kOptionSendOnline[];
-extern const char kOptionAntiRecall[];
-extern const char kOptionEditHistory[];
-extern const char kOptionKeepSelfDestructing[];
 extern const char kOptionMarkMessages[];
 
 // Ghost mode is a master switch: each of the three below stays meaningful on

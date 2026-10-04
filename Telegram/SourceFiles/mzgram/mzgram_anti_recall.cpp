@@ -6,6 +6,7 @@ For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "mzgram/mzgram_anti_recall.h"
+#include "mzgram/mzgram_archive_rules.h"
 #include "mzgram/mzgram_lang.h"
 
 #include "data/data_peer.h"
@@ -25,9 +26,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 namespace MZGram {
 namespace {
 
-// Only the chats the user picked keep deleted messages and edit history.
+// Other people's messages, in every chat; never the owner's own.
 [[nodiscard]] bool ChatQualifies(not_null<const HistoryItem*> item) {
-	return IsTracked(item->history()->peer);
+	return SavesChat(item->history()->peer)
+		&& KeepsMessage(item->isService(), item->out());
 }
 
 } // namespace
