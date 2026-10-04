@@ -26,6 +26,9 @@ const std::vector<Phrase> kPhrases = {
 	{ "section_media_calls", "Media and calls", "Медіа і дзвінки" },
 	{ "section_interface", "Interface", "Інтерфейс" },
 	{ "section_ads_filters", "Ads and filters", "Реклама і фільтри" },
+	{ "settings_topics_info",
+		"Every MZGram feature is on one of these pages.",
+		"Кожна функція MZGram є на одній із цих сторінок." },
 
 	// Archive.
 	{ "save_deleted_and_edited",

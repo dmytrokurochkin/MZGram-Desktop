@@ -32,10 +32,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/wrap/vertical_layout.h"
 #include "window/window_session_controller.h"
 #include "styles/style_layers.h"
+#include "styles/style_menu_icons.h"
 #include "styles/style_settings.h"
 #include "styles/style_widgets.h"
 
 #include <QtCore/QFile>
+
+#include <array>
 
 namespace Settings {
 namespace {
@@ -179,12 +182,10 @@ void TotalMediaCapBox(not_null<Ui::GenericBox*> box) {
 	});
 }
 
-void BuildMZGramSection(SectionBuilder &builder) {
+void BuildArchive(SectionBuilder &builder) {
 	using namespace MZGram;
 
-	// Archive.
 	builder.addSkip();
-	builder.addSubsectionTitle(Text("section_archive"));
 	AddOptionToggle(
 		builder,
 		u"mzgram/save-deleted-and-edited"_q,
@@ -320,10 +321,12 @@ void BuildMZGramSection(SectionBuilder &builder) {
 	});
 	builder.addSkip();
 	builder.addDividerText(Text("clear_archive_info"));
+}
 
-	// Privacy.
+void BuildPrivacy(SectionBuilder &builder) {
+	using namespace MZGram;
+
 	builder.addSkip();
-	builder.addSubsectionTitle(Text("section_privacy"));
 	AddOptionToggle(
 		builder,
 		u"mzgram/spy-hide-online-status"_q,
@@ -332,10 +335,12 @@ void BuildMZGramSection(SectionBuilder &builder) {
 		{ u"spy"_q, u"online"_q, u"last seen"_q });
 	builder.addSkip();
 	builder.addDividerText(Text("hide_own_online_info"));
+}
 
-	// Ghost Mode.
+void BuildGhostMode(SectionBuilder &builder) {
+	using namespace MZGram;
+
 	builder.addSkip();
-	builder.addSubsectionTitle(Text("section_ghost_mode"));
 	AddOptionToggle(
 		builder,
 		u"mzgram/ghost-mode"_q,
@@ -399,10 +404,12 @@ void BuildMZGramSection(SectionBuilder &builder) {
 		{ u"ghost"_q, u"stories"_q, u"seen"_q });
 	builder.addSkip();
 	builder.addDividerText(Text("offer_ghost_stories_info"));
+}
 
-	// Message menu.
+void BuildMessageMenu(SectionBuilder &builder) {
+	using namespace MZGram;
+
 	builder.addSkip();
-	builder.addSubsectionTitle(Text("section_message_menu"));
 	AddOptionToggle(
 		builder,
 		u"mzgram/repeat-message"_q,
@@ -450,10 +457,12 @@ void BuildMZGramSection(SectionBuilder &builder) {
 		{ u"protected"_q, u"forward"_q, u"save"_q, u"copy"_q, u"screenshot"_q });
 	builder.addSkip();
 	builder.addDividerText(Text("save_protected_content_info"));
+}
 
-	// Media and calls.
+void BuildMediaCalls(SectionBuilder &builder) {
+	using namespace MZGram;
+
 	builder.addSkip();
-	builder.addSubsectionTitle(Text("section_media_calls"));
 	AddOptionToggle(
 		builder,
 		u"mzgram/auto-pause-video"_q,
@@ -484,10 +493,12 @@ void BuildMZGramSection(SectionBuilder &builder) {
 		{ u"media"_q, u"preview"_q, u"chat preview"_q, u"photo"_q, u"video"_q });
 	builder.addSkip();
 	builder.addDividerText(Text("media_preview_info"));
+}
 
-	// Interface.
+void BuildInterface(SectionBuilder &builder) {
+	using namespace MZGram;
+
 	builder.addSkip();
-	builder.addSubsectionTitle(Text("section_interface"));
 	AddOptionToggle(
 		builder,
 		u"mzgram/message-seconds"_q,
@@ -524,10 +535,12 @@ void BuildMZGramSection(SectionBuilder &builder) {
 		{ u"archive"_q, u"pull"_q, u"overscroll"_q });
 	builder.addSkip();
 	builder.addDividerText(Text("open_archive_on_pull_info"));
+}
 
-	// Ads and filters.
+void BuildAdsFilters(SectionBuilder &builder) {
+	using namespace MZGram;
+
 	builder.addSkip();
-	builder.addSubsectionTitle(Text("section_ads_filters"));
 	AddOptionToggle(
 		builder,
 		u"mzgram/disable-sponsored-messages"_q,
@@ -546,6 +559,43 @@ void BuildMZGramSection(SectionBuilder &builder) {
 		{ u"zalgo"_q, u"corrupted"_q, u"text"_q });
 	builder.addSkip();
 	builder.addDividerText(Text("zalgo_filter_info"));
+}
+
+struct Topic {
+	const char *title = nullptr;
+	const style::icon *icon = nullptr;
+	void (*build)(SectionBuilder &builder) = nullptr;
+};
+
+// The topics, in the order the MZGram page lists them.
+[[nodiscard]] const std::array<Topic, 7> &Topics() {
+	static const auto result = std::array<Topic, 7>{ {
+		{ "section_archive", &st::menuIconArchive, BuildArchive },
+		{ "section_privacy", &st::menuIconLock, BuildPrivacy },
+		{ "section_ghost_mode", &st::menuIconStealth, BuildGhostMode },
+		{ "section_message_menu", &st::menuIconChatBubble, BuildMessageMenu },
+		{ "section_media_calls", &st::menuIconPhone, BuildMediaCalls },
+		{ "section_interface", &st::menuIconPalette, BuildInterface },
+		{ "section_ads_filters", &st::menuIconBlock, BuildAdsFilters },
+	} };
+	return result;
+}
+
+[[nodiscard]] Type TopicId(int index);
+
+// Settings > MZGram: one row per topic; each opens the topic's own page.
+void BuildMZGramSection(SectionBuilder &builder) {
+	const auto &topics = Topics();
+	builder.addSkip();
+	for (auto i = 0; i != int(topics.size()); ++i) {
+		builder.addSectionButton({
+			.title = Text(topics[i].title),
+			.targetSection = TopicId(i),
+			.icon = { topics[i].icon },
+		});
+	}
+	builder.addSkip();
+	builder.addDividerText(Text("settings_topics_info"));
 }
 
 class MZGramSection : public Section<MZGramSection> {
@@ -590,6 +640,55 @@ void MZGramSection::setupContent() {
 
 	build(content, buildMethod);
 	Ui::ResizeFitChild(this, content);
+}
+
+// A topic's own page, opened from the MZGram page; Back returns there.
+template <int Index>
+class MZGramTopicSection : public Section<MZGramTopicSection<Index>> {
+public:
+	MZGramTopicSection(
+		QWidget *parent,
+		not_null<Window::SessionController*> controller)
+	: Section<MZGramTopicSection<Index>>(parent, controller) {
+		setupContent();
+	}
+
+	[[nodiscard]] rpl::producer<QString> title() override {
+		return Text(Topics()[Index].title);
+	}
+
+private:
+	void setupContent() {
+		const auto content = Ui::CreateChild<Ui::VerticalLayout>(this);
+		const SectionBuildMethod buildMethod = [](
+				not_null<Ui::VerticalLayout*> container,
+				not_null<Window::SessionController*> controller,
+				Fn<void(Type)> showOther,
+				rpl::producer<> showFinished) {
+			auto builder = SectionBuilder(WidgetContext{
+				.container = container,
+				.controller = controller,
+				.showOther = std::move(showOther),
+			});
+			Topics()[Index].build(builder);
+		};
+		this->build(content, buildMethod);
+		Ui::ResizeFitChild(this, content);
+	}
+
+};
+
+Type TopicId(int index) {
+	switch (index) {
+	case 0: return MZGramTopicSection<0>::Id();
+	case 1: return MZGramTopicSection<1>::Id();
+	case 2: return MZGramTopicSection<2>::Id();
+	case 3: return MZGramTopicSection<3>::Id();
+	case 4: return MZGramTopicSection<4>::Id();
+	case 5: return MZGramTopicSection<5>::Id();
+	case 6: return MZGramTopicSection<6>::Id();
+	}
+	Unexpected("Index in MZGram TopicId.");
 }
 
 } // namespace

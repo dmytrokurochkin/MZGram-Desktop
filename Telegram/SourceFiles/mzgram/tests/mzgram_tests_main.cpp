@@ -407,6 +407,63 @@ void TestArchiveIsForEveryChat() {
 		problems.join(u", "_q).toStdString().c_str());
 }
 
+
+// Settings > MZGram lists the topics; each opens its own page with that
+// topic's switches. No switch is on the list page itself, and each topic
+// page builder is in the topic table.
+void TestSettingsAreTopicPages() {
+	auto file = QFile(
+		QString::fromUtf8(MZGRAM_SOURCE_DIR) + u"/mzgram/mzgram_settings.cpp"_q);
+	const auto text = file.open(QIODevice::ReadOnly)
+		? QString::fromUtf8(file.readAll())
+		: QString();
+	auto problems = QStringList();
+	const auto topics = {
+		u"Archive"_q,
+		u"Privacy"_q,
+		u"GhostMode"_q,
+		u"MessageMenu"_q,
+		u"MediaCalls"_q,
+		u"Interface"_q,
+		u"AdsFilters"_q,
+	};
+	auto toggles = 0;
+	for (const auto &topic : topics) {
+		const auto name = u"void Build"_q + topic + u"(SectionBuilder &builder) {"_q;
+		const auto start = text.indexOf(name);
+		if (start < 0) {
+			problems.push_back(topic + u": no page"_q);
+			continue;
+		}
+		const auto end = text.indexOf(u"\n}\n"_q, start);
+		const auto body = text.mid(start, end - start);
+		const auto count = int(body.count(u"AddOptionToggle("_q))
+			+ int(body.count(u"addButton({"_q));
+		if (!count) {
+			problems.push_back(topic + u": empty page"_q);
+		}
+		toggles += count;
+		if (!text.contains(u", Build"_q + topic + u" },"_q)) {
+			problems.push_back(topic + u": not in the topic table"_q);
+		}
+	}
+	const auto mainStart = text.indexOf(
+		u"void BuildMZGramSection(SectionBuilder &builder) {"_q);
+	const auto mainBody = text.mid(
+		mainStart,
+		text.indexOf(u"\n}\n"_q, mainStart) - mainStart);
+	if (mainStart < 0
+		|| mainBody.contains(u"AddOptionToggle("_q)
+		|| !mainBody.contains(u"addSectionButton("_q)) {
+		problems.push_back(u"list page"_q);
+	}
+	std::printf("settings topic pages: %d switches and buttons\n", toggles);
+	Check(
+		problems.isEmpty() && toggles == 33,
+		"settings are a list of topic pages, every switch on one",
+		problems.join(u", "_q).toStdString().c_str());
+}
+
 } // namespace
 
 int main() {
@@ -423,6 +480,7 @@ int main() {
 		TestProtectedContentIsWired,
 		TestArchiveRules,
 		TestArchiveIsForEveryChat,
+		TestSettingsAreTopicPages,
 	};
 	for (const auto &test : tests) {
 		test();
