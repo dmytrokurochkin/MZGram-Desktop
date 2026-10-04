@@ -414,8 +414,9 @@ void TestArchiveIsForEveryChat() {
 void TestSettingsAreTopicPages() {
 	auto file = QFile(
 		QString::fromUtf8(MZGRAM_SOURCE_DIR) + u"/mzgram/mzgram_settings.cpp"_q);
+	// A Windows checkout has CRLF line ends.
 	const auto text = file.open(QIODevice::ReadOnly)
-		? QString::fromUtf8(file.readAll())
+		? QString::fromUtf8(file.readAll()).replace(u"\r\n"_q, u"\n"_q)
 		: QString();
 	auto problems = QStringList();
 	const auto topics = {
