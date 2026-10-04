@@ -46,38 +46,15 @@ const std::vector<Phrase> kPhrases = {
 		"відредагованих повідомлень і їхні одноразові медіа. Ваші власні "
 		"повідомлення не зберігаються. Усе зберігається на цьому пристрої "
 		"в незашифрованій базі і лишається після перезапуску." },
-	{ "media_size_limit", "Media size limit", "Обмеження розміру медіа" },
-	{ "media_size_limit_info",
-		"Videos and files larger than this are not saved. Photos, voice "
-		"messages, round videos and view-once media are always saved. "
-		"Enter 0 for no limit.",
-		"Відео і файли, більші за це, не зберігаються. Фото, голосові, "
-		"відеоповідомлення та одноразові медіа зберігаються завжди. "
-		"Введіть 0, щоб зняти обмеження." },
-	{ "total_media_cap", "Total media size cap", "Загальне обмеження медіа" },
-	{ "total_media_cap_info",
-		"Caps everything saved across all chats combined. When exceeded, "
-		"the oldest saved media files are deleted first. Enter 0 for no "
-		"limit.",
-		"Обмежує все, що збережено в усіх чатах разом. Коли його "
-		"перевищено, спершу видаляються найстаріші збережені медіа. "
-		"Введіть 0, щоб зняти обмеження." },
-	{ "megabytes", "Megabytes", "Мегабайти" },
-	{ "megabytes_value", "%1 MB", "%1 МБ" },
-	{ "no_limit", "No limit", "Без обмежень" },
-	{ "total_media_cap_note",
-		"Total media size cap applies across all chats combined; the "
-		"oldest saved media is deleted first when it is exceeded. Off by "
-		"default.",
-		"Загальне обмеження медіа діє для всіх чатів разом; коли його "
-		"перевищено, спершу видаляються найстаріші медіа. Типово вимкнене." },
 	{ "saved_media_note",
-		"Photos, voice messages, round videos and view-once media from "
-		"other people are saved as they arrive. Videos and files are saved "
-		"up to the size limit.",
-		"Чужі фото, голосові, відеоповідомлення та одноразові медіа "
-		"зберігаються, щойно надходять. Відео і файли зберігаються в межах "
-		"обмеження розміру." },
+		"Other people's photos, voice messages, round videos, view-once "
+		"media, videos and files are saved as they arrive, of any size. "
+		"There is no total quota, and saved files are never deleted on "
+		"their own.",
+		"Чужі фото, голосові, відеоповідомлення, одноразові медіа, відео і "
+		"файли зберігаються, щойно надходять, будь-якого розміру. "
+		"Загальної квоти немає, і збережені файли ніколи не видаляються "
+		"самі." },
 	{ "export_archive", "Export archive", "Експортувати архів" },
 	{ "import_archive", "Import archive", "Імпортувати архів" },
 	{ "export_archive_title", "Export MZGram archive", "Експорт архіву MZGram" },

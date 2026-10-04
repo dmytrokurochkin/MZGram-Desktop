@@ -184,19 +184,9 @@ void QueueMediaSave(not_null<HistoryItem*> item, const MessageKey &key) {
 		; !saved.isEmpty() && QFileInfo::exists(saved)) {
 		return;
 	}
-	if (document) {
-		if (document->sticker()) {
-			return;
-		}
-		// The user asked for these regardless of size: they are the kinds
-		// people delete or burn on purpose.
-		const auto always = document->isVoiceMessage()
-			|| document->isVideoMessage()
-			|| media->ttlSeconds();
-		const auto limit = store.mediaSizeLimit();
-		if (!always && limit > 0 && document->size > limit) {
-			return;
-		}
+	// Any size is saved: there is no per-file limit and no total quota.
+	if (document && document->sticker()) {
+		return;
 	}
 
 	const auto session = &item->history()->session();

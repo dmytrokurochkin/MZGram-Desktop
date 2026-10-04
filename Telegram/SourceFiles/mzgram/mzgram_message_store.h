@@ -87,25 +87,13 @@ public:
 	[[nodiscard]] bool isDeleted(const MessageKey &key);
 	[[nodiscard]] std::vector<StoredEdit> edits(const MessageKey &key);
 
-	// In bytes, 0 for no limit. Applies to videos and files only.
-	[[nodiscard]] int64 mediaSizeLimit();
-	[[nodiscard]] rpl::producer<int64> mediaSizeLimitValue();
-	void setMediaSizeLimit(int64 bytes);
-
+	// Saved media has no size limit and no total quota, and is never
+	// deleted on its own.
 	[[nodiscard]] QString mediaFolder(uint64 account, uint64 peer) const;
-
-	// Total cap across the whole media folder (every account, every
-	// chat), in bytes, 0 for no limit. Enforced right after each
-	// media file is saved (see setMediaPath): the oldest files are deleted
-	// first until back under the cap.
-	[[nodiscard]] int64 totalMediaCap();
-	[[nodiscard]] rpl::producer<int64> totalMediaCapValue();
-	void setTotalMediaCap(int64 bytes);
 
 	// Full wipe for the settings screen's "clear archive" action: every
 	// archived row (messages, edits, deletions) plus every copied media
-	// file on disk, for every account and every peer. Leaves the media
-	// size limit settings untouched.
+	// file on disk, for every account and every peer.
 	void wipeAll();
 
 	// Export/import for the settings screen. The export is the raw SQLite
@@ -132,14 +120,9 @@ private:
 	void loadCaches();
 	void flushRaw();
 	void markKeyDeleted(const MessageKey &key, qint64 now);
-	[[nodiscard]] QString setting(const QString &key);
-	void setSetting(const QString &key, const QString &value);
-	void enforceMediaCap();
 
 	QSqlDatabase _db;
 	std::set<MessageKey> _deleted;
-	rpl::variable<int64> _totalMediaCap;
-	rpl::variable<int64> _mediaSizeLimit;
 	std::vector<PendingRaw> _pendingRaw;
 	bool _flushScheduled = false;
 	bool _opened = false;

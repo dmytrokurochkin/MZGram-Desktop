@@ -26,7 +26,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/layers/generic_box.h"
 #include "ui/toast/toast.h"
 #include "ui/widgets/buttons.h"
-#include "ui/widgets/fields/number_input.h"
 #include "ui/widgets/labels.h"
 #include "ui/wrap/padding_wrap.h"
 #include "ui/wrap/vertical_layout.h"
@@ -45,20 +44,12 @@ namespace {
 
 using namespace Builder;
 
-constexpr auto kMegabyte = int64(1024) * 1024;
-
 // Texts come from MZGram's own table (mzgram_lang.h), in the app's
 // language, not from lang.strings. The cost is that this section is not in
 // settings search.
 
 [[nodiscard]] rpl::producer<QString> Text(const char *key) {
 	return MZGram::Tr(key);
-}
-
-[[nodiscard]] QString LimitText(int64 bytes) {
-	return (bytes > 0)
-		? MZGram::TrNow("megabytes_value").arg(bytes / kMegabyte)
-		: MZGram::TrNow("no_limit");
 }
 
 [[nodiscard]] rpl::producer<bool> OptionValue(const char id[]) {
@@ -101,87 +92,6 @@ void AddOptionToggle(
 	}, button->lifetime());
 }
 
-void MediaLimitBox(not_null<Ui::GenericBox*> box) {
-	const auto megabytes = MZGram::MessageStore::Instance().mediaSizeLimit()
-		/ kMegabyte;
-	box->setTitle(Text("media_size_limit"));
-	box->addRow(object_ptr<Ui::FlatLabel>(
-		box,
-		Text("media_size_limit_info"),
-		st::boxLabel));
-	// NumberInput is not an RpWidget, so addRow cannot take it directly.
-	const auto wrap = box->addRow(object_ptr<Ui::FixedHeightWidget>(
-		box,
-		st::defaultInputField.heightMin));
-	const auto input = Ui::CreateChild<Ui::NumberInput>(
-		wrap,
-		st::defaultInputField,
-		Text("megabytes"),
-		QString::number(megabytes),
-		1024 * 1024);
-	wrap->widthValue() | rpl::on_next([=](int width) {
-		input->move(0, 0);
-		input->resize(width, input->height());
-		wrap->resize(width, input->height());
-	}, wrap->lifetime());
-	const auto save = [=] {
-		const auto value = input->getLastText().toLongLong();
-		MZGram::MessageStore::Instance().setMediaSizeLimit(
-			value * kMegabyte);
-		box->closeBox();
-	};
-	QObject::connect(input, &Ui::MaskedInputField::submitted, [=] {
-		save();
-	});
-	box->setFocusCallback([=] {
-		input->setFocusFast();
-	});
-	box->addButton(tr::lng_settings_save(), save);
-	box->addButton(tr::lng_cancel(), [=] {
-		box->closeBox();
-	});
-}
-
-void TotalMediaCapBox(not_null<Ui::GenericBox*> box) {
-	const auto megabytes = MZGram::MessageStore::Instance().totalMediaCap()
-		/ kMegabyte;
-	box->setTitle(Text("total_media_cap"));
-	box->addRow(object_ptr<Ui::FlatLabel>(
-		box,
-		Text("total_media_cap_info"),
-		st::boxLabel));
-	const auto wrap = box->addRow(object_ptr<Ui::FixedHeightWidget>(
-		box,
-		st::defaultInputField.heightMin));
-	const auto input = Ui::CreateChild<Ui::NumberInput>(
-		wrap,
-		st::defaultInputField,
-		Text("megabytes"),
-		QString::number(megabytes),
-		1024 * 1024);
-	wrap->widthValue() | rpl::on_next([=](int width) {
-		input->move(0, 0);
-		input->resize(width, input->height());
-		wrap->resize(width, input->height());
-	}, wrap->lifetime());
-	const auto save = [=] {
-		const auto value = input->getLastText().toLongLong();
-		MZGram::MessageStore::Instance().setTotalMediaCap(
-			value * kMegabyte);
-		box->closeBox();
-	};
-	QObject::connect(input, &Ui::MaskedInputField::submitted, [=] {
-		save();
-	});
-	box->setFocusCallback([=] {
-		input->setFocusFast();
-	});
-	box->addButton(tr::lng_settings_save(), save);
-	box->addButton(tr::lng_cancel(), [=] {
-		box->closeBox();
-	});
-}
-
 void BuildArchive(SectionBuilder &builder) {
 	using namespace MZGram;
 
@@ -208,36 +118,10 @@ void BuildArchive(SectionBuilder &builder) {
 	builder.addDividerText(Text("archive_info"));
 
 	builder.addSkip();
-	const auto controller = builder.controller();
-	builder.addButton({
-		.id = u"mzgram/media-limit"_q,
-		.title = Text("media_size_limit"),
-		.st = &st::settingsButtonNoIcon,
-		.label = MessageStore::Instance().mediaSizeLimitValue(
-		) | rpl::map(LimitText),
-		.onClick = [=] {
-			controller->show(Box(MediaLimitBox));
-		},
-		.keywords = { u"size"_q, u"limit"_q, u"media"_q, u"video"_q },
-	});
-	builder.addButton({
-		.id = u"mzgram/total-media-cap"_q,
-		.title = Text("total_media_cap"),
-		.st = &st::settingsButtonNoIcon,
-		.label = MessageStore::Instance().totalMediaCapValue(
-		) | rpl::map(LimitText),
-		.onClick = [=] {
-			controller->show(Box(TotalMediaCapBox));
-		},
-		.keywords = { u"size"_q, u"cap"_q, u"media"_q, u"total"_q },
-	});
-	builder.addSkip();
-	builder.addDividerText(Text("total_media_cap_note"));
-
-	builder.addSkip();
 	builder.addDividerText(Text("saved_media_note"));
 
 	builder.addSkip();
+	const auto controller = builder.controller();
 	builder.addButton({
 		.id = u"mzgram/export-archive"_q,
 		.title = Text("export_archive"),

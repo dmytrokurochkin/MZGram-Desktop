@@ -118,7 +118,7 @@ void TestEveryPhraseInBothLanguages() {
 	}
 	std::printf("string table: %d phrases\n", int(keys.size()));
 	Check(
-		problems.isEmpty() && keys.size() > 100,
+		problems.isEmpty() && keys.size() > 50,
 		"every MZGram phrase is in English and Ukrainian",
 		problems.join(u", "_q).toStdString().c_str());
 }
@@ -175,7 +175,7 @@ void TestEveryUsedKeyIsInTheTable() {
 	}
 	std::printf("keys used in the sources: %d\n", used);
 	Check(
-		missing.isEmpty() && used > 100,
+		missing.isEmpty() && used > 50,
 		"every key the sources use is in the string table",
 		missing.join(u", "_q).toStdString().c_str());
 }
@@ -408,6 +408,56 @@ void TestArchiveIsForEveryChat() {
 }
 
 
+// Saved media has no size limit and no total quota, and nothing deletes
+// saved files on its own: no limit in the capture, no quota or eviction
+// in the store, no setting or text for either.
+void TestArchiveMediaHasNoLimit() {
+	const auto read = [](const char *path) {
+		auto file = QFile(QString::fromUtf8(MZGRAM_SOURCE_DIR) + '/' + path);
+		return file.open(QIODevice::ReadOnly)
+			? QString::fromUtf8(file.readAll())
+			: QString();
+	};
+	auto problems = QStringList();
+	const auto gone = {
+		u"mediaSizeLimit"_q,
+		u"MediaSizeLimit"_q,
+		u"totalMediaCap"_q,
+		u"TotalMediaCap"_q,
+		u"enforceMediaCap"_q,
+		u"\"media_size_limit\""_q,
+		u"\"total_media_cap\""_q,
+		u"document->size >"_q,
+	};
+	for (const auto path : {
+			"mzgram/mzgram_archive.cpp",
+			"mzgram/mzgram_message_store.cpp",
+			"mzgram/mzgram_message_store.h",
+			"mzgram/mzgram_settings.cpp",
+			"mzgram/mzgram_lang_table.cpp",
+		}) {
+		const auto text = read(path);
+		if (text.isEmpty()) {
+			problems.push_back(QString::fromUtf8(path) + u": not read"_q);
+		}
+		for (const auto &word : gone) {
+			if (text.contains(word)) {
+				problems.push_back(QString::fromUtf8(path) + u": "_q + word);
+			}
+		}
+	}
+	const auto store = read("mzgram/mzgram_message_store.cpp");
+	if (!store.contains(
+			u"WHERE key IN ('media_size_limit', 'total_media_cap')"_q)) {
+		problems.push_back(u"old limits are not dropped"_q);
+	}
+	Check(
+		problems.isEmpty(),
+		"archive media has no size limit and no quota",
+		problems.join(u", "_q).toStdString().c_str());
+}
+
+
 // Settings > MZGram lists the topics; each opens its own page with that
 // topic's switches. No switch is on the list page itself, and each topic
 // page builder is in the topic table.
@@ -460,7 +510,7 @@ void TestSettingsAreTopicPages() {
 	}
 	std::printf("settings topic pages: %d switches and buttons\n", toggles);
 	Check(
-		problems.isEmpty() && toggles == 33,
+		problems.isEmpty() && toggles == 31,
 		"settings are a list of topic pages, every switch on one",
 		problems.join(u", "_q).toStdString().c_str());
 }
@@ -481,6 +531,7 @@ int main() {
 		TestProtectedContentIsWired,
 		TestArchiveRules,
 		TestArchiveIsForEveryChat,
+		TestArchiveMediaHasNoLimit,
 		TestSettingsAreTopicPages,
 	};
 	for (const auto &test : tests) {

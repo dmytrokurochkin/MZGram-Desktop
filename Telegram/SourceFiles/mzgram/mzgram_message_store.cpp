@@ -24,18 +24,6 @@ Q_IMPORT_PLUGIN(QSQLiteDriverPlugin)
 namespace MZGram {
 namespace {
 
-constexpr auto kDefaultMediaSizeLimit = int64(50) * 1024 * 1024;
-// No cap on the total unless the user sets one.
-constexpr auto kDefaultTotalMediaCap = int64(0);
-
-[[nodiscard]] QString MediaSizeLimitKey() {
-	return u"media_size_limit"_q;
-}
-
-[[nodiscard]] QString TotalMediaCapKey() {
-	return u"total_media_cap"_q;
-}
-
 // SQLite INTEGER is signed; the bit pattern survives the round trip.
 [[nodiscard]] qint64 ToSql(uint64 value) {
 	return static_cast<qint64>(value);
@@ -160,13 +148,13 @@ void MessageStore::loadCaches() {
 	readDeleted(u"SELECT account, peer, msg FROM messages "
 		"WHERE deleted_at IS NOT NULL"_q);
 
-	auto ok = false;
-	const auto limit = setting(MediaSizeLimitKey()).toLongLong(&ok);
-	_mediaSizeLimit = ok ? limit : kDefaultMediaSizeLimit;
-
-	auto capOk = false;
-	const auto cap = setting(TotalMediaCapKey()).toLongLong(&capOk);
-	_totalMediaCap = capOk ? cap : kDefaultTotalMediaCap;
+	// Media of any size is kept, with no total quota, and saved files are
+	// never deleted on their own: the limits an older version saved go.
+	auto drop = QSqlQuery(_db);
+	if (!drop.exec(u"DELETE FROM settings "
+			"WHERE key IN ('media_size_limit', 'total_media_cap')"_q)) {
+		LogFailure("dropping the old media limits", drop);
+	}
 }
 
 void MessageStore::storeRaw(
@@ -254,7 +242,6 @@ void MessageStore::setMediaPath(const MessageKey &key, const QString &path) {
 	if (!query.exec()) {
 		LogFailure("saving a media path", query);
 	}
-	enforceMediaCap();
 }
 
 QString MessageStore::mediaPath(const MessageKey &key) {
@@ -459,89 +446,6 @@ std::vector<StoredEdit> MessageStore::edits(const MessageKey &key) {
 	return result;
 }
 
-int64 MessageStore::mediaSizeLimit() {
-	return ensureOpen() ? _mediaSizeLimit.current() : kDefaultMediaSizeLimit;
-}
-
-rpl::producer<int64> MessageStore::mediaSizeLimitValue() {
-	if (!ensureOpen()) {
-		return rpl::single(kDefaultMediaSizeLimit);
-	}
-	return _mediaSizeLimit.value();
-}
-
-void MessageStore::setMediaSizeLimit(int64 bytes) {
-	if (!ensureOpen()) {
-		return;
-	}
-	const auto value = std::max(bytes, int64(0));
-	setSetting(MediaSizeLimitKey(), QString::number(value));
-	_mediaSizeLimit = value;
-}
-
-int64 MessageStore::totalMediaCap() {
-	return ensureOpen() ? _totalMediaCap.current() : kDefaultTotalMediaCap;
-}
-
-rpl::producer<int64> MessageStore::totalMediaCapValue() {
-	if (!ensureOpen()) {
-		return rpl::single(kDefaultTotalMediaCap);
-	}
-	return _totalMediaCap.value();
-}
-
-void MessageStore::setTotalMediaCap(int64 bytes) {
-	if (!ensureOpen()) {
-		return;
-	}
-	const auto value = std::max(bytes, int64(0));
-	setSetting(TotalMediaCapKey(), QString::number(value));
-	_totalMediaCap = value;
-}
-
-// Oldest-first eviction across the whole mzgram media folder (every
-// account, every chat combined), so disk usage stays under the
-// configured cap regardless of which chat is currently growing. Only the
-// media file on disk is removed -- the row/text stays, matching how the
-// per-file size limit above already results in a text-only row.
-void MessageStore::enforceMediaCap() {
-	const auto cap = _totalMediaCap.current();
-	if (cap <= 0) {
-		return;
-	}
-	auto files = std::vector<QFileInfo>();
-	auto total = int64(0);
-	auto collect = [&](const QString &path, auto &&self) -> void {
-		auto dir = QDir(path);
-		const auto entries = dir.entryInfoList(
-			QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot);
-		for (const auto &entry : entries) {
-			if (entry.isDir()) {
-				self(entry.filePath(), self);
-			} else {
-				files.push_back(entry);
-				total += entry.size();
-			}
-		}
-	};
-	collect(cWorkingDir() + u"tdata/mzgram/media/"_q, collect);
-	if (total <= cap) {
-		return;
-	}
-	ranges::sort(files, [](const QFileInfo &a, const QFileInfo &b) {
-		return a.lastModified() < b.lastModified();
-	});
-	for (const auto &file : files) {
-		if (total <= cap) {
-			break;
-		}
-		const auto size = file.size();
-		if (QFile::remove(file.filePath())) {
-			total -= size;
-		}
-	}
-}
-
 QString MessageStore::mediaFolder(uint64 account, uint64 peer) const {
 	return cWorkingDir()
 		+ u"tdata/mzgram/media/%1/%2/"_q.arg(account).arg(peer);
@@ -581,29 +485,6 @@ void MessageStore::wipeAll() {
 	}
 	_deleted.clear();
 	QDir(cWorkingDir() + u"tdata/mzgram/media/"_q).removeRecursively();
-}
-
-QString MessageStore::setting(const QString &key) {
-	if (!ensureOpen()) {
-		return QString();
-	}
-	auto query = QSqlQuery(_db);
-	query.prepare(u"SELECT value FROM settings WHERE key = :key"_q);
-	query.bindValue(u":key"_q, key);
-	return (query.exec() && query.next())
-		? query.value(0).toString()
-		: QString();
-}
-
-void MessageStore::setSetting(const QString &key, const QString &value) {
-	auto query = QSqlQuery(_db);
-	query.prepare(u"INSERT OR REPLACE INTO settings (key, value) "
-		"VALUES (:key, :value)"_q);
-	query.bindValue(u":key"_q, key);
-	query.bindValue(u":value"_q, value);
-	if (!query.exec()) {
-		LogFailure("saving a setting", query);
-	}
 }
 
 } // namespace MZGram
