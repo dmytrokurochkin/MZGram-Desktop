@@ -21,7 +21,6 @@ extern const char kOptionGhostMode[];
 extern const char kOptionSendReadReceipts[];
 extern const char kOptionSendTyping[];
 extern const char kOptionSendOnline[];
-extern const char kOptionMarkMessages[];
 
 // Ghost mode is a master switch: each of the three below stays meaningful on
 // its own, so a user can keep typing status while withholding read receipts.
@@ -69,8 +68,6 @@ extern const char kOptionOfferGhostModeBeforeStories[];
 [[nodiscard]] bool AntiRecall();
 [[nodiscard]] bool EditHistory();
 [[nodiscard]] bool KeepSelfDestructing();
-// Dims kept deleted messages and puts a pencil on edited ones.
-[[nodiscard]] bool MarkKeptMessages();
 
 extern const char kOptionMessageSeconds[];
 [[nodiscard]] bool MessageSeconds();

@@ -6,6 +6,7 @@ For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "mzgram/mzgram_message_dim.h"
+#include "mzgram/mzgram_archive_rules.h"
 
 #include "history/history_item.h"
 #include "history/view/history_view_element.h"
@@ -18,12 +19,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 namespace MZGram {
 namespace {
 
-constexpr auto kDeletedOpacity = 0.5;
-
-// Only deleted messages are dimmed. Edited ones still exist for everyone, so
-// they get a pencil in their date instead, see history_view_bottom_info.cpp.
+// Only deleted messages are dimmed (kDeletedOpacity, 75%). Edited ones still
+// exist for everyone, so they get the edited mark in their date instead,
+// see history_view_bottom_info.cpp.
 [[nodiscard]] float64 MessageOpacity(not_null<const HistoryItem*> item) {
-	return (MarkKeptMessages() && IsPreservedDeleted(item))
+	return (SemiTransparentDeleted() && IsPreservedDeleted(item))
 		? kDeletedOpacity
 		: 1.;
 }

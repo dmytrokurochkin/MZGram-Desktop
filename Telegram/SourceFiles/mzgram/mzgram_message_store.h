@@ -90,6 +90,8 @@ public:
 	// Saved media has no size limit and no total quota, and is never
 	// deleted on its own.
 	[[nodiscard]] QString mediaFolder(uint64 account, uint64 peer) const;
+	// Downloads/MZGram/Saved Attachments, empty when there is no Downloads.
+	[[nodiscard]] QString attachmentsFolder() const;
 
 	// Full wipe for the settings screen's "clear archive" action: every
 	// archived row (messages, edits, deletions) plus every copied media

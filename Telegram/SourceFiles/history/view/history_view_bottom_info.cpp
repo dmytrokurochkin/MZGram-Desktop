@@ -19,6 +19,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lang/lang_keys.h"
 #include "history/history_item_components.h"
 #include "mzgram/mzgram_anti_recall.h"
+#include "mzgram/mzgram_archive_rules.h"
 #include "mzgram/mzgram_options.h"
 #include "mzgram/mzgram_lang.h"
 #include "history/history_item_helpers.h"
@@ -503,28 +504,46 @@ void BottomInfo::layoutDateText() {
 		: QString();
 	const auto author = _data.author;
 	const auto prefix = !author.isEmpty() ? u", "_q : QString();
-	const auto deleted = (_data.flags & Data::Flag::Deleted)
-		? (MZGram::TrNow("deleted_mark") + ' ')
+	// MZGram: the deleted and edited marks (Settings > MZGram > Archive),
+	// any text; a mark that is a single emoji is drawn as one, at 60% of
+	// emoji size, so it reads as a mark, not content.
+	const auto deletedMark = (_data.flags & Data::Flag::Deleted)
+		? MZGram::DeletedMark()
+		: QString();
+	const auto singleEmoji = [](const QString &text) -> EmojiPtr {
+		auto length = 0;
+		const auto emoji = text.isEmpty()
+			? nullptr
+			: Ui::Emoji::Find(text.data(), text.data() + text.size(), &length);
+		return (emoji && length == text.size()) ? emoji : nullptr;
+	};
+	const auto deletedEmoji = singleEmoji(deletedMark);
+	const auto deleted = (!deletedMark.isEmpty() && !deletedEmoji)
+		? (deletedMark + ' ')
 		: QString();
 	const auto dateText = editedPrimary
 		? FormatEditedDate(_data.date, _data.editedDate)
 		: edited + ((_data.flags & Data::Flag::ForwardedDate)
 		? Ui::FormatDateTimeSavedFrom(_data.date)
 		: MZGram::FormatMessageTime(_data.date.time()));
-	// MZGram: a pencil makes edited messages stand out without dimming them.
-	// Flag::Edited follows displayedEditDate, so hidden edits get no pencil.
-	// It is drawn at 60% of emoji size, so it reads as a mark, not content.
-	const auto pencil = ((_data.flags & Data::Flag::Edited)
-		&& MZGram::MarkKeptMessages())
-		? Ui::Emoji::Find(QString::fromUtf8("\xe2\x9c\x8f\xef\xb8\x8f"))
-		: nullptr;
+	// The edited mark makes edited messages stand out without dimming them.
+	// Flag::Edited follows displayedEditDate, so hidden edits get no mark.
+	const auto editedMark = ((_data.flags & Data::Flag::Edited)
+		&& MZGram::SaveEditHistory())
+		? MZGram::EditedMark()
+		: QString();
+	const auto pencil = singleEmoji(editedMark);
+	const auto editedText = (!editedMark.isEmpty() && !pencil)
+		? (editedMark + ' ')
+		: QString();
 	const auto ratio = style::DevicePixelRatio();
 	const auto emojiPixels = Ui::Emoji::GetSizeNormal();
 	const auto pencilPixels = emojiPixels * 3 / 5;
-	const auto pencilWidth = pencil
-		? (pencilPixels / ratio + st::msgDateFont->spacew)
-		: 0;
-	const auto date = deleted + dateText;
+	const auto pencilWidth = (pencil ? 1 : 0)
+		* (pencilPixels / ratio + st::msgDateFont->spacew)
+		+ (deletedEmoji ? 1 : 0)
+		* (pencilPixels / ratio + st::msgDateFont->spacew);
+	const auto date = deleted + editedText + dateText;
 	const auto afterAuthor = prefix + date;
 	const auto afterAuthorWidth = st::msgDateFont->width(afterAuthor)
 		+ pencilWidth;
@@ -556,23 +575,30 @@ void BottomInfo::layoutDateText() {
 			.textColor = false,
 		})).append("  ");
 	}
+	const auto appendMark = [&](EmojiPtr emoji) {
+		marked.append(helper.image({
+			.image = Ui::Emoji::SinglePixmap(
+				emoji,
+				emojiPixels).toImage().scaledToHeight(
+					pencilPixels,
+					Qt::SmoothTransformation),
+			.margin = QMargins(
+				0,
+				(emojiPixels - pencilPixels) / (2 * ratio),
+				0,
+				0),
+			.textColor = false,
+		})).append(u" "_q);
+	};
 	const auto appendDate = [&] {
+		if (deletedEmoji) {
+			appendMark(deletedEmoji);
+		}
 		marked.append(deleted);
 		if (pencil) {
-			marked.append(helper.image({
-				.image = Ui::Emoji::SinglePixmap(
-					pencil,
-					emojiPixels).toImage().scaledToHeight(
-						pencilPixels,
-						Qt::SmoothTransformation),
-				.margin = QMargins(
-					0,
-					(emojiPixels - pencilPixels) / (2 * ratio),
-					0,
-					0),
-				.textColor = false,
-			})).append(u" "_q);
+			appendMark(pencil);
 		}
+		marked.append(editedText);
 		marked.append(dateText);
 	};
 	if (_data.flags & Data::Flag::Sponsored) {

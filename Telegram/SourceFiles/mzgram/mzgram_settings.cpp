@@ -26,6 +26,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/layers/generic_box.h"
 #include "ui/toast/toast.h"
 #include "ui/widgets/buttons.h"
+#include "ui/widgets/fields/input_field.h"
 #include "ui/widgets/labels.h"
 #include "ui/wrap/padding_wrap.h"
 #include "ui/wrap/vertical_layout.h"
@@ -92,36 +93,129 @@ void AddOptionToggle(
 	}, button->lifetime());
 }
 
+// The current text of a mark option, kept up to date.
+[[nodiscard]] rpl::producer<QString> MarkValue(const char optionId[]) {
+	const auto option = &base::options::lookup<QString>(optionId);
+	return rpl::single(
+		rpl::empty
+	) | rpl::then(
+		option->changes()
+	) | rpl::map([=] {
+		return option->value();
+	});
+}
+
+// Edits the deleted or edited mark: any text, empty for none.
+void MarkBox(
+		not_null<Ui::GenericBox*> box,
+		const char *titleKey,
+		const char optionId[]) {
+	const auto option = &base::options::lookup<QString>(optionId);
+	box->setTitle(Text(titleKey));
+	box->addRow(object_ptr<Ui::FlatLabel>(
+		box,
+		Text("archive_mark_info"),
+		st::boxLabel));
+	const auto input = box->addRow(object_ptr<Ui::InputField>(
+		box,
+		st::defaultInputField,
+		Text(titleKey),
+		option->value()));
+	const auto save = [=] {
+		option->set(input->getLastText());
+		box->closeBox();
+	};
+	input->submits() | rpl::on_next([=] {
+		save();
+	}, input->lifetime());
+	box->setFocusCallback([=] {
+		input->setFocusFast();
+	});
+	box->addButton(tr::lng_settings_save(), save);
+	box->addButton(tr::lng_cancel(), [=] {
+		box->closeBox();
+	});
+}
+
 void BuildArchive(SectionBuilder &builder) {
 	using namespace MZGram;
 
 	builder.addSkip();
 	AddOptionToggle(
 		builder,
-		u"mzgram/save-deleted-and-edited"_q,
-		"save_deleted_and_edited",
-		kOptionSaveDeletedAndEdited,
-		{
-			u"anti-recall"_q,
-			u"deleted"_q,
-			u"edited"_q,
-			u"history"_q,
-			u"view once"_q,
-		});
+		u"mzgram/save-deleted-messages"_q,
+		"save_deleted_messages",
+		kOptionSaveDeletedMessages,
+		{ u"anti-recall"_q, u"deleted"_q, u"view once"_q });
 	AddOptionToggle(
 		builder,
-		u"mzgram/mark-messages"_q,
-		"mark_messages",
-		kOptionMarkMessages,
-		{ u"dim"_q, u"pencil"_q, u"deleted"_q, u"edited"_q });
+		u"mzgram/save-edit-history"_q,
+		"save_edit_history",
+		kOptionSaveEditHistory,
+		{ u"edited"_q, u"history"_q });
 	builder.addSkip();
 	builder.addDividerText(Text("archive_info"));
 
+	builder.addSkip();
+	AddOptionToggle(
+		builder,
+		u"mzgram/save-archive-media"_q,
+		"save_archive_media",
+		kOptionSaveArchiveMedia,
+		{ u"media"_q, u"files"_q, u"attachments"_q });
+	AddOptionToggle(
+		builder,
+		u"mzgram/save-formatting"_q,
+		"save_formatting",
+		kOptionSaveFormatting,
+		{ u"formatting"_q });
+	AddOptionToggle(
+		builder,
+		u"mzgram/save-reactions"_q,
+		"save_reactions",
+		kOptionSaveReactions,
+		{ u"reactions"_q });
+	AddOptionToggle(
+		builder,
+		u"mzgram/save-for-bots"_q,
+		"save_for_bots",
+		kOptionSaveForBots,
+		{ u"bots"_q });
 	builder.addSkip();
 	builder.addDividerText(Text("saved_media_note"));
 
 	builder.addSkip();
 	const auto controller = builder.controller();
+	builder.addButton({
+		.id = u"mzgram/deleted-mark"_q,
+		.title = Text("deleted_mark_text"),
+		.st = &st::settingsButtonNoIcon,
+		.label = MarkValue(kOptionDeletedMark),
+		.onClick = [=] {
+			controller->show(Box(MarkBox, "deleted_mark_text", kOptionDeletedMark));
+		},
+		.keywords = { u"deleted"_q, u"mark"_q },
+	});
+	builder.addButton({
+		.id = u"mzgram/edited-mark"_q,
+		.title = Text("edited_mark_text"),
+		.st = &st::settingsButtonNoIcon,
+		.label = MarkValue(kOptionEditedMark),
+		.onClick = [=] {
+			controller->show(Box(MarkBox, "edited_mark_text", kOptionEditedMark));
+		},
+		.keywords = { u"edited"_q, u"mark"_q, u"pencil"_q },
+	});
+	AddOptionToggle(
+		builder,
+		u"mzgram/semi-transparent-deleted"_q,
+		"semi_transparent_deleted",
+		kOptionSemiTransparentDeleted,
+		{ u"dim"_q, u"deleted"_q, u"transparent"_q });
+	builder.addSkip();
+	builder.addDividerText(Text("archive_look_info"));
+
+	builder.addSkip();
 	builder.addButton({
 		.id = u"mzgram/export-archive"_q,
 		.title = Text("export_archive"),

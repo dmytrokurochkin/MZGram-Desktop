@@ -14,6 +14,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QDir>
 #include <QtCore/QFile>
 #include <QtCore/QFileInfo>
+#include <QtCore/QStandardPaths>
 #include <QtCore/QtPlugin>
 #include <QtSql/QSqlError>
 #include <QtSql/QSqlQuery>
@@ -446,7 +447,31 @@ std::vector<StoredEdit> MessageStore::edits(const MessageKey &key) {
 	return result;
 }
 
+// Kept files go to a visible folder, Downloads/MZGram/Saved Attachments,
+// with a .nomedia file as on Android; the app's own folder is used when it
+// cannot be written.
+QString MessageStore::attachmentsFolder() const {
+	const auto downloads = QStandardPaths::writableLocation(
+		QStandardPaths::DownloadLocation);
+	return downloads.isEmpty()
+		? QString()
+		: (downloads + u"/MZGram/Saved Attachments/"_q);
+}
+
 QString MessageStore::mediaFolder(uint64 account, uint64 peer) const {
+	const auto attachments = attachmentsFolder();
+	if (!attachments.isEmpty() && QDir().mkpath(attachments)) {
+		const auto noMedia = attachments + u".nomedia"_q;
+		if (!QFileInfo::exists(noMedia)) {
+			auto file = QFile(noMedia);
+			if (file.open(QIODevice::WriteOnly)) {
+				file.close();
+			}
+		}
+		if (QFileInfo(attachments).isWritable()) {
+			return attachments;
+		}
+	}
 	return cWorkingDir()
 		+ u"tdata/mzgram/media/%1/%2/"_q.arg(account).arg(peer);
 }
@@ -485,6 +510,9 @@ void MessageStore::wipeAll() {
 	}
 	_deleted.clear();
 	QDir(cWorkingDir() + u"tdata/mzgram/media/"_q).removeRecursively();
+	if (const auto attachments = attachmentsFolder(); !attachments.isEmpty()) {
+		QDir(attachments).removeRecursively();
+	}
 }
 
 } // namespace MZGram

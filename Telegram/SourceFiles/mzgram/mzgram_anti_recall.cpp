@@ -11,6 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "data/data_peer.h"
 #include "data/data_session.h"
+#include "data/data_user.h"
 #include "history/history.h"
 #include "history/history_item.h"
 #include "history/history_item_components.h"
@@ -26,10 +27,18 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 namespace MZGram {
 namespace {
 
+[[nodiscard]] bool IsBotChat(not_null<const HistoryItem*> item) {
+	const auto user = item->history()->peer->asUser();
+	return user && user->isBot();
+}
+
 // Other people's messages, in every chat; never the owner's own.
 [[nodiscard]] bool ChatQualifies(not_null<const HistoryItem*> item) {
-	return SavesChat(item->history()->peer)
-		&& KeepsMessage(item->isService(), item->out());
+	return KeepsDeleted(item->isService(), item->out(), IsBotChat(item));
+}
+
+[[nodiscard]] bool EditQualifies(not_null<const HistoryItem*> item) {
+	return KeepsEdit(item->isService(), item->out(), IsBotChat(item));
 }
 
 } // namespace
@@ -69,7 +78,7 @@ bool IsPreservedDeleted(not_null<const HistoryItem*> item) {
 void RecordEditBefore(
 		not_null<const HistoryItem*> item,
 		const TextWithEntities &incoming) {
-	if (!EditHistory() || item->isService() || !ChatQualifies(item)) {
+	if (!EditHistory() || item->isService() || !EditQualifies(item)) {
 		return;
 	}
 	const auto &previous = item->originalText().text;

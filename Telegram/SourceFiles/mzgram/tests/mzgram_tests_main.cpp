@@ -326,32 +326,71 @@ void TestProtectedContentIsWired() {
 }
 
 
-// Settings > MZGram > Archive > "Save deleted and edited messages".
+// Settings > MZGram > Archive: a switch for each part, all on by default.
 
-// On by default, for every chat: other people's messages are kept, the
-// owner's own and service messages never are, and nothing with it off.
+// Other people's messages are kept in every chat, the owner's own and
+// service messages never are; deleted messages and edits each follow their
+// own switch, and chats with bots follow theirs.
 void TestArchiveRules() {
-	auto &option = base::options::lookup<bool>(
-		MZGram::kOptionSaveDeletedAndEdited);
-	const auto byDefault = option.value();
-	const auto others = MZGram::KeepsMessage(false, false);
-	const auto own = MZGram::KeepsMessage(false, true);
-	const auto service = MZGram::KeepsMessage(true, false);
-	option.set(false);
-	const auto off = MZGram::KeepsMessage(false, false);
-	option.set(true);
+	using namespace MZGram;
+	auto &deleted = base::options::lookup<bool>(kOptionSaveDeletedMessages);
+	auto &edits = base::options::lookup<bool>(kOptionSaveEditHistory);
+	auto &bots = base::options::lookup<bool>(kOptionSaveForBots);
+	auto problems = QStringList();
+	for (const auto id : {
+			kOptionSaveDeletedMessages,
+			kOptionSaveEditHistory,
+			kOptionSaveArchiveMedia,
+			kOptionSaveFormatting,
+			kOptionSaveReactions,
+			kOptionSaveForBots,
+			kOptionSemiTransparentDeleted,
+		}) {
+		if (!base::options::lookup<bool>(id).value()) {
+			problems.push_back(QString::fromUtf8(id) + u" off by default"_q);
+		}
+	}
+	if (DeletedMark() != QString::fromUtf8("\xf0\x9f\xa7\xb9")
+		|| EditedMark() != QString::fromUtf8("\xe2\x9c\x8f\xef\xb8\x8f")) {
+		problems.push_back(u"marks are not the broom and the pencil"_q);
+	}
+	if (kDeletedOpacity != 0.75) {
+		problems.push_back(u"deleted opacity is not 75%"_q);
+	}
+	if (!KeepsDeleted(false, false, false) || !KeepsEdit(false, false, false)) {
+		problems.push_back(u"other people's message not kept"_q);
+	}
+	if (KeepsDeleted(false, true, false) || KeepsEdit(false, true, false)) {
+		problems.push_back(u"own message kept"_q);
+	}
+	if (KeepsDeleted(true, false, false) || KeepsEdit(true, false, false)) {
+		problems.push_back(u"service message kept"_q);
+	}
+	if (!KeepsDeleted(false, false, true)) {
+		problems.push_back(u"bot chat not kept by default"_q);
+	}
+	bots.set(false);
+	if (KeepsDeleted(false, false, true) || KeepsEdit(false, false, true)) {
+		problems.push_back(u"bot chat kept with its switch off"_q);
+	}
+	if (!KeepsDeleted(false, false, false)) {
+		problems.push_back(u"bot switch affects other chats"_q);
+	}
+	bots.set(true);
+	edits.set(false);
+	if (KeepsEdit(false, false, false) || !KeepsDeleted(false, false, false)) {
+		problems.push_back(u"edit history switch not on its own"_q);
+	}
+	edits.set(true);
+	deleted.set(false);
+	if (KeepsDeleted(false, false, false) || !KeepsEdit(false, false, false)) {
+		problems.push_back(u"deleted switch not on its own"_q);
+	}
+	deleted.set(true);
 	Check(
-		byDefault && others && !own && !service && !off,
-		"archive keeps other people's messages, on by default",
-		!byDefault
-			? "off by default"
-			: !others
-			? "other people's message not kept"
-			: own
-			? "own message kept"
-			: service
-			? "service message kept"
-			: "kept with the switch off");
+		problems.isEmpty(),
+		"archive keeps other people's messages, a switch for each part",
+		problems.join(u", "_q).toStdString().c_str());
 }
 
 // No list of chats any more: nothing in the sources picks chats, and the
@@ -389,17 +428,44 @@ void TestArchiveIsForEveryChat() {
 			}
 		}
 	}
-	if (!read("mzgram/mzgram_anti_recall.cpp").contains(
-			u"KeepsMessage(item->isService(), item->out())"_q)) {
-		problems.push_back(u"anti-recall does not ask KeepsMessage"_q);
+	const auto antiRecall = read("mzgram/mzgram_anti_recall.cpp");
+	if (!antiRecall.contains(
+			u"KeepsDeleted(item->isService(), item->out(), IsBotChat(item))"_q)
+		|| !antiRecall.contains(
+			u"KeepsEdit(item->isService(), item->out(), IsBotChat(item))"_q)) {
+		problems.push_back(u"anti-recall does not ask the rules"_q);
 	}
-	if (!read("mzgram/mzgram_archive.cpp").contains(
-			u"KeepsMessage(false, message.c_message().is_out())"_q)) {
-		problems.push_back(u"capture does not ask KeepsMessage"_q);
+	const auto archive = read("mzgram/mzgram_archive.cpp");
+	if (!archive.contains(u"message.c_message().is_out(),"_q)
+		|| !archive.contains(u"KeepsDeleted("_q)
+		|| !archive.contains(u"Serialize(WithoutSwitchedOffParts(message))"_q)
+		|| !archive.contains(u"if (!SaveArchiveMedia()) {"_q)) {
+		problems.push_back(u"capture does not ask the rules"_q);
 	}
-	if (!read("mzgram/mzgram_settings.cpp").contains(
-			u"kOptionSaveDeletedAndEdited"_q)) {
-		problems.push_back(u"no switch in settings"_q);
+	const auto settings = read("mzgram/mzgram_settings.cpp");
+	for (const auto option : {
+			u"kOptionSaveDeletedMessages"_q,
+			u"kOptionSaveEditHistory"_q,
+			u"kOptionSaveArchiveMedia"_q,
+			u"kOptionSaveFormatting"_q,
+			u"kOptionSaveReactions"_q,
+			u"kOptionSaveForBots"_q,
+			u"kOptionSemiTransparentDeleted"_q,
+			u"kOptionDeletedMark"_q,
+			u"kOptionEditedMark"_q,
+		}) {
+		if (!settings.contains(option)) {
+			problems.push_back(u"no switch in settings: "_q + option);
+		}
+	}
+	const auto store = read("mzgram/mzgram_message_store.cpp");
+	if (!store.contains(u"/MZGram/Saved Attachments/"_q)
+		|| !store.contains(u".nomedia"_q)) {
+		problems.push_back(u"no Saved Attachments folder"_q);
+	}
+	if (!read("history/view/history_view_bottom_info.cpp").contains(
+			u"MZGram::DeletedMark()"_q)) {
+		problems.push_back(u"deleted mark not drawn from the setting"_q);
 	}
 	Check(
 		problems.isEmpty(),
@@ -510,7 +576,7 @@ void TestSettingsAreTopicPages() {
 	}
 	std::printf("settings topic pages: %d switches and buttons\n", toggles);
 	Check(
-		problems.isEmpty() && toggles == 31,
+		problems.isEmpty() && toggles == 38,
 		"settings are a list of topic pages, every switch on one",
 		problems.join(u", "_q).toStdString().c_str());
 }

@@ -17,6 +17,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_photo.h"
 #include "data/data_photo_media.h"
 #include "data/data_session.h"
+#include "data/data_user.h"
 #include "history/history.h"
 #include "history/history_item.h"
 #include "main/main_session.h"
@@ -67,6 +68,72 @@ struct SessionSaves {
 	return QByteArray(
 		reinterpret_cast<const char*>(buffer.constData()),
 		buffer.size() * sizeof(mtpPrime));
+}
+
+// The message without the parts whose switches are off (formatting,
+// reactions), field by field as the server sent it otherwise.
+[[nodiscard]] MTPMessage WithoutSwitchedOffParts(const MTPMessage &message) {
+	if ((SaveFormatting() && SaveReactions())
+		|| (message.type() != mtpc_message)) {
+		return message;
+	}
+	const auto &data = message.c_message();
+	using Flag = MTPDmessage::Flag;
+	auto flags = data.vflags().v;
+	if (!SaveFormatting()) {
+		flags &= ~Flag::f_entities;
+	}
+	if (!SaveReactions()) {
+		flags &= ~Flag::f_reactions;
+	}
+	return MTP_message(
+		MTP_flags(flags),
+		data.vid(),
+		data.vfrom_id() ? *data.vfrom_id() : MTPPeer(),
+		MTP_int(data.vfrom_boosts_applied().value_or_empty()),
+		MTP_bytes(data.vfrom_rank().value_or_empty()),
+		data.vpeer_id(),
+		data.vsaved_peer_id() ? *data.vsaved_peer_id() : MTPPeer(),
+		data.vfwd_from() ? *data.vfwd_from() : MTPMessageFwdHeader(),
+		MTP_long(data.vvia_bot_id().value_or_empty()),
+		MTP_long(data.vvia_business_bot_id().value_or_empty()),
+		(data.vguestchat_via_from()
+			? *data.vguestchat_via_from()
+			: MTPPeer()),
+		data.vreply_to() ? *data.vreply_to() : MTPMessageReplyHeader(),
+		data.vdate(),
+		data.vmessage(),
+		data.vmedia() ? *data.vmedia() : MTPMessageMedia(),
+		data.vreply_markup() ? *data.vreply_markup() : MTPReplyMarkup(),
+		((SaveFormatting() && data.ventities())
+			? *data.ventities()
+			: MTPVector<MTPMessageEntity>()),
+		MTP_int(data.vviews().value_or_empty()),
+		MTP_int(data.vforwards().value_or_empty()),
+		data.vreplies() ? *data.vreplies() : MTPMessageReplies(),
+		MTP_int(data.vedit_date().value_or_empty()),
+		MTP_bytes(data.vpost_author().value_or_empty()),
+		MTP_long(data.vgrouped_id().value_or_empty()),
+		((SaveReactions() && data.vreactions())
+			? *data.vreactions()
+			: MTPMessageReactions()),
+		(data.vrestriction_reason()
+			? *data.vrestriction_reason()
+			: MTPVector<MTPRestrictionReason>()),
+		MTP_int(data.vttl_period().value_or_empty()),
+		MTP_int(data.vquick_reply_shortcut_id().value_or_empty()),
+		MTP_long(data.veffect().value_or_empty()),
+		data.vfactcheck() ? *data.vfactcheck() : MTPFactCheck(),
+		MTP_int(data.vreport_delivery_until_date().value_or_empty()),
+		MTP_long(data.vpaid_message_stars().value_or_empty()),
+		(data.vsuggested_post()
+			? *data.vsuggested_post()
+			: MTPSuggestedPost()),
+		MTP_int(data.vschedule_repeat_period().value_or_empty()),
+		MTP_string(qs(data.vsummary_from_language().value_or_empty())),
+		(data.vrich_message()
+			? *data.vrich_message()
+			: MTPRichMessage()));
 }
 
 [[nodiscard]] std::optional<MTPMessage> Deserialize(const QByteArray &raw) {
@@ -179,6 +246,9 @@ void QueueMediaSave(not_null<HistoryItem*> item, const MessageKey &key) {
 	if (!photo && !document) {
 		return;
 	}
+	if (!SaveArchiveMedia()) {
+		return;
+	}
 	auto &store = MessageStore::Instance();
 	if (const auto saved = store.mediaPath(key)
 		; !saved.isEmpty() && QFileInfo::exists(saved)) {
@@ -213,6 +283,8 @@ void QueueMediaSave(not_null<HistoryItem*> item, const MessageKey &key) {
 		Data::FileOriginMessage(item->fullId()));
 	const auto target = [&](const QString &extension) {
 		return folder
+			+ QString::number(key.peer)
+			+ '_'
 			+ QString::number(key.msg)
 			+ (extension.isEmpty() ? QString() : ('.' + extension));
 	};
@@ -236,7 +308,9 @@ void QueueMediaSave(not_null<HistoryItem*> item, const MessageKey &key) {
 } // namespace
 
 bool SavesChat(not_null<PeerData*> peer) {
-	return SaveDeletedAndEdited();
+	const auto user = peer->asUser();
+	return SaveDeletedMessages()
+		&& (SaveForBots() || !user || !user->isBot());
 }
 
 void CaptureMessage(not_null<HistoryItem*> item, const MTPMessage &message) {
@@ -247,8 +321,11 @@ void CaptureMessage(not_null<HistoryItem*> item, const MTPMessage &message) {
 	}
 	const auto history = item->history();
 	// The owner's own messages are never kept.
-	if (!SavesChat(history->peer)
-		|| !KeepsMessage(false, message.c_message().is_out())) {
+	const auto user = history->peer->asUser();
+	if (!KeepsDeleted(
+			false,
+			message.c_message().is_out(),
+			user && user->isBot())) {
 		return;
 	}
 	const auto key = KeyFor(item);
@@ -256,7 +333,7 @@ void CaptureMessage(not_null<HistoryItem*> item, const MTPMessage &message) {
 		key,
 		history->peer->isChannel(),
 		item->date(),
-		Serialize(message),
+		Serialize(WithoutSwitchedOffParts(message)),
 		!WouldShowExpired(message));
 	QueueMediaSave(item, key);
 }

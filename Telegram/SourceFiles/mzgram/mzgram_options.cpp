@@ -88,14 +88,6 @@ base::options::toggle OptionOfferGhostModeBeforeStories({
 		"whether to turn ghost mode on first.",
 });
 
-// On by default: it only changes how messages are drawn.
-base::options::toggle OptionMarkMessages({
-	.id = kOptionMarkMessages,
-	.name = "Mark deleted and edited messages",
-	.description = "Dim kept deleted messages and add a pencil to edited ones",
-	.defaultValue = true,
-});
-
 base::options::toggle OptionMessageSeconds({
 	.id = kOptionMessageSeconds,
 	.name = "Message time with seconds",
@@ -207,7 +199,6 @@ const char kOptionGhostSilentSend[] = "mzgram-ghost-silent-send";
 const char kOptionOfferGhostModeBeforeStories[] = "mzgram-offer-ghost-mode-before-stories";
 const char kOptionDisableSponsoredMessages[] = "mzgram-disable-sponsored-messages";
 // The id keeps its first name so a saved choice survives the rename.
-const char kOptionMarkMessages[] = "mzgram-dim-marked";
 const char kOptionMessageSeconds[] = "mzgram-message-seconds";
 const char kOptionDisableStories[] = "mzgram-disable-stories";
 const char kOptionDisableGreetingSticker[] =
@@ -298,21 +289,17 @@ void MarkMessageReadDueToInteraction(
 	}
 }
 
-// One switch for all three, see mzgram_archive_rules.h.
+// See mzgram_archive_rules.h.
 bool AntiRecall() {
-	return SaveDeletedAndEdited();
+	return SaveDeletedMessages();
 }
 
 bool EditHistory() {
-	return SaveDeletedAndEdited();
+	return SaveEditHistory();
 }
 
 bool KeepSelfDestructing() {
-	return SaveDeletedAndEdited();
-}
-
-bool MarkKeptMessages() {
-	return OptionMarkMessages.value();
+	return SaveDeletedMessages();
 }
 
 bool MessageSeconds() {

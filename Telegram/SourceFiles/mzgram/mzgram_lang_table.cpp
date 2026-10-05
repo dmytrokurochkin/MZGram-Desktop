@@ -31,10 +31,31 @@ const std::vector<Phrase> kPhrases = {
 		"Кожна функція MZGram є на одній із цих сторінок." },
 
 	// Archive.
-	{ "save_deleted_and_edited",
-		"Save deleted and edited messages",
-		"Зберігати видалені й редаговані" },
-	{ "mark_messages", "Mark deleted and edited messages", "Позначати видалені та змінені повідомлення" },
+	{ "save_deleted_messages",
+		"Save deleted messages",
+		"Зберігати видалені повідомлення" },
+	{ "save_edit_history", "Save edit history", "Зберігати історію редагувань" },
+	{ "save_archive_media", "Save media", "Зберігати медіа" },
+	{ "save_formatting", "Save formatting", "Зберігати форматування" },
+	{ "save_reactions", "Save reactions", "Зберігати реакції" },
+	{ "save_for_bots", "Save in chats with bots", "Зберігати в чатах з ботами" },
+	{ "deleted_mark_text", "Deleted mark", "Позначка видаленого" },
+	{ "edited_mark_text", "Edited mark", "Позначка редагованого" },
+	{ "semi_transparent_deleted",
+		"Semi-transparent deleted messages",
+		"Напівпрозорі видалені повідомлення" },
+	{ "archive_mark_info",
+		"Shown before the time of another person's message. Any text; "
+		"leave empty for none.",
+		"Показується перед часом чужого повідомлення. Будь-який текст; "
+		"порожньо, щоб не показувати." },
+	{ "archive_look_info",
+		"The marks are shown before the time of another person's deleted "
+		"or edited message. Deleted messages kept in the chat are drawn at "
+		"75% opacity.",
+		"Позначки показуються перед часом чужого видаленого чи "
+		"редагованого повідомлення. Видалені повідомлення, що лишаються в "
+		"чаті, малюються з непрозорістю 75%." },
 	{ "archive_info",
 		"In every private chat, group, channel and secret chat, other "
 		"people's deleted messages, earlier versions of their edited "
@@ -48,13 +69,17 @@ const std::vector<Phrase> kPhrases = {
 		"в незашифрованій базі і лишається після перезапуску." },
 	{ "saved_media_note",
 		"Other people's photos, voice messages, round videos, view-once "
-		"media, videos and files are saved as they arrive, of any size. "
-		"There is no total quota, and saved files are never deleted on "
-		"their own.",
+		"media, videos and files are saved to Downloads/MZGram/Saved "
+		"Attachments as they arrive, of any size. There is no total quota, "
+		"and saved files are never deleted on their own. Formatting and "
+		"reactions are kept with the text; chats with bots are saved only "
+		"while their switch is on.",
 		"Чужі фото, голосові, відеоповідомлення, одноразові медіа, відео і "
-		"файли зберігаються, щойно надходять, будь-якого розміру. "
-		"Загальної квоти немає, і збережені файли ніколи не видаляються "
-		"самі." },
+		"файли зберігаються в Downloads/MZGram/Saved Attachments, щойно "
+		"надходять, будь-якого розміру. Загальної квоти немає, і збережені "
+		"файли ніколи не видаляються самі. Форматування і реакції "
+		"зберігаються разом з текстом; чати з ботами зберігаються, лише поки "
+		"їхній перемикач увімкнений." },
 	{ "export_archive", "Export archive", "Експортувати архів" },
 	{ "import_archive", "Import archive", "Імпортувати архів" },
 	{ "export_archive_title", "Export MZGram archive", "Експорт архіву MZGram" },
@@ -255,7 +280,6 @@ const std::vector<Phrase> kPhrases = {
 	// Chat menu.
 
 	// Messages.
-	{ "deleted_mark", "deleted", "видалено" },
 	{ "edit_history", "Edit history", "Історія змін" },
 	{ "no_earlier_versions",
 		"No earlier versions were recorded for this message.",
