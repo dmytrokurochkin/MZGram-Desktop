@@ -524,6 +524,41 @@ void TestArchiveMediaHasNoLimit() {
 }
 
 
+// Settings > MZGram > Archive > "Clear Telegram local database": clears
+// Telegram's cache and restarts, never the MZGram archive.
+void TestEraseLocalDatabase() {
+	auto file = QFile(
+		QString::fromUtf8(MZGRAM_SOURCE_DIR) + u"/mzgram/mzgram_settings.cpp"_q);
+	const auto text = file.open(QIODevice::ReadOnly)
+		? QString::fromUtf8(file.readAll()).replace(u"\r\n"_q, u"\n"_q)
+		: QString();
+	const auto start = text.indexOf(u"u\"mzgram/erase-local-database\"_q"_q);
+	const auto end = text.indexOf(u"});"_q, start);
+	const auto body = (start < 0) ? QString() : text.mid(start, end - start);
+	auto problems = QStringList();
+	if (body.isEmpty()) {
+		problems.push_back(u"no button"_q);
+	}
+	for (const auto &needed : {
+			u"data().cache().clear()"_q,
+			u"data().cacheBigFile().clear()"_q,
+			u"Core::Restart()"_q,
+			u"erase_local_database_confirm"_q,
+		}) {
+		if (!body.contains(needed)) {
+			problems.push_back(u"missing "_q + needed);
+		}
+	}
+	if (body.contains(u"wipeAll"_q)) {
+		problems.push_back(u"clears the archive"_q);
+	}
+	Check(
+		problems.isEmpty(),
+		"clearing Telegram's local database keeps the archive",
+		problems.join(u", "_q).toStdString().c_str());
+}
+
+
 // Settings > MZGram lists the topics; each opens its own page with that
 // topic's switches. No switch is on the list page itself, and each topic
 // page builder is in the topic table.
@@ -576,7 +611,7 @@ void TestSettingsAreTopicPages() {
 	}
 	std::printf("settings topic pages: %d switches and buttons\n", toggles);
 	Check(
-		problems.isEmpty() && toggles == 38,
+		problems.isEmpty() && toggles == 39,
 		"settings are a list of topic pages, every switch on one",
 		problems.join(u", "_q).toStdString().c_str());
 }
@@ -598,6 +633,7 @@ int main() {
 		TestArchiveRules,
 		TestArchiveIsForEveryChat,
 		TestArchiveMediaHasNoLimit,
+		TestEraseLocalDatabase,
 		TestSettingsAreTopicPages,
 	};
 	for (const auto &test : tests) {

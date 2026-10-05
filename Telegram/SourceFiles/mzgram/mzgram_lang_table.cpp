@@ -81,6 +81,29 @@ const std::vector<Phrase> kPhrases = {
 		"зберігаються разом з текстом; чати з ботами зберігаються, лише поки "
 		"їхній перемикач увімкнений." },
 	{ "export_archive", "Export archive", "Експортувати архів" },
+	{ "erase_local_database",
+		"Clear Telegram local database",
+		"Стерти локальну базу Telegram" },
+	{ "erase_local_database_button", "Clear and restart", "Стерти й перезапустити" },
+	{ "erase_local_database_info",
+		"Clears Telegram's cache on this device and restarts the app; "
+		"messages and chats load again from the server. The MZGram archive "
+		"is not cleared.",
+		"Стирає кеш Telegram на цьому пристрої і перезапускає застосунок; "
+		"повідомлення й чати знову завантажаться з сервера. Архів MZGram не "
+		"стирається." },
+	{ "erase_local_database_confirm",
+		"This clears Telegram's local cache on this device and restarts the "
+		"app; messages and chats then load again from the server. The MZGram "
+		"archive (kept deleted and edited messages, and the Saved Attachments "
+		"folder) is NOT cleared; use \"Clear archive\" for that. A message "
+		"deleted on the server while the app restarts is not kept.",
+		"Буде стерто локальний кеш Telegram на цьому пристрої і "
+		"перезапущено застосунок; повідомлення й чати потім знову "
+		"завантажаться з сервера. Архів MZGram (збережені видалені й "
+		"редаговані повідомлення і тека Saved Attachments) НЕ стирається; "
+		"для нього є \"Очистити архів\". Повідомлення, видалене на сервері, "
+		"поки застосунок перезапускається, не збережеться." },
 	{ "import_archive", "Import archive", "Імпортувати архів" },
 	{ "export_archive_title", "Export MZGram archive", "Експорт архіву MZGram" },
 	{ "import_archive_title", "Import MZGram archive", "Імпорт архіву MZGram" },

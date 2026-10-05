@@ -299,6 +299,35 @@ void BuildArchive(SectionBuilder &builder) {
 	});
 	builder.addSkip();
 	builder.addDividerText(Text("clear_archive_info"));
+
+	// Telegram's local cache on this device. Telegram Desktop keeps no
+	// messages or chat list on disk; they load from the server on every
+	// start. So this clears the files cache (the same as "Clear all" in
+	// Manage local storage) and restarts, so everything loads again. The
+	// account's own files (session keys, settings, drafts) and the MZGram
+	// archive are not touched.
+	builder.addSkip();
+	builder.addButton({
+		.id = u"mzgram/erase-local-database"_q,
+		.title = Text("erase_local_database"),
+		.st = &st::settingsAttentionButton,
+		.onClick = [=] {
+			const auto session = &controller->session();
+			controller->show(Ui::MakeConfirmBox({
+				.text = MZGram::TrNow("erase_local_database_confirm"),
+				.confirmed = [=] {
+					session->data().cache().clear();
+					session->data().cacheBigFile().clear();
+					Core::Restart();
+				},
+				.confirmText = MZGram::Tr("erase_local_database_button"),
+				.confirmStyle = &st::attentionBoxButton,
+			}));
+		},
+		.keywords = { u"cache"_q, u"local"_q, u"database"_q, u"clear"_q },
+	});
+	builder.addSkip();
+	builder.addDividerText(Text("erase_local_database_info"));
 }
 
 void BuildPrivacy(SectionBuilder &builder) {
