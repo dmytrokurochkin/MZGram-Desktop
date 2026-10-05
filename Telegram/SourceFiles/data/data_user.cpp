@@ -35,6 +35,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/notify/data_notify_settings.h"
 #include "history/history.h"
 #include "history/history_item.h"
+#include "mzgram/mzgram_presence.h"
 #include "api/api_peer_photo.h"
 #include "apiwrap.h"
 #include "lang/lang_keys.h"
@@ -528,6 +529,8 @@ void UserData::madeAction(TimeId when) {
 	if (isBot() || isServiceUser() || when <= 0) {
 		return;
 	}
+	// MZGram: a sign of being online, for an approximate last seen.
+	MZGram::RecordSeen(this, when);
 	const auto till = lastseen().onlineTill();
 	if (till < when + 1
 		&& updateLastseen(

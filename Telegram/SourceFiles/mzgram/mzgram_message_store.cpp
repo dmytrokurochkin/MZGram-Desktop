@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "mzgram/mzgram_message_store.h"
 
+#include "mzgram/mzgram_presence_rules.h"
+
 #include "base/unixtime.h"
 #include "logs.h"
 #include "settings.h"
@@ -116,6 +118,17 @@ bool MessageStore::ensureOpen() {
 		u"CREATE TABLE IF NOT EXISTS settings ("
 			"key TEXT PRIMARY KEY, "
 			"value TEXT NOT NULL)"_q,
+		u"CREATE TABLE IF NOT EXISTS outbox_reads ("
+			"account INTEGER NOT NULL, "
+			"peer INTEGER NOT NULL, "
+			"max_id INTEGER NOT NULL, "
+			"read_at INTEGER NOT NULL, "
+			"exact INTEGER NOT NULL DEFAULT 0)"_q,
+		u"CREATE INDEX IF NOT EXISTS outbox_reads_peer "
+			"ON outbox_reads (account, peer, max_id)"_q,
+		u"CREATE TABLE IF NOT EXISTS last_seen ("
+			"user INTEGER PRIMARY KEY, "
+			"seen_at INTEGER NOT NULL)"_q,
 	};
 	for (const auto &statement : schema) {
 		if (!query.exec(statement)) {
@@ -148,6 +161,13 @@ void MessageStore::loadCaches() {
 	readDeleted(u"SELECT account, peer, msg FROM deleted_messages"_q);
 	readDeleted(u"SELECT account, peer, msg FROM messages "
 		"WHERE deleted_at IS NOT NULL"_q);
+
+	if (query.exec(u"SELECT user, seen_at FROM last_seen"_q)) {
+		while (query.next()) {
+			_lastSeen[FromSql(query.value(0).toLongLong())]
+				= TimeId(query.value(1).toLongLong());
+		}
+	}
 
 	// Media of any size is kept, with no total quota, and saved files are
 	// never deleted on their own: the limits an older version saved go.
@@ -509,10 +529,122 @@ void MessageStore::wipeAll() {
 		}
 	}
 	_deleted.clear();
+	_lastSeen.clear();
+	for (const auto table : { u"outbox_reads"_q, u"last_seen"_q }) {
+		if (!query.exec(u"DELETE FROM "_q + table)) {
+			LogFailure("wipeAll", query);
+		}
+	}
 	QDir(cWorkingDir() + u"tdata/mzgram/media/"_q).removeRecursively();
 	if (const auto attachments = attachmentsFolder(); !attachments.isEmpty()) {
 		QDir(attachments).removeRecursively();
 	}
+}
+
+void MessageStore::recordLastSeen(uint64 user, TimeId when) {
+	if (!ensureOpen()) {
+		return;
+	}
+	auto &known = _lastSeen[user];
+	if (known >= when) {
+		return;
+	}
+	known = when;
+	auto query = QSqlQuery(_db);
+	query.prepare(u"INSERT OR REPLACE INTO last_seen (user, seen_at) "
+		"VALUES (:user, :when)"_q);
+	query.bindValue(u":user"_q, ToSql(user));
+	query.bindValue(u":when"_q, qint64(when));
+	if (!query.exec()) {
+		LogFailure("saving a last seen time", query);
+	}
+}
+
+TimeId MessageStore::lastSeen(uint64 user) {
+	if (!ensureOpen()) {
+		return 0;
+	}
+	const auto i = _lastSeen.find(user);
+	return (i != end(_lastSeen)) ? i->second : 0;
+}
+
+void MessageStore::addOutboxRead(
+		uint64 account,
+		uint64 peer,
+		int64 maxId,
+		TimeId readAt,
+		bool exact) {
+	if (!ensureOpen()) {
+		return;
+	}
+	auto query = QSqlQuery(_db);
+	if (exact) {
+		query.prepare(u"DELETE FROM outbox_reads WHERE account = :account "
+			"AND peer = :peer AND max_id = :max AND exact = 1"_q);
+	} else {
+		// Only a read further on than the ones kept says anything new.
+		query.prepare(u"SELECT MAX(max_id) FROM outbox_reads "
+			"WHERE account = :account AND peer = :peer AND exact = 0"_q);
+	}
+	query.bindValue(u":account"_q, ToSql(account));
+	query.bindValue(u":peer"_q, ToSql(peer));
+	if (exact) {
+		query.bindValue(u":max"_q, qint64(maxId));
+	}
+	if (!query.exec()) {
+		LogFailure("reading the outbox reads", query);
+		return;
+	}
+	if (!exact
+		&& query.next()
+		&& !query.value(0).isNull()
+		&& query.value(0).toLongLong() >= maxId) {
+		return;
+	}
+	auto insert = QSqlQuery(_db);
+	insert.prepare(u"INSERT INTO outbox_reads "
+		"(account, peer, max_id, read_at, exact) "
+		"VALUES (:account, :peer, :max, :read, :exact)"_q);
+	insert.bindValue(u":account"_q, ToSql(account));
+	insert.bindValue(u":peer"_q, ToSql(peer));
+	insert.bindValue(u":max"_q, qint64(maxId));
+	insert.bindValue(u":read"_q, qint64(readAt));
+	insert.bindValue(u":exact"_q, exact ? 1 : 0);
+	if (!insert.exec()) {
+		LogFailure("saving an outbox read", insert);
+	}
+}
+
+std::pair<TimeId, bool> MessageStore::readTime(
+		uint64 account,
+		uint64 peer,
+		int64 msg) {
+	if (!ensureOpen()) {
+		return { 0, false };
+	}
+	auto query = QSqlQuery(_db);
+	query.prepare(u"SELECT max_id, read_at, exact FROM outbox_reads "
+		"WHERE account = :account AND peer = :peer AND max_id >= :msg"_q);
+	query.bindValue(u":account"_q, ToSql(account));
+	query.bindValue(u":peer"_q, ToSql(peer));
+	query.bindValue(u":msg"_q, qint64(msg));
+	if (!query.exec()) {
+		LogFailure("reading a read time", query);
+		return { 0, false };
+	}
+	auto reads = std::vector<OutboxRead>();
+	while (query.next()) {
+		const auto maxId = query.value(0).toLongLong();
+		const auto readAt = TimeId(query.value(1).toLongLong());
+		if (query.value(2).toInt()) {
+			if (maxId == msg) {
+				return { readAt, true };
+			}
+		} else {
+			reads.push_back({ .maxId = maxId, .readAt = readAt });
+		}
+	}
+	return { FirstReadAt(reads, msg), false };
 }
 
 } // namespace MZGram

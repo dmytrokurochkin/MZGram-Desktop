@@ -6,6 +6,7 @@ For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "data/data_peer_values.h"
+#include "mzgram/mzgram_presence.h"
 #include "mzgram/mzgram_protected_content.h"
 
 #include "lang/lang_keys.h"
@@ -509,6 +510,9 @@ QString OnlineText(Data::LastseenStatus status, TimeId now) {
 QString OnlineText(not_null<UserData*> user, TimeId now) {
 	if (const auto special = OnlineTextSpecial(user)) {
 		return *special;
+	} else if (const auto approximate = MZGram::ApproximateOnlineText(user, now)) {
+		// MZGram: a hidden last seen, as this device last saw the user.
+		return *approximate;
 	}
 	return OnlineText(user->lastseen(), now);
 }
@@ -516,6 +520,8 @@ QString OnlineText(not_null<UserData*> user, TimeId now) {
 QString OnlineTextFull(not_null<UserData*> user, TimeId now) {
 	if (const auto special = OnlineTextSpecial(user)) {
 		return *special;
+	} else if (const auto approximate = MZGram::ApproximateOnlineText(user, now)) {
+		return *approximate;
 	} else if (const auto common = OnlineTextCommon(user->lastseen(), now)) {
 		return *common;
 	}

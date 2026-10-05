@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/basic_types.h"
 #include "mzgram/mzgram_archive_rules.h"
 #include "mzgram/mzgram_lang.h"
+#include "mzgram/mzgram_presence_rules.h"
 #include "mzgram/mzgram_protected_content.h"
 #include "mzgram/mzgram_text_filters.h"
 
@@ -593,6 +594,75 @@ void TestNoPrivacyDuplicates() {
 }
 
 
+// A hidden last seen shows the time this device last saw the person online
+// only while it fits what the server says; a message's read time is the
+// earliest read event covering it.
+void TestPresenceRules() {
+	using namespace MZGram;
+	const auto now = TimeId(1'800'000'000);
+	const auto day = TimeId(24 * 60 * 60);
+	auto problems = QStringList();
+	if (!ApproximateFits(HiddenLastSeen::Recently, now - 3600, now)) {
+		problems.push_back(u"an hour ago does not fit recently"_q);
+	}
+	if (ApproximateFits(HiddenLastSeen::Recently, now - 4 * day, now)) {
+		problems.push_back(u"four days ago fits recently"_q);
+	}
+	if (!ApproximateFits(HiddenLastSeen::WithinWeek, now - 6 * day, now)
+		|| !ApproximateFits(HiddenLastSeen::WithinMonth, now - 20 * day, now)) {
+		problems.push_back(u"week or month bounds"_q);
+	}
+	if (ApproximateFits(HiddenLastSeen::None, now - 60, now)
+		|| ApproximateFits(HiddenLastSeen::Recently, 0, now)) {
+		problems.push_back(u"shown with nothing hidden or nothing seen"_q);
+	}
+	const auto reads = std::vector<OutboxRead>{
+		{ .maxId = 100, .readAt = now - 300 },
+		{ .maxId = 200, .readAt = now - 100 },
+	};
+	if (FirstReadAt(reads, 90) != now - 300
+		|| FirstReadAt(reads, 150) != now - 100
+		|| FirstReadAt(reads, 250) != 0) {
+		problems.push_back(u"read time of a message"_q);
+	}
+	Check(
+		problems.isEmpty(),
+		"approximate last seen and read times follow the rules",
+		problems.join(u", "_q).toStdString().c_str());
+}
+
+// Where the signs and read events come from, and where they are shown.
+void TestPresenceIsWired() {
+	const auto read = [](const char *path) {
+		auto file = QFile(QString::fromUtf8(MZGRAM_SOURCE_DIR) + '/' + path);
+		return file.open(QIODevice::ReadOnly)
+			? QString::fromUtf8(file.readAll())
+			: QString();
+	};
+	const auto wired = std::vector<std::pair<const char*, QString>>{
+		{ "data/data_user.cpp", u"MZGram::RecordSeen(this, when);"_q },
+		{ "data/data_peer_values.cpp", u"MZGram::ApproximateOnlineText(user, now)"_q },
+		{ "api/api_updates.cpp", u"MZGram::RecordOutboxRead(history, d.vmax_id().v);"_q },
+		{ "api/api_updates.cpp", u"MZGram::RecordSeen(user, base::unixtime::now());"_q },
+		{ "mzgram/mzgram_context_actions.cpp", u"MTPmessages_GetOutboxReadDate("_q },
+		{ "mzgram/mzgram_context_actions.cpp", u"MZGram::KeptReadTime(item)"_q },
+	};
+	auto missing = QStringList();
+	for (const auto &[path, text] : wired) {
+		if (!read(path).contains(text)) {
+			missing.push_back(QString::fromUtf8(path) + u": "_q + text);
+		}
+	}
+	if (read("api/api_updates.cpp").count(u"MZGram::RecordOutboxRead("_q) < 2) {
+		missing.push_back(u"channel read events"_q);
+	}
+	Check(
+		missing.isEmpty(),
+		"read times and last seen signs are recorded and shown",
+		missing.join(u", "_q).toStdString().c_str());
+}
+
+
 // Settings > MZGram lists the topics; each opens its own page with that
 // topic's switches. No switch is on the list page itself, and each topic
 // page builder is in the topic table.
@@ -668,6 +738,8 @@ int main() {
 		TestArchiveMediaHasNoLimit,
 		TestEraseLocalDatabase,
 		TestNoPrivacyDuplicates,
+		TestPresenceRules,
+		TestPresenceIsWired,
 		TestSettingsAreTopicPages,
 	};
 	for (const auto &test : tests) {

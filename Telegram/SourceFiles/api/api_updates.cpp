@@ -18,6 +18,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_transcribes.h"
 #include "main/main_session.h"
 #include "mzgram/mzgram_options.h"
+#include "mzgram/mzgram_presence.h"
 #include "main/main_account.h"
 #include "mtproto/mtp_instance.h"
 #include "mtproto/mtproto_config.h"
@@ -1379,6 +1380,8 @@ void Updates::applyUpdateNoPtsCheck(const MTPUpdate &update) {
 		const auto peer = peerFromMTP(d.vpeer());
 		if (const auto history = _session->data().historyLoaded(peer)) {
 			history->outboxRead(d.vmax_id().v);
+			// MZGram: when own messages were read, for message details.
+			MZGram::RecordOutboxRead(history, d.vmax_id().v);
 			if (!requestingDifference()) {
 				if (const auto user = history->peer->asUser()) {
 					user->madeAction(base::unixtime::now());
@@ -1829,6 +1832,7 @@ void Updates::feedUpdate(const MTPUpdate &update) {
 		const auto peer = peerFromChannel(d.vchannel_id().v);
 		if (const auto history = session().data().historyLoaded(peer)) {
 			history->outboxRead(d.vmax_id().v);
+			MZGram::RecordOutboxRead(history, d.vmax_id().v);
 			if (!requestingDifference()) {
 				if (const auto user = history->peer->asUser()) {
 					user->madeAction(base::unixtime::now());
@@ -2070,6 +2074,10 @@ void Updates::feedUpdate(const MTPUpdate &update) {
 	case mtpc_updateUserStatus: {
 		const auto &d = update.c_updateUserStatus();
 		if (const auto user = session().data().userLoaded(d.vuser_id())) {
+			// MZGram: a hidden status changing now.
+			if (d.vstatus().type() == mtpc_userStatusRecently) {
+				MZGram::RecordSeen(user, base::unixtime::now());
+			}
 			const auto now = LastseenFromMTP(d.vstatus(), user->lastseen());
 			if (user->updateLastseen(now)) {
 				session().changes().peerUpdated(

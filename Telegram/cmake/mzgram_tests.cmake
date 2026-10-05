@@ -24,6 +24,8 @@ PRIVATE
     mzgram/mzgram_archive_rules.h
     mzgram/mzgram_lang.h
     mzgram/mzgram_lang_table.cpp
+    mzgram/mzgram_presence_rules.cpp
+    mzgram/mzgram_presence_rules.h
     mzgram/mzgram_protected_content.cpp
     mzgram/mzgram_protected_content.h
     mzgram/mzgram_text_filters.cpp

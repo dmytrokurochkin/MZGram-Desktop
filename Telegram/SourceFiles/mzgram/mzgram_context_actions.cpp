@@ -26,6 +26,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_session.h"
 #include "menu/menu_send_details.h"
 #include "mzgram/mzgram_options.h"
+#include "mzgram/mzgram_presence.h"
 #include "ui/layers/generic_box.h"
 #include "ui/text/format_values.h"
 #include "ui/widgets/labels.h"
@@ -185,6 +186,47 @@ void AddMessageDetailsAction(
 			addRow(MZGram::TrNow("details_date"), FormatMoment(item->date()));
 			if (edited) {
 				addRow(MZGram::TrNow("details_edited"), FormatMoment(edited->date));
+			}
+			// An own message the other side read: when, from the server
+			// where it tells, otherwise as this device learned of it.
+			if (item->out()
+				&& item->isRegular()
+				&& !item->unread(item->history())) {
+				const auto read = box->lifetime().make_state<
+					rpl::variable<QString>>(QString::fromUtf8("\xe2\x80\xa6"));
+				const auto show = [=](TimeId at, bool fromServer) {
+					*read = !at
+						? MZGram::TrNow("details_read_unknown")
+						: fromServer
+						? FormatMoment(at)
+						: MZGram::TrNow("details_read_local").arg(
+							FormatMoment(at));
+				};
+				const auto kept = MZGram::KeptReadTime(item);
+				show(kept.first, kept.second);
+				const auto user = item->history()->peer->asUser();
+				if (!kept.second && user && !user->isBot() && !user->isSelf()) {
+					const auto weak = QPointer<Ui::GenericBox>(box.get());
+					item->history()->session().api().request(
+						MTPmessages_GetOutboxReadDate(
+							user->input(),
+							MTP_int(item->id.bare))
+					).done([=](const MTPOutboxReadDate &result) {
+						const auto at = result.data().vdate().v;
+						if (const auto item = owner->message(itemId)) {
+							MZGram::RememberServerReadTime(item, at);
+						}
+						if (weak) {
+							show(at, true);
+						}
+					}).send();
+				}
+				box->addRow(object_ptr<Ui::FlatLabel>(
+					box,
+					read->value() | rpl::map([](const QString &value) {
+						return MZGram::TrNow("details_read") + u": "_q + value;
+					}),
+					st::aboutLabel));
 			}
 			if (isForwarded) {
 				addRow(

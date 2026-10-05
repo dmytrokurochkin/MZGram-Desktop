@@ -12,6 +12,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <rpl/event_stream.h>
 #include <rpl/variable.h>
 
+#include <map>
 #include <optional>
 #include <set>
 #include <vector>
@@ -107,6 +108,25 @@ public:
 	void closeForFileOp();
 	void reopenAfterFileReplace();
 
+	// The last time a user was seen online (mzgram_presence.h), kept in
+	// memory and on disk.
+	void recordLastSeen(uint64 user, TimeId when);
+	[[nodiscard]] TimeId lastSeen(uint64 user);
+
+	// Read events of the owner's messages: up to maxId read by readAt;
+	// exact is the server's time for the one message maxId.
+	void addOutboxRead(
+		uint64 account,
+		uint64 peer,
+		int64 maxId,
+		TimeId readAt,
+		bool exact);
+	// {readAt, exact}; {0, false} when unknown.
+	[[nodiscard]] std::pair<TimeId, bool> readTime(
+		uint64 account,
+		uint64 peer,
+		int64 msg);
+
 private:
 	struct PendingRaw {
 		MessageKey key;
@@ -125,6 +145,7 @@ private:
 
 	QSqlDatabase _db;
 	std::set<MessageKey> _deleted;
+	std::map<uint64, TimeId> _lastSeen;
 	std::vector<PendingRaw> _pendingRaw;
 	bool _flushScheduled = false;
 	bool _opened = false;
