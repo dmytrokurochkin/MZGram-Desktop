@@ -330,20 +330,6 @@ void BuildArchive(SectionBuilder &builder) {
 	builder.addDividerText(Text("erase_local_database_info"));
 }
 
-void BuildPrivacy(SectionBuilder &builder) {
-	using namespace MZGram;
-
-	builder.addSkip();
-	AddOptionToggle(
-		builder,
-		u"mzgram/spy-hide-online-status"_q,
-		"hide_own_online",
-		kOptionSpyHideOnlineStatus,
-		{ u"spy"_q, u"online"_q, u"last seen"_q });
-	builder.addSkip();
-	builder.addDividerText(Text("hide_own_online_info"));
-}
-
 void BuildGhostMode(SectionBuilder &builder) {
 	using namespace MZGram;
 
@@ -575,10 +561,9 @@ struct Topic {
 };
 
 // The topics, in the order the MZGram page lists them.
-[[nodiscard]] const std::array<Topic, 7> &Topics() {
-	static const auto result = std::array<Topic, 7>{ {
+[[nodiscard]] const std::array<Topic, 6> &Topics() {
+	static const auto result = std::array<Topic, 6>{ {
 		{ "section_archive", &st::menuIconArchive, BuildArchive },
-		{ "section_privacy", &st::menuIconLock, BuildPrivacy },
 		{ "section_ghost_mode", &st::menuIconStealth, BuildGhostMode },
 		{ "section_message_menu", &st::menuIconChatBubble, BuildMessageMenu },
 		{ "section_media_calls", &st::menuIconPhone, BuildMediaCalls },
@@ -693,7 +678,6 @@ Type TopicId(int index) {
 	case 3: return MZGramTopicSection<3>::Id();
 	case 4: return MZGramTopicSection<4>::Id();
 	case 5: return MZGramTopicSection<5>::Id();
-	case 6: return MZGramTopicSection<6>::Id();
 	}
 	Unexpected("Index in MZGram TopicId.");
 }

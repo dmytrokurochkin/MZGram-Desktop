@@ -559,6 +559,40 @@ void TestEraseLocalDatabase() {
 }
 
 
+// Hiding the own online status is left to Telegram's own privacy settings:
+// no such switch, and no Privacy topic left for it.
+void TestNoPrivacyDuplicates() {
+	auto problems = QStringList();
+	for (const auto path : {
+			"mzgram/mzgram_options.cpp",
+			"mzgram/mzgram_options.h",
+			"mzgram/mzgram_settings.cpp",
+			"mzgram/mzgram_lang_table.cpp",
+		}) {
+		auto file = QFile(QString::fromUtf8(MZGRAM_SOURCE_DIR) + '/' + path);
+		const auto text = file.open(QIODevice::ReadOnly)
+			? QString::fromUtf8(file.readAll())
+			: QString();
+		if (text.isEmpty()) {
+			problems.push_back(QString::fromUtf8(path) + u": not read"_q);
+		}
+		for (const auto &word : {
+				u"SpyHideOnlineStatus"_q,
+				u"\"hide_own_online"_q,
+				u"BuildPrivacy"_q,
+			}) {
+			if (text.contains(word)) {
+				problems.push_back(QString::fromUtf8(path) + u": "_q + word);
+			}
+		}
+	}
+	Check(
+		problems.isEmpty(),
+		"no switches that copy Telegram's privacy settings",
+		problems.join(u", "_q).toStdString().c_str());
+}
+
+
 // Settings > MZGram lists the topics; each opens its own page with that
 // topic's switches. No switch is on the list page itself, and each topic
 // page builder is in the topic table.
@@ -572,7 +606,6 @@ void TestSettingsAreTopicPages() {
 	auto problems = QStringList();
 	const auto topics = {
 		u"Archive"_q,
-		u"Privacy"_q,
 		u"GhostMode"_q,
 		u"MessageMenu"_q,
 		u"MediaCalls"_q,
@@ -611,7 +644,7 @@ void TestSettingsAreTopicPages() {
 	}
 	std::printf("settings topic pages: %d switches and buttons\n", toggles);
 	Check(
-		problems.isEmpty() && toggles == 39,
+		problems.isEmpty() && toggles == 38,
 		"settings are a list of topic pages, every switch on one",
 		problems.join(u", "_q).toStdString().c_str());
 }
@@ -634,6 +667,7 @@ int main() {
 		TestArchiveIsForEveryChat,
 		TestArchiveMediaHasNoLimit,
 		TestEraseLocalDatabase,
+		TestNoPrivacyDuplicates,
 		TestSettingsAreTopicPages,
 	};
 	for (const auto &test : tests) {

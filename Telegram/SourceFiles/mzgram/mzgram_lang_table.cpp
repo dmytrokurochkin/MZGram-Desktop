@@ -20,7 +20,6 @@ const std::vector<Phrase> kPhrases = {
 	// Settings > MZGram: sections.
 	{ "settings_title", "MZGram", "MZGram" },
 	{ "section_archive", "Archive", "Архів" },
-	{ "section_privacy", "Privacy", "Приватність" },
 	{ "section_ghost_mode", "Ghost Mode", "Режим привида" },
 	{ "section_message_menu", "Message menu", "Меню повідомлення" },
 	{ "section_media_calls", "Media and calls", "Медіа і дзвінки" },
@@ -138,13 +137,6 @@ const std::vector<Phrase> kPhrases = {
 		"chat. Does not change the settings above.",
 		"Видаляє всі збережені повідомлення і медіафайли в усіх чатах. "
 		"Не змінює налаштування вище." },
-
-	// Privacy.
-	{ "hide_own_online", "Hide own online status", "Приховати свій статус у мережі" },
-	{ "hide_own_online_info",
-		"Always reports offline to the server, independent of Ghost mode.",
-		"Завжди повідомляє серверу, що ви не в мережі, незалежно від "
-		"режиму привида." },
 
 	// Ghost Mode.
 	{ "ghost_mode", "Ghost mode", "Режим привида" },
