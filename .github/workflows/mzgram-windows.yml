@@ -149,15 +149,20 @@ jobs:
             echo "MZGRAM_API=-D TDESKTOP_API_TEST=ON" >> $GITHUB_ENV
           fi
 
-      # The build needs more of drive C: than the image leaves free (27 GB on
-      # x64 runners); none of these tools are used here.
+      # The build needs more of drive C: than the image leaves free (24 GB on
+      # x64 runners, and the image keeps growing); none of these tools are
+      # used here.
       - name: Make room on drive C.
         shell: bash
         run: |
           df -h /c
           for dir in /c/Android /c/hostedtoolcache/windows/CodeQL /c/hostedtoolcache/windows/go \
               /c/hostedtoolcache/windows/Ruby /c/hostedtoolcache/windows/PyPy /c/SeleniumWebDrivers \
-              "/c/Program Files/Microsoft SQL Server" "/c/Program Files (x86)/Microsoft SQL Server"; do
+              "/c/Program Files/Microsoft SQL Server" "/c/Program Files (x86)/Microsoft SQL Server" \
+              /c/ghcup /c/Miniconda /c/vcpkg /c/Users/runneradmin/.rustup /c/Users/runneradmin/.cargo \
+              /c/hostedtoolcache/windows/Java_* /c/hostedtoolcache/windows/node \
+              "/c/Program Files/PostgreSQL" "/c/Program Files/MongoDB" "/c/Program Files/MySQL" \
+              "/c/Program Files/Google/Chrome" "/c/Program Files/Mozilla Firefox"; do
             if [ -d "$dir" ]; then
               echo "removing $dir"
               rm -rf "$dir" || true
