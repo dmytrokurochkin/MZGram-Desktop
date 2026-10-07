@@ -1,45 +1,107 @@
-# [Telegram Desktop][telegram_desktop] – Official Messenger
+# MZGram Desktop
 
-This is the complete source code and the build instructions for the official [Telegram][telegram] messenger desktop client, based on the [Telegram API][telegram_api] and the [MTProto][telegram_proto] secure protocol.
+MZGram is an unofficial Telegram client for desktop that keeps deleted and edited messages, adds a ghost mode and many small extras.
 
-[![Version](https://badge.fury.io/gh/telegramdesktop%2Ftdesktop.svg)](https://github.com/telegramdesktop/tdesktop/releases)
-[![Build Status](https://github.com/telegramdesktop/tdesktop/workflows/Windows./badge.svg)](https://github.com/telegramdesktop/tdesktop/actions)
-[![Build Status](https://github.com/telegramdesktop/tdesktop/workflows/MacOS./badge.svg)](https://github.com/telegramdesktop/tdesktop/actions)
-[![Build Status](https://github.com/telegramdesktop/tdesktop/workflows/Linux./badge.svg)](https://github.com/telegramdesktop/tdesktop/actions)
-[![Built with Depot](https://img.shields.io/badge/Built%20with-Depot.dev-46A75A)](https://depot.dev)
+> **Disclaimer.** MZGram is an unofficial client. It is not affiliated with, endorsed by or supported by Telegram. It is a fork of [Telegram Desktop](https://github.com/telegramdesktop/tdesktop) (the Android version is a fork of [Telegram for Android](https://github.com/DrKLO/Telegram): [MZGram for Android](https://github.com/dmytrokurochkin/MZGram-Android)). MZGram uses its own name and its own `api_id`. The Telegram name and logo are trademarks of Telegram, and MZGram does not use the Telegram logo as its own; the app icon is still the one inherited from upstream and is to be replaced.
 
-[![Preview of Telegram Desktop][preview_image]][preview_image_url]
+Built in CI for Windows x64, Windows ARM64 and Linux x64.
 
-The source code is published under GPLv3 with OpenSSL exception, the license is available [here][license].
+## Features
 
-## Supported systems
+All MZGram features are in **Settings > MZGram**, grouped by topic. Every MZGram text is available in English and Ukrainian.
 
-The latest version is available for
+### Archive of deleted and edited messages
 
-* [Windows 7 and above (64 bit)](https://telegram.org/dl/desktop/win64) ([portable](https://telegram.org/dl/desktop/win64_portable))
-* [Windows 7 and above (32 bit)](https://telegram.org/dl/desktop/win) ([portable](https://telegram.org/dl/desktop/win_portable))
-* [macOS 10.13 and above](https://telegram.org/dl/desktop/mac)
-* [Linux static build for 64 bit](https://telegram.org/dl/desktop/linux)
-* [Snap](https://snapcraft.io/telegram-desktop)
-* [Flatpak](https://flathub.org/apps/details/org.telegram.desktop)
+- Keeps other people's deleted messages, earlier versions of their edited messages and their view-once media, in every chat. On by default.
+- Deleted messages stay in the chat; the edit history of a message can be opened from it.
+- Separate switches for media, formatting, reactions and chats with bots.
+- Media of saved messages is copied to `Downloads/MZGram/Saved Attachments`, with no size limit and no total quota.
+- Your own messages are never saved.
+- Editable marks before the time of a deleted or edited message; deleted messages are drawn at 75% opacity (switchable).
+- Clear the archive, export it to a file and import it back.
+- Clear Telegram's local cache and restart, without touching the archive.
 
-## Old system versions
+### Protected content
 
-Version **4.9.9** was the last that supports older systems
+- In chats and channels that restrict saving content: forward, save and copy messages and media. Such messages are sent as new messages without the original sender.
 
-* [macOS 10.12](https://updates.tdesktop.com/tmac/tsetup.4.9.9.dmg)
-* [Linux with glibc < 2.28 static build](https://updates.tdesktop.com/tlinux/tsetup.4.9.9.tar.xz)
+### Ghost mode
 
-Version **2.4.4** was the last that supports older systems
+- Separate switches for read receipts, typing status and online status.
+- Delay sending outgoing messages, so sending right away does not show you online.
+- Send every message without sound while ghost mode is on.
+- Offer to turn ghost mode on before opening a story.
 
-* [OS X 10.10 and 10.11](https://updates.tdesktop.com/tosx/tsetup-osx.2.4.4.dmg)
-* [Linux static build for 32 bit](https://updates.tdesktop.com/tlinux32/tsetup32.2.4.4.tar.xz)
+### Message menu
 
-Version **1.8.15** was the last that supports older systems
+- Repeat, Save message (to Saved Messages), Set a reminder, Open in... (downloaded files).
+- Message details: ids, dates, views, file and media of a message. For your own messages it shows when the other side read them.
+- Scan for QR code: decodes a QR code in a downloaded photo, on the device.
 
-* [Windows XP and Vista](https://updates.tdesktop.com/tsetup/tsetup.1.8.15.exe) ([portable](https://updates.tdesktop.com/tsetup/tportable.1.8.15.zip))
-* [OS X 10.8 and 10.9](https://updates.tdesktop.com/tmac/tsetup.1.8.15.dmg)
-* [OS X 10.6 and 10.7](https://updates.tdesktop.com/tmac32/tsetup32.1.8.15.dmg)
+### Media and calls
+
+- Auto pause video in the media viewer.
+- Confirm before sending voice messages and round videos.
+- Media preview instead of Chat Preview on a chat's avatar.
+
+### Interface
+
+- Message times with seconds.
+- Hide Stories.
+- Disable the greeting sticker in empty chats.
+- Hide the bottom button in channels where you cannot post.
+- Open Archive on pull down.
+- For people who hide their last seen, an approximate last seen from what this device saw.
+
+### Ads and filters
+
+- Disable sponsored messages in channels and the promo banner in the chat list.
+- Zalgo filter: removes stacked combining marks from names, chat titles and message text.
+
+## Download
+
+Releases will be published on the [Releases](https://github.com/dmytrokurochkin/MZGram-Desktop/releases) page. There are no releases yet.
+
+## Build
+
+The working branch is `mzgram`.
+
+1. Get your own `api_id` and `api_hash` at https://my.telegram.org/apps (see [docs/api_credentials.md](docs/api_credentials.md)). Do not commit them.
+2. Follow the upstream instructions for your system and pass your credentials to `configure`:
+   ```
+   configure.bat x64 -D TDESKTOP_API_ID=YOUR_API_ID -D TDESKTOP_API_HASH=YOUR_API_HASH
+   ```
+   - [Windows](docs/building-win.md). On an ARM64 host, initialize the shell with `vcvarsarm64.bat` and pass `arm` to `configure.bat`.
+   - [GNU/Linux using Docker](docs/building-linux.md)
+   - [macOS](docs/building-mac.md) (not built or tested for MZGram)
+
+CI builds Windows x64, Windows ARM64 and Linux x64 on every push to `mzgram` (`.github/workflows/mzgram-windows.yml`, `.github/workflows/mzgram-linux.yml`). It reads the credentials from the repository secrets `TELEGRAM_API_ID` and `TELEGRAM_API_HASH`. The other workflows in `.github/workflows` are inherited from upstream and are not used. More about the fork is in [MZGRAM.md](MZGRAM.md).
+
+<details>
+<summary>Links from the upstream README</summary>
+
+- Telegram API: https://core.telegram.org
+- MTProto protocol: https://core.telegram.org/mtproto
+- Obtaining an api_id: https://core.telegram.org/api/obtaining_api_id
+- Official Telegram Desktop downloads and supported systems: https://desktop.telegram.org
+
+</details>
+
+## Upstream
+
+MZGram Desktop is based on Telegram Desktop **7.2.8** from [telegramdesktop/tdesktop](https://github.com/telegramdesktop/tdesktop). Upstream updates are taken from that repository: the `mzgram` branch is rebased onto a newer upstream release tag, so the fork stays a readable set of patches on top of it.
+
+Every fork commit has the `[mzgram]` prefix. To list all changes against upstream:
+
+```bash
+git log --grep='^\[mzgram\]'
+```
+
+## License
+
+MZGram Desktop is free software under the GNU General Public License v3 with the OpenSSL exception, inherited from Telegram Desktop. See [LICENSE](LICENSE) and [LEGAL](LEGAL). If you distribute a modified build, you must publish its source code under the same license.
+
+MZGram for Android is licensed under GPL v2, see its [repository](https://github.com/dmytrokurochkin/MZGram-Android).
 
 ## Third-party
 
@@ -66,34 +128,8 @@ Version **1.8.15** was the last that supports older systems
 * CMake ([New BSD License](https://github.com/Kitware/CMake/blob/master/Copyright.txt))
 * Hunspell ([LGPL](https://github.com/hunspell/hunspell/blob/master/COPYING.LESSER))
 * Ada ([Apache License 2.0](https://github.com/ada-url/ada/blob/main/LICENSE-APACHE))
+* quirc ([ISC License](Telegram/SourceFiles/mzgram/quirc/LICENSE-quirc.txt)), used by MZGram for QR code scanning
 
-## Build instructions
+## Credits
 
-* [Windows (32-bit and 64-bit)][win]
-* [macOS][mac]
-* [GNU/Linux using Docker][linux]
-
-[//]: # (LINKS)
-[telegram]: https://telegram.org
-[telegram_desktop]: https://desktop.telegram.org
-[telegram_api]: https://core.telegram.org
-[telegram_proto]: https://core.telegram.org/mtproto
-[license]: LICENSE
-[win]: docs/building-win.md
-[mac]: docs/building-mac.md
-[linux]: docs/building-linux.md
-[preview_image]: https://github.com/telegramdesktop/tdesktop/blob/dev/docs/assets/preview.png "Preview of Telegram Desktop"
-[preview_image_url]: https://raw.githubusercontent.com/telegramdesktop/tdesktop/dev/docs/assets/preview.png
-
-## Thanks to
-
-<a href="https://depot.dev">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://depot.dev/assets/brand/1693758816/depot-logo-horizontal-on-dark.svg">
-    <source media="(prefers-color-scheme: light)" srcset="https://depot.dev/assets/brand/1693758816/depot-logo-horizontal-on-light.svg">
-    <img alt="Depot" src="https://depot.dev/assets/brand/1693758816/depot-logo-horizontal-on-light.svg" width="150">
-  </picture>
-</a>
-
-CI infrastructure sponsored by [Depot](https://depot.dev) — fast GitHub Actions runners.
-
+- [Telegram](https://telegram.org) and the Telegram Desktop Authors, on whose code MZGram is built.
