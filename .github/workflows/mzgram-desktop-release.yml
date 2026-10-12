@@ -67,7 +67,7 @@ jobs:
               exit 1
             fi
           fi
-          UPSTREAM=$(sed -n 's/^AppVersionStr *//p' Telegram/build/version)
+          UPSTREAM=$(awk '$1 == "AppVersionStr" { print $2 }' Telegram/build/version)
           git tag -l 'v*' | python3 .github/scripts/mzgram_version.py release "$TAG" --upstream "$UPSTREAM" --floor 0 | tee -a "$GITHUB_OUTPUT"
           echo "upstream=$UPSTREAM" >> "$GITHUB_OUTPUT"
           echo "previous=$(git tag -l 'v*' | python3 .github/scripts/mzgram_version.py previous "$TAG")" | tee -a "$GITHUB_OUTPUT"
