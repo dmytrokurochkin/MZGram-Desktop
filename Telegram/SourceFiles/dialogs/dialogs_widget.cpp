@@ -11,6 +11,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/qt/qt_key_modifiers.h"
 #include "base/options.h"
 #include "mzgram/mzgram_options.h"
+#include "mzgram/mzgram_update.h"
+#include "mzgram/mzgram_update_bar.h"
 #include "dialogs/ui/chat_search_in.h"
 #include "dialogs/ui/dialogs_stories_content.h"
 #include "dialogs/ui/dialogs_stories_list.h"
@@ -668,6 +670,21 @@ Widget::Widget(
 			checker.ready()
 		) | rpl::on_next([=] {
 			checkUpdateStatus();
+		}, lifetime());
+	}
+
+	if (_layout != Layout::Child) {
+		MZGram::Update::Available(
+		) | rpl::on_next([=](std::optional<MZGram::Update::Release> release) {
+			_mzgramUpdate.destroy();
+			if (release) {
+				_mzgramUpdate = MZGram::Update::CreateBar(this, *release);
+				_mzgramUpdate->show();
+				if (_connecting) {
+					_connecting->raise();
+				}
+			}
+			updateControlsGeometry();
 		}, lifetime());
 	}
 
@@ -1958,6 +1975,9 @@ void Widget::updateControlsVisibility(bool fast) {
 	if (_updateTelegram) {
 		_updateTelegram->show();
 	}
+	if (_mzgramUpdate) {
+		_mzgramUpdate->show();
+	}
 	_searchControls->setVisible(
 		!_openedFolder && !_openedForum && !_openedCommunity);
 	if (_moreChatsBar) {
@@ -2944,6 +2964,9 @@ void Widget::showAnimated(
 
 	if (_updateTelegram) {
 		_updateTelegram->hide();
+	}
+	if (_mzgramUpdate) {
+		_mzgramUpdate->hide();
 	}
 	if (_connecting) {
 		_connecting->setForceHidden(true);
@@ -4663,6 +4686,7 @@ void Widget::updateControlsGeometry() {
 				buttonHeight);
 		}
 	};
+	putBottomButton(_mzgramUpdate);
 	putBottomButton(_updateTelegram);
 	putBottomButton(_downloadBar);
 	putBottomButton(_loadMoreChats);

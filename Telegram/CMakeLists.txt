@@ -46,6 +46,14 @@ if (DESKTOP_APP_TEST_APPS)
     include(cmake/mzgram_tests.cmake)
 endif()
 
+# MZGram: the release code of this build (the release and push workflows
+# pass it), compared with the latest GitHub release by mzgram_update.cpp.
+# Only that file gets it, so a new code does not rebuild the whole client.
+if (DEFINED MZGRAM_VERSION_CODE)
+    set_source_files_properties(${src_loc}/mzgram/mzgram_update.cpp
+        PROPERTIES COMPILE_DEFINITIONS "MZGRAM_VERSION_CODE=${MZGRAM_VERSION_CODE}")
+endif()
+
 if (WIN32)
     include(cmake/generate_midl.cmake)
     generate_midl(Telegram ${src_loc}
@@ -1531,6 +1539,12 @@ PRIVATE
     mzgram/mzgram_protected_copy.h
     mzgram/mzgram_text_filters.cpp
     mzgram/mzgram_text_filters.h
+    mzgram/mzgram_update.cpp
+    mzgram/mzgram_update.h
+    mzgram/mzgram_update_bar.cpp
+    mzgram/mzgram_update_bar.h
+    mzgram/mzgram_update_rules.cpp
+    mzgram/mzgram_update_rules.h
     mzgram/mzgram_qr_scan.cpp
     mzgram/mzgram_qr_scan.h
     mzgram/mzgram_settings.cpp

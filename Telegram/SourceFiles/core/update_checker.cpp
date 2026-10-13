@@ -82,11 +82,10 @@ constexpr auto kFlatpakPortalObjectPath = "/org/freedesktop/portal/Flatpak";
 constexpr auto kFlatpakUpdated = "/app/.updated"_cs;
 #endif // !Q_OS_WIN && !Q_OS_MAC
 
-#ifdef TDESKTOP_DISABLE_AUTOUPDATE
+// MZGram: always off, also in a build without TDESKTOP_DISABLE_AUTOUPDATE.
+// The updater installs the official Telegram Desktop over MZGram; MZGram
+// shows a bar about its own GitHub releases instead (mzgram/mzgram_update.h).
 bool UpdaterIsDisabled = true;
-#else // TDESKTOP_DISABLE_AUTOUPDATE
-bool UpdaterIsDisabled = false;
-#endif // TDESKTOP_DISABLE_AUTOUPDATE
 
 std::weak_ptr<Updater> UpdaterInstance;
 

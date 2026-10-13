@@ -20,6 +20,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "mzgram/mzgram_message_store.h"
 #include "mzgram/mzgram_options.h"
 #include "mzgram/mzgram_protected_content.h"
+#include "mzgram/mzgram_update.h"
 #include "settings/settings_builder.h"
 #include "settings/settings_common_session.h"
 #include "ui/boxes/confirm_box.h"
@@ -528,6 +529,16 @@ void BuildInterface(SectionBuilder &builder) {
 		{ u"archive"_q, u"pull"_q, u"overscroll"_q });
 	builder.addSkip();
 	builder.addDividerText(Text("open_archive_on_pull_info"));
+
+	builder.addSkip();
+	AddOptionToggle(
+		builder,
+		u"mzgram/check-updates"_q,
+		"check_updates",
+		kOptionCheckUpdates,
+		{ u"update"_q, u"version"_q, u"release"_q, u"github"_q });
+	builder.addSkip();
+	builder.addDividerText(Text("check_updates_info"));
 }
 
 void BuildAdsFilters(SectionBuilder &builder) {

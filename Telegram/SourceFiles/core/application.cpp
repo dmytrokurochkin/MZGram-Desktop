@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "core/application.h"
 
+#include "mzgram/mzgram_update.h"
+
 #include "data/data_abstract_structure.h"
 #include "data/data_channel.h"
 #include "data/data_forum.h"
@@ -435,6 +437,8 @@ void Application::run() {
 
 	startDomain();
 	startTray();
+	// MZGram: the bar about a newer MZGram release, in place of the updater
+	MZGram::Update::Start();
 
 	_lastActivePrimaryWindow->firstShow();
 

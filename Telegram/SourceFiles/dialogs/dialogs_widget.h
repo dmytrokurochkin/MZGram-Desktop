@@ -378,6 +378,8 @@ private:
 	std::vector<std::unique_ptr<Suggestions>> _hidingSuggestions;
 	class BottomButton;
 	object_ptr<BottomButton> _updateTelegram = { nullptr };
+	// MZGram: the bar about a newer MZGram release (mzgram/mzgram_update.h)
+	object_ptr<Ui::RpWidget> _mzgramUpdate = { nullptr };
 	object_ptr<BottomButton> _loadMoreChats = { nullptr };
 	std::unique_ptr<Ui::DownloadBar> _downloadBar;
 	std::unique_ptr<Window::ConnectionState> _connecting;

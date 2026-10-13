@@ -283,6 +283,21 @@ const std::vector<Phrase> kPhrases = {
 		"Pulling the chat list down past the Archive row opens it.",
 		"Якщо потягнути список чатів униз далі за рядок архіву, він "
 		"відкривається." },
+	{ "check_updates", "Check for MZGram updates", "Перевіряти оновлення MZGram" },
+	{ "check_updates_info",
+		"Every few hours MZGram looks for its latest stable release on GitHub "
+		"and shows a bar at the bottom of the chat list when it is newer. "
+		"Update opens the release page; nothing is downloaded or installed "
+		"by the app. The updater of Telegram Desktop is off: it installs the "
+		"official app.",
+		"Раз на кілька годин MZGram шукає свій останній стабільний реліз на "
+		"GitHub і показує плашку внизу списку чатів, якщо він новіший. Оновити "
+		"відкриває сторінку релізу; застосунок нічого не завантажує і не "
+		"встановлює. Оновлювач Telegram Desktop вимкнений: він встановлює "
+		"офіційний застосунок." },
+	{ "update_available", "MZGram %1 update available", "Доступне оновлення MZGram %1" },
+	{ "update_open", "Update", "Оновити" },
+	{ "update_close", "Close", "Закрити" },
 
 	// Ads and filters.
 	{ "disable_sponsored", "Disable sponsored messages", "Вимкнути рекламні повідомлення" },
