@@ -215,6 +215,22 @@ jobs:
           done
           df -h /c
 
+      # dump_syms, breakpad's symbol tool, is built only for Release and needs
+      # ATL, which neither runner has for the toolset in use. It only serves
+      # crash report symbols, and MZGram builds without crash reports; the
+      # breakpad libraries themselves are still built.
+      - name: Leave out dump_syms.
+        shell: bash
+        run: |
+          python - "$TBUILD/$REPO_NAME/Telegram/build/prepare/prepare.py" <<'EOF'
+          import sys
+          path = sys.argv[1]
+          lines = open(path, encoding='utf-8').read().split('\n')
+          kept = [line for line in lines if not ('dump_syms' in line and ('windows' in line or 'gyp ' in line or 'msbuild' in line))]
+          assert len(lines) - len(kept) == 3, len(lines) - len(kept)
+          open(path, 'w', encoding='utf-8', newline='\n').write('\n'.join(kept))
+          EOF
+
       # Debug and Release of every dependency (no skip-release).
       - name: Libraries.
         id: prepare
