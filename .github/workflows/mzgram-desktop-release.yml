@@ -336,6 +336,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       IMAGE_TAG: tdesktop:centos_env
+      DOCKER_BUILD_RECORD_UPLOAD: false
 
     steps:
       - name: Clone.
@@ -453,10 +454,13 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
+      # Only the builds: the Docker step of the Linux job leaves a build record
+      # artifact too, which does not download as a file
       - name: Download the builds.
         uses: actions/download-artifact@v7
         with:
           path: dist
+          pattern: '{windows-x64,windows-arm64,linux-x64}'
           merge-multiple: true
 
       # The complete corresponding source for the GPL: this repository at the
