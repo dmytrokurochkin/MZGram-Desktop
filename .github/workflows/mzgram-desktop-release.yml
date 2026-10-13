@@ -46,6 +46,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
+      code: ${{ steps.version.outputs.code }}
       prerelease: ${{ steps.version.outputs.prerelease }}
       upstream: ${{ steps.version.outputs.upstream }}
       previous: ${{ steps.version.outputs.previous }}
@@ -285,6 +286,7 @@ jobs:
           -D CMAKE_CONFIGURATION_TYPES=Release ^
           -D CMAKE_MSVC_DEBUG_INFORMATION_FORMAT= ^
           -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON ^
+          -D MZGRAM_VERSION_CODE=${{ needs.version.outputs.code }} ^
           -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON ^
           -D DESKTOP_APP_TEST_APPS=ON
 
@@ -406,6 +408,7 @@ jobs:
           -D CMAKE_CONFIGURATION_TYPES=Release \
           $MZGRAM_API \
           -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON \
+          -D MZGRAM_VERSION_CODE=${{ needs.version.outputs.code }} \
           -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON
 
       # tar keeps the executable bit, which an artifact zip drops.

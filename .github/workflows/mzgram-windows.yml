@@ -135,6 +135,17 @@ jobs:
         run: |
           %TBUILD%\%REPO_NAME%\Telegram\build\prepare\win.bat skip-release silent qt6
 
+      # The release code of the newest v* tag (0 before the first one): the
+      # update bar compares it with the latest GitHub release
+      - name: Version code.
+        shell: bash
+        run: |
+          CODE=$(git -C "$TBUILD/$REPO_NAME" ls-remote --tags origin 'refs/tags/v*' \
+            | python "$TBUILD/$REPO_NAME/.github/scripts/mzgram_version.py" dev --upstream 0 --floor 0 \
+            | sed -n 's/^code=//p')
+          echo "MZGRAM_CODE=${CODE:-0}" >> $GITHUB_ENV
+          echo "version code: ${CODE:-0}"
+
       - name: Resolve API credentials.
         shell: bash
         env:
@@ -187,6 +198,7 @@ jobs:
           -D CMAKE_CONFIGURATION_TYPES=Debug ^
           -D CMAKE_MSVC_DEBUG_INFORMATION_FORMAT= ^
           -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON ^
+          -D MZGRAM_VERSION_CODE=%MZGRAM_CODE% ^
           -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON ^
           -D DESKTOP_APP_TEST_APPS=ON
 

@@ -102,6 +102,16 @@ jobs:
           key: ${{ runner.OS }}-tdesktop-${{ github.run_id }}
           restore-keys: ${{ runner.OS }}-tdesktop-
 
+      # The release code of the newest v* tag (0 before the first one): the
+      # update bar compares it with the latest GitHub release
+      - name: Version code.
+        run: |
+          CODE=$(git ls-remote --tags origin 'refs/tags/v*' \
+            | python3 .github/scripts/mzgram_version.py dev --upstream 0 --floor 0 \
+            | sed -n 's/^code=//p')
+          echo "MZGRAM_CODE=${CODE:-0}" >> $GITHUB_ENV
+          echo "version code: ${CODE:-0}"
+
       - name: Resolve API credentials.
         env:
           API_ID: ${{ secrets.TELEGRAM_API_ID }}
@@ -136,6 +146,7 @@ jobs:
           -D CMAKE_CXX_FLAGS_DEBUG="-O0 -fpch-preprocess" \
           $MZGRAM_API \
           -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON \
+          -D MZGRAM_VERSION_CODE=$MZGRAM_CODE \
           -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON
 
       - name: Count ccache misses.
