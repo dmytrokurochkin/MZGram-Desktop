@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/basic_types.h"
 #include "mzgram/mzgram_archive_rules.h"
 #include "mzgram/mzgram_lang.h"
+#include "mzgram/mzgram_local_pins_rules.h"
 #include "mzgram/mzgram_presence_rules.h"
 #include "mzgram/mzgram_protected_content.h"
 #include "mzgram/mzgram_text_filters.h"
@@ -799,6 +800,76 @@ void TestUpdateOffer() {
 	Check(!Offer(state, installed, true, false), "update: nothing without a release", "");
 }
 
+// Pinned chats in MZGram only (mzgram_local_pins_rules.h).
+void TestLocalPinsRule() {
+	using namespace MZGram::LocalPins;
+	Check(!PinsLocally(4, 0, 5), "local pins: below the server limit the server pins", "");
+	Check(PinsLocally(5, 0, 5), "local pins: at the server limit MZGram pins", "");
+	Check(PinsLocally(5, 4, 5), "local pins: up to ten in all", "");
+	Check(!PinsLocally(5, 5, 5), "local pins: not past ten in all", "");
+	Check(!PinsLocally(10, 0, 10), "local pins: not past ten with a higher limit", "");
+}
+
+void TestLocalPinsSortPosition() {
+	using namespace MZGram::LocalPins;
+	// Dialogs::PinnedDialogPos(index) = 0xFFFFFFFF000000FF - index, server
+	// lists hold at most 100 pins; a date key is (date << 32) | counter.
+	const auto lowestServerPin = 0xFFFFFFFF000000FFULL - 100;
+	const auto newestDate = (quint64(0x7FFFFFFF) << 32) | 0x7FFFFFFFULL;
+	const auto unreadOnTop = (quint64(2000000000) << 32 | 0xFFFFFFULL) | 0x8000000000000000ULL;
+	Check(SortPosition(0) < lowestServerPin, "local pins: after every server pin", "");
+	Check(SortPosition(kMaxTotal) > newestDate, "local pins: before every chat by date", "");
+	Check(SortPosition(kMaxTotal) > unreadOnTop, "local pins: before unread on top", "");
+	Check(SortPosition(0) > SortPosition(1), "local pins: in pin order", "");
+}
+
+void TestLocalPinsStorage() {
+	using namespace MZGram::LocalPins;
+	auto stored = Stored();
+	stored[u"123_0"_q] = { 9000000001ULL, 0x0001000000000002ULL };
+	stored[u"123_1"_q] = { 77ULL };
+	stored[u"456_0"_q] = {};
+	const auto parsed = Parse(Serialize(stored));
+	Check(parsed.size() == 2, "local pins: empty lists are not stored", "");
+	Check(
+		parsed.count(u"123_0"_q)
+			&& parsed.at(u"123_0"_q) == std::vector<quint64>{ 9000000001ULL, 0x0001000000000002ULL },
+		"local pins: ids and their order kept (64-bit peer ids)",
+		"");
+	Check(parsed.count(u"123_1"_q) && parsed.at(u"123_1"_q).size() == 1, "local pins: the archive kept apart", "");
+	Check(Parse("not json").empty(), "local pins: a broken file reads as none", "");
+}
+
+// The chat list sorts, pins and paints the local pins, with no request.
+void TestLocalPinsAreWired() {
+	const auto read = [](const QString &path) {
+		auto file = QFile(QString::fromUtf8(MZGRAM_SOURCE_DIR) + '/' + path);
+		return file.open(QIODevice::ReadOnly)
+			? QString::fromUtf8(file.readAll()).replace(u"\r\n"_q, u"\n"_q)
+			: QString();
+	};
+	auto problems = QStringList();
+	if (!read(u"dialogs/dialogs_entry.cpp"_q).contains(u"MZGram::LocalPins::SortPosition(local)"_q)) {
+		problems.push_back(u"not sorted"_q);
+	}
+	const auto menu = read(u"window/window_peer_menu.cpp"_q);
+	const auto toggle = menu.indexOf(u"MZGram::LocalPins::WouldPinLocally(history)"_q);
+	const auto request = menu.indexOf(u"MTPmessages_ToggleDialogPin("_q);
+	if (toggle < 0 || request < 0 || toggle > request || !menu.contains(u"MZGram::LocalPins::Pin(history);"_q)) {
+		problems.push_back(u"not pinned before the server request"_q);
+	}
+	if (!menu.contains(u"\"pin_locally\""_q) || !menu.contains(u"\"unpin_locally\""_q)) {
+		problems.push_back(u"no menu labels"_q);
+	}
+	if (!read(u"dialogs/ui/dialogs_layout.cpp"_q).contains(u"PaintingLocalPin"_q)) {
+		problems.push_back(u"no mark in the chat list"_q);
+	}
+	Check(
+		problems.isEmpty(),
+		"local pins: sorted, pinned without a request, marked",
+		problems.join(u", "_q).toStdString().c_str());
+}
+
 // Telegram Desktop's updater is off in the code itself, and the MZGram
 // check starts with the app and shows its bar in the chat list.
 void TestUpdateIsWired() {
@@ -865,6 +936,10 @@ int main() {
 		TestUpdateOffer,
 		TestUpdateDue,
 		TestUpdateIsWired,
+		TestLocalPinsRule,
+		TestLocalPinsSortPosition,
+		TestLocalPinsStorage,
+		TestLocalPinsAreWired,
 	};
 	for (const auto &test : tests) {
 		test();
