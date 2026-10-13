@@ -87,10 +87,14 @@ jobs:
             toolset: '14.44'
             configure_arch: 'x64'
             libs_suffix: '\win64'
+            # A Release build of Telegram with every core ran the x64 compiler
+            # out of memory (C1060, out of heap space) on the 16 GB runner
+            build_jobs: '2'
           - arch: arm64
             toolset: ''
             configure_arch: 'arm'
             libs_suffix: ''
+            build_jobs: ''
 
     defaults:
       run:
@@ -284,7 +288,7 @@ jobs:
           -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON ^
           -D DESKTOP_APP_TEST_APPS=ON
 
-          cmake --build ..\out --config Release --parallel
+          cmake --build ..\out --config Release --parallel ${{ matrix.build_jobs }}
 
       - name: Run MZGram unit tests.
         run: |
