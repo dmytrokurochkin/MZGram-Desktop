@@ -54,6 +54,13 @@ if (DEFINED MZGRAM_VERSION_CODE)
         PROPERTIES COMPILE_DEFINITIONS "MZGRAM_VERSION_CODE=${MZGRAM_VERSION_CODE}")
 endif()
 
+# MZGram: the update check (mzgram_update.cpp) makes HTTP requests with
+# QNetworkAccessManager, and the static Qt Network resolves names with the
+# Windows DNS API. Upstream links it only through its updater, which is off.
+if (WIN32)
+    target_link_libraries(Telegram PRIVATE dnsapi)
+endif()
+
 if (WIN32)
     include(cmake/generate_midl.cmake)
     generate_midl(Telegram ${src_loc}
