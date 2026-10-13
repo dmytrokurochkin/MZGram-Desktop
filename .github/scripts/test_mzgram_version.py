@@ -94,6 +94,23 @@ class NotesTest(unittest.TestCase):
         self.assertEqual(notes(["[mzgram] Testing mode for the archive", "[mzgram] CIrcle videos: keep the sound"]),
                          ["- Testing mode for the archive", "- CIrcle videos: keep the sound"])
 
+    def test_lines_naming_other_clients_are_left_out(self):
+        subjects = [
+            "[mzgram] Archive deleted messages via single AYUGRAM-aligned path",
+            "[mzgram] Port the nekogram helper",
+            "[mzgram] Ayu style switch",
+            "[mzgram] From MercuryGram: read receipts",
+            "[mzgram] Mercury icons",
+            "[mzgram] Keep the archive across restarts",
+        ]
+        self.assertEqual(notes(subjects), ["- Keep the archive across restarts"])
+
+    def test_commit_hashes_are_removed(self):
+        self.assertEqual(notes(["[mzgram] Revert own-deletion archiving (0b331573e)",
+                                "[mzgram] Hide statuses on both platforms (1caf86c27, ec74fd73e8)",
+                                "[mzgram] Keep (beta) in titles"]),
+                         ["- Revert own-deletion archiving", "- Hide statuses on both platforms", "- Keep (beta) in titles"])
+
     def test_nothing_left_gives_one_line(self):
         self.assertEqual(notes(["[mzgram] CI: x", "[mzgram] Test: y", "upstream commit"]), [NO_CHANGES])
         self.assertEqual(notes([]), [NO_CHANGES])

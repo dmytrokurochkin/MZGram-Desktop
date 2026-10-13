@@ -19,7 +19,8 @@ Subcommands (tags of the repo on stdin, one per line):
   notes
       commit subjects on stdin, the "Changes" list of the release notes out:
       the [mzgram] commits users see, without the internal CI:, Test:,
-      Release workflow:, Docs: and Spec: ones
+      Release workflow:, Docs: and Spec: ones, without any line naming
+      another client, and without commit hashes in parentheses
 """
 
 import argparse
@@ -30,6 +31,10 @@ TAG = re.compile(r"^v(0|[1-9]\d*)\.(0|[1-9]\d?)\.(0|[1-9]\d?)(?:-beta\.([1-9]\d?
 MAX_BASE = (2100000000 - 9) // 10  # Android's versionCode limit after * 10 + 9
 INTERNAL = re.compile(r"^(CI|Test|Tests|Release workflow|Docs|Spec)\s*:")
 NO_CHANGES = "- Build, test and CI changes only."
+# Names of other clients never go into the notes, whatever case
+FORBIDDEN = re.compile(r"ayu|neko|mercury", re.IGNORECASE)
+# A commit hash in parentheses, e.g. "(0b331573e)" or "(1caf86c27, ec74fd73e8)"
+HASHES = re.compile(r"\s*\((?:[0-9a-f]{7,40})(?:,\s*[0-9a-f]{7,40})*\)")
 
 
 class VersionError(ValueError):
@@ -110,7 +115,10 @@ def notes(subjects: list[str]) -> list[str]:
         if not subject.startswith("[mzgram] "):
             continue
         text = subject[len("[mzgram] "):].strip()
-        if text and not INTERNAL.match(text):
+        if not text or INTERNAL.match(text) or FORBIDDEN.search(text):
+            continue
+        text = HASHES.sub("", text).strip()
+        if text:
             lines.append(f"- {text}")
     return lines or [NO_CHANGES]
 
