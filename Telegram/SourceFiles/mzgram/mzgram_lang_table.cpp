@@ -298,6 +298,14 @@ const std::vector<Phrase> kPhrases = {
 	{ "update_available", "MZGram %1 update available", "Доступне оновлення MZGram %1" },
 	{ "update_open", "Update", "Оновити" },
 	{ "update_close", "Close", "Закрити" },
+	{ "pin_locally", "Pin in MZGram only", "Закріпити лише в MZGram" },
+	{ "unpin_locally", "Unpin from MZGram", "Відкріпити з MZGram" },
+	{ "pinned_locally",
+		"Pinned in MZGram only: the server allows no more pinned chats, so "
+		"this one is pinned on this device and not on your other devices.",
+		"Закріплено лише в MZGram: сервер не дозволяє більше закріплених "
+		"чатів, тому цей закріплено на цьому пристрої, а на інших ваших "
+		"пристроях ні." },
 
 	// Ads and filters.
 	{ "disable_sponsored", "Disable sponsored messages", "Вимкнути рекламні повідомлення" },

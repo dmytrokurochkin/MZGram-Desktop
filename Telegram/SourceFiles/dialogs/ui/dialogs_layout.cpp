@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "dialogs/ui/dialogs_layout.h"
 
+#include "mzgram/mzgram_local_pins.h"
+
 #include "base/options.h"
 #include "base/unixtime.h"
 #include "core/ui_integration.h"
@@ -56,6 +58,29 @@ namespace Dialogs::Ui {
 const char kOptionDialogsMuteIcon[] = "dialogs-mute-icon";
 
 namespace {
+
+// MZGram: the row being painted is pinned in MZGram only
+// (mzgram/mzgram_local_pins.h): its pin is painted in another color.
+bool PaintingLocalPin = false;
+
+[[nodiscard]] bool ShowsPin(not_null<const Entry*> entry, FilterId filter) {
+	return (entry->isPinnedDialog(filter)
+		&& (filter || !entry->fixedOnTopIndex()))
+		|| (!filter && MZGram::LocalPins::IsPinned(entry));
+}
+
+void PaintPinIcon(
+		QPainter &p,
+		const style::icon &icon,
+		int x,
+		int y,
+		int outerw) {
+	if (PaintingLocalPin) {
+		icon.paint(p, x, y, outerw, st::windowActiveTextFg->c);
+	} else {
+		icon.paint(p, x, y, outerw);
+	}
+}
 
 base::options::toggle DialogsMuteIcon({
 	.id = kOptionDialogsMuteIcon,
@@ -239,7 +264,7 @@ int PaintBadges(
 			st::dialogsPinnedIcon,
 			context.active,
 			context.selected);
-		icon.paint(p, right - icon.width(), pinnedIconTop, context.width);
+		PaintPinIcon(p, icon, right - icon.width(), pinnedIconTop, context.width);
 		right -= icon.width() + st::dialogsUnreadPadding;
 	}
 	if ((!narrow || (painted < 2))
@@ -460,6 +485,12 @@ void PaintRow(
 	if (supportMode) {
 		draft = nullptr;
 	}
+	const auto localPinGuard = gsl::finally([was = PaintingLocalPin] {
+		PaintingLocalPin = was;
+	});
+	PaintingLocalPin = !context.filter
+		&& !entry->isPinnedDialog(FilterId())
+		&& MZGram::LocalPins::IsPinned(entry);
 
 	const auto history = entry->asHistory();
 	const auto thread = entry->asThread();
@@ -624,8 +655,7 @@ void PaintRow(
 		// Unlike the Archive folder (fixed on top), a collapsed community is
 		// a movable pinned entry, so it shows the pinned icon when pinned and
 		// without an unread counter, exactly like an ordinary chat.
-		const auto displayPinnedIcon = entry->isPinnedDialog(context.filter)
-			&& (context.filter || !entry->fixedOnTopIndex());
+		const auto displayPinnedIcon = ShowsPin(entry, context.filter);
 		const auto availableWidth = PaintWideCounter(
 			p,
 			context,
@@ -672,14 +702,14 @@ void PaintRow(
 		auto availableWidth = namewidth;
 		if (const auto used = PaintRightButton(p, context)) {
 			availableWidth -= used;
-		} else if (entry->isPinnedDialog(context.filter)
-			&& (context.filter || !entry->fixedOnTopIndex())) {
+		} else if (ShowsPin(entry, context.filter)) {
 			auto &icon = ThreeStateIcon(
 				st::dialogsPinnedIcon,
 				context.active,
 				context.selected);
-			icon.paint(
+			PaintPinIcon(
 				p,
+				icon,
 				context.width - context.st->padding.right() - icon.width(),
 				texttop,
 				context.width);
@@ -770,13 +800,12 @@ void PaintRow(
 		auto availableWidth = namewidth;
 		if (const auto used = PaintRightButton(p, context)) {
 			availableWidth -= used;
-		} else if (entry->isPinnedDialog(context.filter)
-			&& (context.filter || !entry->fixedOnTopIndex())) {
+		} else if (ShowsPin(entry, context.filter)) {
 			auto &icon = ThreeStateIcon(
 				st::dialogsPinnedIcon,
 				context.active,
 				context.selected);
-			icon.paint(p, context.width - context.st->padding.right() - icon.width(), texttop, context.width);
+			PaintPinIcon(p, icon, context.width - context.st->padding.right() - icon.width(), texttop, context.width);
 			availableWidth -= icon.width() + st::dialogsUnreadPadding;
 		}
 
@@ -810,14 +839,14 @@ void PaintRow(
 		}
 
 		paintItemCallback(nameleft, namewidth);
-	} else if (entry->isPinnedDialog(context.filter)
-		&& (context.filter || !entry->fixedOnTopIndex())) {
+	} else if (ShowsPin(entry, context.filter)) {
 		auto &icon = ThreeStateIcon(
 			st::dialogsPinnedIcon,
 			context.active,
 			context.selected);
-		icon.paint(
+		PaintPinIcon(
 			p,
+			icon,
 			context.width - context.st->padding.right() - icon.width(),
 			texttop,
 			context.width);
@@ -1164,8 +1193,7 @@ void RowPainter::Paint(
 		return std::max(itemDate, draftDate);
 	}();
 	const auto displayPinnedIcon = badgesState.empty()
-		&& entry->isPinnedDialog(context.filter)
-		&& (context.filter || !entry->fixedOnTopIndex());
+		&& ShowsPin(entry, context.filter);
 
 	const auto from = history
 		? (history->peer->migrateTo()

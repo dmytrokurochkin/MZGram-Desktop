@@ -1530,6 +1530,10 @@ PRIVATE
     mzgram/mzgram_lang.cpp
     mzgram/mzgram_lang.h
     mzgram/mzgram_lang_table.cpp
+    mzgram/mzgram_local_pins.cpp
+    mzgram/mzgram_local_pins.h
+    mzgram/mzgram_local_pins_rules.cpp
+    mzgram/mzgram_local_pins_rules.h
     mzgram/mzgram_message_dim.cpp
     mzgram/mzgram_message_dim.h
     mzgram/mzgram_message_store.cpp

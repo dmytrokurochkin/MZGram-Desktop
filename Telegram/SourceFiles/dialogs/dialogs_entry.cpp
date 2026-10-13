@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "dialogs/dialogs_key.h"
 #include "dialogs/dialogs_indexed_list.h"
+#include "mzgram/mzgram_local_pins.h"
 #include "base/options.h"
 #include "base/unixtime.h"
 #include "data/data_changes.h"
@@ -247,6 +248,13 @@ int Entry::lookupPinnedIndex(FilterId filterId) const {
 
 uint64 Entry::computeSortPosition(FilterId filterId) const {
 	const auto index = lookupPinnedIndex(filterId);
+	if (!index && !filterId) {
+		// MZGram: pinned in MZGram only, right after the server's pinned chats
+		const auto local = MZGram::LocalPins::Index(this);
+		if (local >= 0) {
+			return MZGram::LocalPins::SortPosition(local);
+		}
+	}
 	return index ? PinnedDialogPos(index) : _sortKeyByDate;
 }
 

@@ -7,6 +7,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "window/window_peer_menu.h"
 
+#include "mzgram/mzgram_lang.h"
+#include "mzgram/mzgram_local_pins.h"
+
 #include "base/call_delayed.h"
 #include "menu/menu_check_item.h"
 #include "menu/menu_mark_as_read.h"
@@ -437,6 +440,25 @@ void TogglePinnedThread(
 	if (!entry->folderKnown()) {
 		return;
 	}
+	// MZGram: past the server's limit a chat is pinned in MZGram only
+	// (mzgram/mzgram_local_pins.h), without a request to the server
+	if (const auto history = entry->asHistory()) {
+		if (MZGram::LocalPins::IsPinned(history)) {
+			MZGram::LocalPins::Unpin(history);
+			if (onToggled) {
+				onToggled();
+			}
+			return;
+		} else if (MZGram::LocalPins::WouldPinLocally(history)) {
+			MZGram::LocalPins::Pin(history);
+			controller->showToast(MZGram::TrNow("pinned_locally"));
+			controller->content()->dialogsToUp();
+			if (onToggled) {
+				onToggled();
+			}
+			return;
+		}
+	}
 	const auto owner = &entry->owner();
 	const auto isPinned = !entry->isPinnedDialog(FilterId());
 	if (isPinned && PinnedLimitReached(controller, entry)) {
@@ -565,9 +587,17 @@ void Filler::addTogglePin() {
 	} else if (InsideCollapsedCommunity(_request.key.history())) {
 		return;
 	}
+	const auto history = _request.key.history();
+	// MZGram: the label says when the pin is MZGram's own (mzgram/mzgram_local_pins.h)
+	const auto localPinned = !filterId && history && MZGram::LocalPins::IsPinned(history);
+	const auto pinsLocally = !filterId && history && MZGram::LocalPins::WouldPinLocally(history);
 	const auto pinText = [=] {
-		return entry->isPinnedDialog(filterId)
+		return localPinned
+			? MZGram::TrNow("unpin_locally")
+			: entry->isPinnedDialog(filterId)
 			? tr::lng_context_unpin_from_top(tr::now)
+			: pinsLocally
+			? MZGram::TrNow("pin_locally")
 			: tr::lng_context_pin_to_top(tr::now);
 	};
 	const auto weak = base::make_weak(entry);
@@ -579,7 +609,7 @@ void Filler::addTogglePin() {
 	_addAction(
 		pinText(),
 		pinToggle,
-		(entry->isPinnedDialog(filterId)
+		((entry->isPinnedDialog(filterId) || localPinned)
 			? &st::menuIconUnpin
 			: &st::menuIconPin));
 }
