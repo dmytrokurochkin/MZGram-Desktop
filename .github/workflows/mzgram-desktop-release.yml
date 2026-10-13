@@ -236,15 +236,17 @@ jobs:
           open(path, 'w', encoding='utf-8', newline='\n').write('\n'.join(kept))
           EOF
 
-      # Debug and Release of every dependency (no skip-release).
+      # Debug and Release of every dependency (no skip-release). Runs even
+      # with a whole cached tree: it skips the built stages in seconds and
+      # sets up ThirdParty (the Python the configure step runs), which the
+      # library cache does not hold.
       - name: Libraries.
         id: prepare
-        if: steps.libs-state.outputs.complete != 'true'
         run: |
           %TBUILD%\%REPO_NAME%\Telegram\build\prepare\win.bat silent qt6 && echo complete> %LibrariesPath%\cache_keys\mzgram-release-complete
 
       - name: Free up some disk space.
-        if: always() && steps.libs.outcome == 'success' && steps.prepare.outcome != 'skipped'
+        if: always() && steps.libs.outcome == 'success' && steps.libs-state.outputs.complete != 'true'
         shell: bash
         run: |
           find $LibrariesPath '(' '(' ! '(' -name '*.lib' -o -name '*.a' -o -name '*.exe' -o -name '*.h' -o -name '*.hpp' -o -name '*.inc' -o -name '*.cmake' -o -name '*.pc' -o -path '*/include/*' -o -path '*/objects-*' -o -path '*/cache_keys/*' -o -path '*/patches/*' -o -path '*/nv-codec-headers/*' ')' -type f ')' -o -empty ')' -delete
@@ -253,7 +255,7 @@ jobs:
       # Saved even when the libraries step failed or ran out of time, so the
       # next run goes on from the stages already built.
       - name: Save the Release libraries.
-        if: always() && steps.libs.outcome == 'success' && steps.prepare.outcome != 'skipped'
+        if: always() && steps.libs.outcome == 'success' && steps.libs-state.outputs.complete != 'true'
         uses: actions/cache/save@v6
         with:
           path: |
@@ -274,6 +276,17 @@ jobs:
             echo "::error::No API credentials: a release could not sign in."
             exit 1
           fi
+
+      # The Release compile of the big generated sources (qrc_emoji_*.cpp)
+      # ran the x64 compiler out of memory (C1060) even with two jobs: a
+      # larger page file on the free drive gives it room.
+      - name: Page file.
+        if: matrix.arch == 'x64'
+        uses: al-cheb/configure-pagefile-action@a3b6ebd6b634da88790d9c58d4b37a7f4a7b8708
+        with:
+          minimum-size: 16GB
+          maximum-size: 40GB
+          disk-root: "D:"
 
       - name: Build.
         run: |
