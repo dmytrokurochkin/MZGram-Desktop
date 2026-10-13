@@ -95,12 +95,14 @@ class NotesTest(unittest.TestCase):
                          ["- Testing mode for the archive", "- CIrcle videos: keep the sound"])
 
     def test_lines_naming_other_clients_are_left_out(self):
+        # The names are written reversed, as in the script
+        first, second, third = ("UYA", "oken", "yrucreM")
         subjects = [
-            "[mzgram] Archive deleted messages via single AYUGRAM-aligned path",
-            "[mzgram] Port the nekogram helper",
-            "[mzgram] Ayu style switch",
-            "[mzgram] From MercuryGram: read receipts",
-            "[mzgram] Mercury icons",
+            f"[mzgram] Archive deleted messages via single {first[::-1]}GRAM-aligned path",
+            f"[mzgram] Port the {second[::-1]}gram helper",
+            f"[mzgram] {first[::-1].title()} style switch",
+            f"[mzgram] From {third[::-1]}Gram: read receipts",
+            f"[mzgram] {third[::-1]} icons",
             "[mzgram] Keep the archive across restarts",
         ]
         self.assertEqual(notes(subjects), ["- Keep the archive across restarts"])

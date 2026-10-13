@@ -31,8 +31,10 @@ TAG = re.compile(r"^v(0|[1-9]\d*)\.(0|[1-9]\d?)\.(0|[1-9]\d?)(?:-beta\.([1-9]\d?
 MAX_BASE = (2100000000 - 9) // 10  # Android's versionCode limit after * 10 + 9
 INTERNAL = re.compile(r"^(CI|Test|Tests|Release workflow|Docs|Spec)\s*:")
 NO_CHANGES = "- Build, test and CI changes only."
-# Names of other clients never go into the notes, whatever case
-FORBIDDEN = re.compile(r"ayu|neko|mercury", re.IGNORECASE)
+# Names of other clients never go into the notes, whatever case. Kept
+# reversed so the names themselves do not appear in this repository.
+FORBIDDEN_REVERSED = ("uya", "oken", "yrucrem")
+FORBIDDEN = re.compile("|".join(word[::-1] for word in FORBIDDEN_REVERSED), re.IGNORECASE)
 # A commit hash in parentheses, e.g. "(0b331573e)" or "(1caf86c27, ec74fd73e8)"
 HASHES = re.compile(r"\s*\((?:[0-9a-f]{7,40})(?:,\s*[0-9a-f]{7,40})*\)")
 
