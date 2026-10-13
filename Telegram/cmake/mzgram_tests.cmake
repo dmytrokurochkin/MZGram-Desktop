@@ -30,6 +30,8 @@ PRIVATE
     mzgram/mzgram_protected_content.h
     mzgram/mzgram_text_filters.cpp
     mzgram/mzgram_text_filters.h
+    mzgram/mzgram_update_rules.cpp
+    mzgram/mzgram_update_rules.h
     mzgram/tests/mzgram_tests_main.cpp
 )
 

@@ -11,6 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "mzgram/mzgram_presence_rules.h"
 #include "mzgram/mzgram_protected_content.h"
 #include "mzgram/mzgram_text_filters.h"
+#include "mzgram/mzgram_update_rules.h"
 
 #include <QtCore/QDirIterator>
 #include <QtCore/QFile>
@@ -719,6 +720,124 @@ void TestSettingsAreTopicPages() {
 		problems.join(u", "_q).toStdString().c_str());
 }
 
+// The MZGram update check (mzgram_update_rules.h).
+QByteArray ReleaseJson(
+		const char *tag,
+		bool draft = false,
+		bool prerelease = false,
+		const char *url = nullptr) {
+	const auto page = url
+		? QByteArray(url)
+		: ("https://github.com/dmytrokurochkin/MZGram-Desktop/releases/tag/"
+			+ QByteArray(tag));
+	return "{\"tag_name\":\"" + QByteArray(tag)
+		+ "\",\"draft\":" + (draft ? "true" : "false")
+		+ ",\"prerelease\":" + (prerelease ? "true" : "false")
+		+ ",\"html_url\":\"" + page + "\"}";
+}
+
+void TestUpdateVersions() {
+	using namespace MZGram::Update;
+	Check(StableCode(u"v1.0.0"_q) == 1000099, "update: v1.0.0 code", "");
+	Check(StableCode(u"v1.2.3"_q) == 1020399, "update: v1.2.3 code", "");
+	Check(
+		StableCode(u"v1.10.0"_q) > StableCode(u"v1.9.99"_q),
+		"update: 1.10.0 is newer than 1.9.99",
+		"");
+	Check(StableCode(u"v1.1.0-beta.1"_q) == -1, "update: a beta is not offered", "");
+	for (const auto tag : { "1.0.0", "v1.0", "v1.100.0", "v01.0.0", "", "v7.2.8x" }) {
+		Check(StableCode(QString::fromLatin1(tag)) == -1, "update: not a release tag", tag);
+	}
+}
+
+void TestUpdateParse() {
+	using namespace MZGram::Update;
+	const auto stable = ParseLatest(ReleaseJson("v1.0.1"));
+	Check(stable && stable->tag == u"v1.0.1"_q, "update: stable release parsed", "");
+	Check(
+		stable && stable->url == u"https://github.com/dmytrokurochkin/MZGram-Desktop/releases/tag/v1.0.1"_q,
+		"update: release page link",
+		"");
+	Check(!ParseLatest(ReleaseJson("v2.0.0", true)), "update: a draft is ignored", "");
+	Check(!ParseLatest(ReleaseJson("v2.0.0", false, true)), "update: a prerelease is ignored", "");
+	Check(!ParseLatest(ReleaseJson("v2.0.0-beta.1")), "update: a beta tag is ignored", "");
+	Check(!ParseLatest("not json"), "update: a broken answer is ignored", "");
+	const auto other = ParseLatest(ReleaseJson("v2.0.0", false, false, "https://example.com/x"));
+	Check(
+		other && other->url.startsWith(u"https://github.com/dmytrokurochkin/MZGram-Desktop/releases/"_q),
+		"update: only the MZGram releases page is opened",
+		"");
+}
+
+void TestUpdateOffer() {
+	using namespace MZGram::Update;
+	const auto installed = StableCode(u"v1.0.0"_q);
+	auto state = State();
+	Apply(state, 200, ReleaseJson("v1.0.1"), u"\"e1\""_q);
+	Check(state.etag == u"\"e1\""_q, "update: the ETag is kept", "");
+	const auto offered = Offer(state, installed, true, false);
+	Check(offered && offered->version() == u"1.0.1"_q, "update: a newer release is offered", "");
+	Check(!Offer(state, installed, false, false), "update: nothing with the switch off", "");
+	Check(!Offer(state, 0, true, false), "update: nothing in a build without a version", "");
+	Check(!Offer(state, StableCode(u"v1.0.1"_q), true, false), "update: not the installed version", "");
+	Check(!Offer(state, StableCode(u"v1.1.0"_q), true, false), "update: not an older version", "");
+
+	state.dismissedTag = u"v1.0.1"_q;
+	Check(!Offer(state, installed, true, false), "update: a closed version stays closed", "");
+	Check(Offer(state, installed, true, true).has_value(), "update: the user's own check shows it", "");
+	Apply(state, 200, ReleaseJson("v1.0.2"), u"\"e2\""_q);
+	Check(Offer(state, installed, true, false).has_value(), "update: a newer one after closing is offered", "");
+
+	Apply(state, 304, QByteArray(), u"\"e2\""_q);
+	Check(state.latestTag == u"v1.0.2"_q, "update: 304 keeps the saved release", "");
+	Apply(state, 500, QByteArray(), QString());
+	Check(state.latestTag == u"v1.0.2"_q, "update: an error keeps the saved release", "");
+	Apply(state, 200, ReleaseJson("v1.0.3", false, true), u"\"e3\""_q);
+	Check(!Offer(state, installed, true, false), "update: a prerelease answer offers nothing", "");
+	Apply(state, 404, QByteArray(), QString());
+	Check(state.latestTag.isEmpty() && state.etag.isEmpty(), "update: no release yet clears it", "");
+	Check(!Offer(state, installed, true, false), "update: nothing without a release", "");
+}
+
+// Telegram Desktop's updater is off in the code itself, and the MZGram
+// check starts with the app and shows its bar in the chat list.
+void TestUpdateIsWired() {
+	const auto read = [](const QString &path) {
+		auto file = QFile(QString::fromUtf8(MZGRAM_SOURCE_DIR) + '/' + path);
+		return file.open(QIODevice::ReadOnly)
+			? QString::fromUtf8(file.readAll()).replace(u"\r\n"_q, u"\n"_q)
+			: QString();
+	};
+	auto problems = QStringList();
+	const auto updater = read(u"core/update_checker.cpp"_q);
+	if (!updater.contains(u"\nbool UpdaterIsDisabled = true;\n"_q)
+		|| updater.contains(u"UpdaterIsDisabled = false"_q)) {
+		problems.push_back(u"Telegram updater not off"_q);
+	}
+	if (!read(u"core/application.cpp"_q).contains(u"MZGram::Update::Start();"_q)) {
+		problems.push_back(u"check not started"_q);
+	}
+	const auto dialogs = read(u"dialogs/dialogs_widget.cpp"_q);
+	if (!dialogs.contains(u"MZGram::Update::Available("_q)
+		|| !dialogs.contains(u"putBottomButton(_mzgramUpdate);"_q)) {
+		problems.push_back(u"no bar in the chat list"_q);
+	}
+	Check(
+		problems.isEmpty(),
+		"update: Telegram's updater is off, the MZGram bar is wired",
+		problems.join(u", "_q).toStdString().c_str());
+}
+
+void TestUpdateDue() {
+	using namespace MZGram::Update;
+	auto state = State();
+	state.lastCheck = 1000;
+	Check(!Due(state, 1000 + kCheckIntervalMs - 1, true, false), "update: not again within the interval", "");
+	Check(Due(state, 1000 + kCheckIntervalMs, true, false), "update: due after the interval", "");
+	Check(!Due(state, 1000 + kCheckIntervalMs, false, false), "update: never with the switch off", "");
+	Check(Due(state, 1001, false, true), "update: the user's own check is always due", "");
+}
+
 } // namespace
 
 int main() {
@@ -741,6 +860,11 @@ int main() {
 		TestPresenceRules,
 		TestPresenceIsWired,
 		TestSettingsAreTopicPages,
+		TestUpdateVersions,
+		TestUpdateParse,
+		TestUpdateOffer,
+		TestUpdateDue,
+		TestUpdateIsWired,
 	};
 	for (const auto &test : tests) {
 		test();
