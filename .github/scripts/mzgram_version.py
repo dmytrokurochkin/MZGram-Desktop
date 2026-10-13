@@ -16,6 +16,10 @@ Subcommands (tags of the repo on stdin, one per line):
       tag, so a push build installs over the last release and never below it
   previous TAG
       the tag the release notes of TAG start from
+  notes
+      commit subjects on stdin, the "Changes" list of the release notes out:
+      the [mzgram] commits users see, without the internal CI:, Test:,
+      Release workflow:, Docs: and Spec: ones
 """
 
 import argparse
@@ -24,6 +28,8 @@ import sys
 
 TAG = re.compile(r"^v(0|[1-9]\d*)\.(0|[1-9]\d?)\.(0|[1-9]\d?)(?:-beta\.([1-9]\d?))?$")
 MAX_BASE = (2100000000 - 9) // 10  # Android's versionCode limit after * 10 + 9
+INTERNAL = re.compile(r"^(CI|Test|Tests|Release workflow|Docs|Spec)\s*:")
+NO_CHANGES = "- Build, test and CI changes only."
 
 
 class VersionError(ValueError):
@@ -96,6 +102,19 @@ def previous(tag: str, tags: list[str]) -> str:
     return max(older, key=code) if older else ""
 
 
+def notes(subjects: list[str]) -> list[str]:
+    """The release notes list: one line per [mzgram] commit a user would notice."""
+    lines = []
+    for subject in subjects:
+        subject = subject.strip()
+        if not subject.startswith("[mzgram] "):
+            continue
+        text = subject[len("[mzgram] "):].strip()
+        if text and not INTERNAL.match(text):
+            lines.append(f"- {text}")
+    return lines or [NO_CHANGES]
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     sub = parser.add_subparsers(dest="command", required=True)
@@ -108,8 +127,12 @@ def main() -> int:
     dv.add_argument("--floor", type=int, required=True)
     prev = sub.add_parser("previous")
     prev.add_argument("tag")
+    sub.add_parser("notes")
     args = parser.parse_args()
 
+    if args.command == "notes":
+        print("\n".join(notes(sys.stdin.read().splitlines())))
+        return 0
     tags = [line.strip() for line in sys.stdin if line.strip()]
     # git ls-remote prints "<sha>\trefs/tags/v1.0.0" and "...^{}" for annotated tags
     tags = sorted({tag.split("refs/tags/")[-1].removesuffix("^{}") for tag in tags})

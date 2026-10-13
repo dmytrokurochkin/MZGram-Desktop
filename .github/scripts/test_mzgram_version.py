@@ -5,7 +5,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from mzgram_version import VersionError, code, dev, previous, release  # noqa: E402
+from mzgram_version import NO_CHANGES, VersionError, code, dev, notes, previous, release  # noqa: E402
 
 SCRIPT = Path(__file__).parent / "mzgram_version.py"
 
@@ -72,6 +72,33 @@ class PreviousTest(unittest.TestCase):
         self.assertEqual(previous("v1.0.0", self.TAGS), "")
 
 
+class NotesTest(unittest.TestCase):
+    def test_internal_commits_are_left_out(self):
+        subjects = [
+            "[mzgram] CI: stop the build daemons before the emulator starts",
+            "[mzgram] Test: the color theme row follows the list",
+            "[mzgram] Release workflow: a dry run can sign with a throwaway key",
+            "[mzgram] Docs: versions, signing key setup and releases",
+            "[mzgram] Spec: I3",
+            "[mzgram] Color theme list: keep the whole list while the chat themes load again",
+            "[mzgram] Hide camera tile: the gallery reads the switch",
+            "Merge upstream 12.10.1",
+            "update to 12.10.1 (7038)",
+        ]
+        self.assertEqual(notes(subjects), [
+            "- Color theme list: keep the whole list while the chat themes load again",
+            "- Hide camera tile: the gallery reads the switch",
+        ])
+
+    def test_a_word_that_only_starts_like_a_prefix_stays(self):
+        self.assertEqual(notes(["[mzgram] Testing mode for the archive", "[mzgram] CIrcle videos: keep the sound"]),
+                         ["- Testing mode for the archive", "- CIrcle videos: keep the sound"])
+
+    def test_nothing_left_gives_one_line(self):
+        self.assertEqual(notes(["[mzgram] CI: x", "[mzgram] Test: y", "upstream commit"]), [NO_CHANGES])
+        self.assertEqual(notes([]), [NO_CHANGES])
+
+
 class CliTest(unittest.TestCase):
     def run_cli(self, *args, stdin=""):
         return subprocess.run([sys.executable, str(SCRIPT), *args], input=stdin, capture_output=True, text=True)
@@ -80,6 +107,10 @@ class CliTest(unittest.TestCase):
         stdin = "abc\trefs/tags/v1.0.0\nabc\trefs/tags/v1.0.0^{}\ndef\trefs/tags/release-12.10.1\n"
         result = self.run_cli("dev", "--upstream", "12.10.1", "--floor", "7038", stdin=stdin)
         self.assertEqual(result.stdout.split(), ["code=1000099", "name=1.0.0-dev", "(12.10.1)"])
+
+    def test_notes_from_stdin(self):
+        result = self.run_cli("notes", stdin="[mzgram] CI: x\n[mzgram] Feature: y\n")
+        self.assertEqual(result.stdout.strip(), "- Feature: y")
 
     def test_bad_tag_fails(self):
         result = self.run_cli("release", "v1.2", "--upstream", "12.10.1", "--floor", "7038")
