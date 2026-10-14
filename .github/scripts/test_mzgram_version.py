@@ -90,6 +90,31 @@ class NotesTest(unittest.TestCase):
             "- Hide camera tile: the gallery reads the switch",
         ])
 
+    def test_build_ci_and_test_work_under_other_subjects_is_left_out(self):
+        subjects = [
+            "[mzgram] Release notes: leave out the CI, Test, Release workflow, Docs and Spec commits",
+            "[mzgram] Fix Windows CI: msys2 PATH shadows timeout.exe after pacman self-update",
+            "[mzgram] Fix broken Windows CI: msys2 pacman database sync race",
+            "[mzgram] Topic pages test: read the settings source with CRLF line ends",
+            "[mzgram] Build Linux x64 in CI",
+            "[mzgram] Add Windows x64 and ARM64 build workflow",
+            "[mzgram] Install ATL so the Release breakpad build links",
+            "[mzgram] Build Release dependencies and target Qt6",
+            "[mzgram] Route Qt's zlib dependency to the zlib tdesktop builds on Windows",
+            "[mzgram] Cancel superseded Windows runs",
+            "[mzgram] Add headless unit tests for MZGram Zalgo filter",
+            "[mzgram] README about MZGram",
+            "[mzgram] Link the Windows DNS API, which Qt Network needs for the update check",
+            "[mzgram] Describe the fork and how it tracks upstream",
+            "[mzgram] Remove mentions of other Telegram clients from comments",
+            "[mzgram] Pinned chats: past the server's limit, pin in MZGram only, up to ten in all",
+            "[mzgram] Rename the built binary itself from Telegram to MZGram",
+        ]
+        self.assertEqual(notes(subjects), [
+            "- Pinned chats: past the server's limit, pin in MZGram only, up to ten in all",
+            "- Rename the built binary itself from Telegram to MZGram",
+        ])
+
     def test_a_word_that_only_starts_like_a_prefix_stays(self):
         self.assertEqual(notes(["[mzgram] Testing mode for the archive", "[mzgram] CIrcle videos: keep the sound"]),
                          ["- Testing mode for the archive", "- CIrcle videos: keep the sound"])
