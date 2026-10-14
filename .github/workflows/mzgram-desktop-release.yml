@@ -482,7 +482,7 @@ jobs:
         run: |
           (cd dist && sha256sum -- * > SHA256SUMS && cat SHA256SUMS)
           RANGE=${PREVIOUS:+$PREVIOUS..}$GITHUB_SHA
-          # The [mzgram] commits users notice; CI:, Test:, Release workflow:, Docs:, Spec: are left out
+          # The [mzgram] commits users notice; build, CI, test, docs and spec work is left out (mzgram_version.py)
           CHANGES=$(git log --no-merges --format=%s "$RANGE" | python3 .github/scripts/mzgram_version.py notes)
           {
             echo "MZGram Desktop $VERSION, based on Telegram Desktop $UPSTREAM."
@@ -496,7 +496,9 @@ jobs:
             echo "- Windows: unpack \`MZGram-Desktop-$VERSION-windows-x64.zip\` (or \`-arm64\` on ARM) and run \`MZGram.exe\`."
             echo "- Linux: unpack \`MZGram-Desktop-$VERSION-linux-x64.tar.xz\` and run \`MZGram\` (glibc 2.28 or newer)."
             echo
-            echo "MZGram keeps its data in its own folder, apart from Telegram Desktop. Updates are not automatic: download the next release and replace the files."
+            echo "\`MZGram.exe\` is not code-signed, so on the first start Windows SmartScreen may show \"Windows protected your PC\". Check the zip against \`SHA256SUMS\`, then choose **More info** and **Run anyway**."
+            echo
+            echo "MZGram keeps its data in its own folder, apart from Telegram Desktop. When a newer release is out, MZGram shows a bar in the chat list; it does not download it: download the next release and replace the files."
             echo
             echo "\`MZGram-Desktop-$VERSION-source.tar.xz\` is the complete source of this release. \`SHA256SUMS\` lists the SHA-256 of every file."
           } > notes.md

@@ -29,7 +29,12 @@ import sys
 
 TAG = re.compile(r"^v(0|[1-9]\d*)\.(0|[1-9]\d?)\.(0|[1-9]\d?)(?:-beta\.([1-9]\d?))?$")
 MAX_BASE = (2100000000 - 9) // 10  # Android's versionCode limit after * 10 + 9
-INTERNAL = re.compile(r"^(CI|Test|Tests|Release workflow|Docs|Spec)\s*:")
+INTERNAL = re.compile(r"^(CI|Test|Tests|Release workflow|Release notes|Docs|Spec)\s*:")
+# Build, CI and test work under other subjects: "Fix Windows CI: ...",
+# "Topic pages test: ...", "Build Linux x64 in CI", "Install ATL so the
+# Release breakpad build links". Whole words only ("CIrcle" stays).
+INTERNAL_PREFIX = re.compile(r"^[^:]*\b(CI|tests?)\s*:", re.IGNORECASE)
+INTERNAL_WORDS = re.compile(r"\b(CI|workflow|breakpad|unit tests?|builds|Qt6|Qt Network|superseded|README|upstream|comments)\b")
 NO_CHANGES = "- Build, test and CI changes only."
 # Names of other clients never go into the notes, whatever case. Kept
 # reversed so the names themselves do not appear in this repository.
@@ -117,7 +122,7 @@ def notes(subjects: list[str]) -> list[str]:
         if not subject.startswith("[mzgram] "):
             continue
         text = subject[len("[mzgram] "):].strip()
-        if not text or INTERNAL.match(text) or FORBIDDEN.search(text):
+        if not text or INTERNAL.match(text) or INTERNAL_PREFIX.match(text) or INTERNAL_WORDS.search(text) or FORBIDDEN.search(text):
             continue
         text = HASHES.sub("", text).strip()
         if text:
