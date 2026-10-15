@@ -963,6 +963,35 @@ void TestBrandingIsWired() {
 	Check(problems.isEmpty(), "branding: MZGram in the windows, About, menus, notifications and the exe", problems.join(u", "_q).toStdString().c_str());
 }
 
+// Linux ARM64 (aarch64) next to x64: built natively by CI and the release,
+// with the same recipe, published and named in the notes.
+void TestLinuxArm64IsBuilt() {
+	const auto read = [](const QString &path) {
+		auto file = QFile(QString::fromUtf8(MZGRAM_SOURCE_DIR) + '/' + path);
+		return file.open(QIODevice::ReadOnly)
+			? QString::fromUtf8(file.readAll()).replace(u"\r\n"_q, u"\n"_q)
+			: QString();
+	};
+	auto problems = QStringList();
+	const auto arm = u"matrix.arch == 'arm64' && 'ubuntu-24.04-arm'"_q;
+	const auto push = read(u"../../.github/workflows/mzgram-linux.yml"_q);
+	if (!push.contains(arm) || !push.contains(u"arch: [x64, arm64]"_q)) {
+		problems.push_back(u"no arm64 in Linux CI"_q);
+	}
+	const auto release = read(u"../../.github/workflows/mzgram-desktop-release.yml"_q);
+	if (!release.contains(arm)
+		|| !release.contains(u"linux-${{ matrix.arch }}.tar.xz"_q)
+		|| !release.contains(u"linux-arm64}'"_q)
+		|| !release.contains(u"MZGram-Desktop-$VERSION-linux-arm64.tar.xz"_q)) {
+		problems.push_back(u"no arm64 in the release"_q);
+	}
+	const auto docker = read(u"../build/docker/centos_env/Dockerfile"_q);
+	if (docker.isEmpty() || docker.contains(u"x86_64-unknown-linux-gnu"_q)) {
+		problems.push_back(u"the image recipe is x86_64 only"_q);
+	}
+	Check(problems.isEmpty(), "Linux arm64 is built and released", problems.join(u", "_q).toStdString().c_str());
+}
+
 // Telegram Desktop's updater is off in the code itself, and the MZGram
 // check starts with the app and shows its bar in the chat list.
 void TestUpdateIsWired() {
@@ -1032,6 +1061,7 @@ int main() {
 		TestBrandingRules,
 		TestBrandingPhrases,
 		TestBrandingIsWired,
+		TestLinuxArm64IsBuilt,
 		TestLocalPinsRule,
 		TestLocalPinsSortPosition,
 		TestLocalPinsStorage,
