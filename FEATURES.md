@@ -78,6 +78,7 @@ Each item has its own switch.
 |---|---|---|
 | Folder tabs at the bottom | Chat folder tabs sit at the bottom of the chat list, within reach of the thumb. | 1.0.0 |
 | No bottom navigation bar | Removes the tab bar under the chat list; its pages move to the chat list menu. | 1.0.0 |
+| Accounts in the chat list menu | The menu of the three dots at the top of the chat list ends with every signed-in account (avatar and name, the current one marked, the unread count of the others); a tap switches to it at once, without opening Settings. Add Account is there while there is room for one (more with Premium). The standard items stay. On by default, can be switched off. | Next release |
 | Hide stories | Removes the stories row from the chat list. | 1.0.0 |
 | Seconds in message time | Message times show seconds, such as 12:34:56. | 1.0.0 |
 | Exact numbers | Views, reactions and members show exact counts (4777 instead of 4.8K). | 1.0.0 |
@@ -234,6 +235,7 @@ Yes: present. No: absent. Partly: present in a narrower form.
 | Instant camera and camera tile switches | Yes | No |
 | Original video quality | Yes | No |
 | Folder tabs at the bottom, no bottom bar | Yes | No |
+| Accounts in the menu, one tap to switch | Next release | Yes (Telegram Desktop's side menu) |
 | Exact numbers, animation switches | Yes | No |
 | Seconds in time, hide stories, no greeting sticker, channel button | Yes | Yes |
 | No sponsored messages, Zalgo filter | Yes | Yes |
