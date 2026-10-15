@@ -14,6 +14,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/update_checker.h"
 #include "core/version.h"
 #include "lang/lang_keys.h"
+#include "mzgram/mzgram_branding.h"
+#include "mzgram/mzgram_lang.h"
 #include "ui/boxes/confirm_box.h"
 #include "ui/painter.h"
 #include "ui/rect.h"
@@ -35,11 +37,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 namespace {
 
+// MZGram: what the app is, not the official app's description
 rpl::producer<TextWithEntities> Text1() {
-	return tr::lng_about_text1(
-		lt_api_link,
-		tr::lng_about_text1_api(tr::url(u"https://core.telegram.org/api"_q)),
-		tr::marked);
+	return MZGram::Tr("brand_about_text") | rpl::map([](QString text) {
+		return TextWithEntities{ text.replace(
+			u"{version}"_q,
+			MZGram::Branding::BaseVersionText()) };
+	});
 }
 
 rpl::producer<TextWithEntities> Text2() {
@@ -47,11 +51,11 @@ rpl::producer<TextWithEntities> Text2() {
 		lt_gpl_link,
 		rpl::single(tr::link(
 			"GNU GPL",
-			"https://github.com/telegramdesktop/tdesktop/blob/master/LICENSE")),
+			QString::fromLatin1(MZGram::Branding::kLicenseUrl))),
 		lt_github_link,
 		rpl::single(tr::link(
 			"GitHub",
-			"https://github.com/telegramdesktop/tdesktop")),
+			QString::fromLatin1(MZGram::Branding::kRepositoryUrl))),
 		tr::marked);
 }
 
@@ -110,7 +114,7 @@ void AboutBox(not_null<Ui::GenericBox*> box) {
 					"version of Telegram Desktop was copied "
 					"to the clipboard."));
 		} else {
-			File::OpenUrl(Core::App().changelogLink());
+			File::OpenUrl(QString::fromLatin1(MZGram::Branding::kReleasesUrl));
 		}
 	});
 
@@ -153,7 +157,8 @@ QString telegramFaqLink() {
 namespace {
 
 [[nodiscard]] QString CurrentVersionText(bool withCommit) {
-	auto result = QString::fromLatin1(AppVersionStr);
+	// MZGram: the MZGram version, "1.0.0 x64"
+	auto result = MZGram::Branding::CurrentVersionText();
 	if (Core::BuildIsCanary) {
 		result += Core::CanaryVersionSuffix();
 	} else if (cAlphaVersion()) {

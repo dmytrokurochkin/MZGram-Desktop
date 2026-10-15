@@ -44,6 +44,15 @@ enum class Pack {
 	Base,
 };
 
+class Instance;
+
+// MZGram: the text of a key as shown, with the app's own name made
+// MZGram's (mzgram_branding.cpp); the stored packs are kept as they are.
+[[nodiscard]] QString MZGramBrandedValue(
+	const Instance &instance,
+	ushort key,
+	const QString &value);
+
 class Instance {
 	struct PrivateTag;
 
@@ -90,7 +99,7 @@ public:
 	QString getValue(ushort key) const {
 		Expects(key < _values.size());
 
-		return _values[key];
+		return MZGramBrandedValue(*this, key, _values[key]);
 	}
 	QString getNonDefaultValue(const QByteArray &key) const;
 	bool isNonDefaultPlural(ushort key) const {

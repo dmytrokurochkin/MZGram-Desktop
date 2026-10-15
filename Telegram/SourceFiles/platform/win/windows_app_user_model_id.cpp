@@ -25,11 +25,16 @@ const PROPERTYKEY pkey_AppUserModel_ID = { { 0x9F4C2855, 0x9F79, 0x4B39, { 0xA8,
 const PROPERTYKEY pkey_AppUserModel_StartPinOption = { { 0x9F4C2855, 0x9F79, 0x4B39, { 0xA8, 0xD0, 0xE1, 0xD4, 0x2D, 0xE1, 0xD5, 0xF3 } }, 12 };
 const PROPERTYKEY pkey_AppUserModel_ToastActivator = { { 0x9F4C2855, 0x9F79, 0x4B39, { 0xA8, 0xD0, 0xE1, 0xD4, 0x2D, 0xE1, 0xD5, 0xF3 } }, 26 };
 
+// MZGram: its own app id and shortcut, so Windows shows "MZGram" on the
+// notifications and does not mix MZGram up with Telegram Desktop.
 #ifdef OS_WIN_STORE
-const WCHAR AppUserModelIdBase[] = L"Telegram.TelegramDesktop.Store";
+const WCHAR AppUserModelIdBase[] = L"MZGram.MZGramDesktop.Store";
 #else // OS_WIN_STORE
-const WCHAR AppUserModelIdBase[] = L"Telegram.TelegramDesktop";
+const WCHAR AppUserModelIdBase[] = L"MZGram.MZGramDesktop";
 #endif // OS_WIN_STORE
+constexpr auto kShortcutName = "MZGram.lnk";
+// The shortcut MZGram 1.0.0 made under Telegram's name
+constexpr auto kOldShortcutName = "Telegram.lnk";
 
 [[nodiscard]] QString PinnedIconsPath() {
 	WCHAR wstrPath[kMaxFileLen] = {};
@@ -207,13 +212,13 @@ QString systemShortcutPath() {
 	return QString();
 }
 
-void CleanupShortcut() {
+void CleanupShortcutNamed(const QString &name) {
 	const auto myid = MyExecutablePathId();
 	if (!myid) {
 		return;
 	}
 
-	QString path = systemShortcutPath() + u"Telegram.lnk"_q;
+	QString path = systemShortcutPath() + name;
 	std::wstring p = QDir::toNativeSeparators(path).toStdWString();
 
 	DWORD attributes = GetFileAttributes(p.c_str());
@@ -240,6 +245,11 @@ void CleanupShortcut() {
 	if (GetUniqueFileId(szGotPath) == myid) {
 		QFile().remove(path);
 	}
+}
+
+void CleanupShortcut() {
+	CleanupShortcutNamed(QString::fromLatin1(kShortcutName));
+	CleanupShortcutNamed(QString::fromLatin1(kOldShortcutName));
 }
 
 bool validateShortcutAt(const QString &path) {
@@ -345,10 +355,8 @@ bool checkInstalled(QString path = {}) {
 		}
 	}
 
-	const auto installed = u"Telegram Desktop/Telegram.lnk"_q;
-	const auto old = u"Telegram Win (Unofficial)/Telegram.lnk"_q;
-	return validateShortcutAt(path + installed)
-		|| validateShortcutAt(path + old);
+	const auto installed = u"MZGram Desktop/MZGram.lnk"_q;
+	return validateShortcutAt(path + installed);
 }
 
 bool ValidateShortcut() {
@@ -367,7 +375,9 @@ bool ValidateShortcut() {
 			return true;
 		}
 
-		path += u"Telegram.lnk"_q;
+		// Only a shortcut to this very exe is removed
+		CleanupShortcutNamed(QString::fromLatin1(kOldShortcutName));
+		path += QString::fromLatin1(kShortcutName);
 		if (validateShortcutAt(path)) {
 			return true;
 		}

@@ -384,8 +384,8 @@ MainMenu::MainMenu(
 	parentResized();
 
 	_telegram->setMarkedText(tr::link(
-		u"Telegram Desktop"_q,
-		u"https://desktop.telegram.org"_q));
+		u"MZGram Desktop"_q,
+		u"https://github.com/dmytrokurochkin/MZGram-Desktop"_q));
 	_telegram->setLinksTrusted();
 	// The canary version is too long for the "Version {version}" form.
 	_version->setMarkedText(
@@ -403,7 +403,8 @@ MainMenu::MainMenu(
 		.append(tr::link(tr::lng_menu_about(tr::now), 2))); // Link 2.
 	_version->setLink(
 		1,
-		std::make_shared<UrlClickHandler>(Core::App().changelogLink()));
+		std::make_shared<UrlClickHandler>(
+			u"https://github.com/dmytrokurochkin/MZGram-Desktop/releases"_q));
 	_version->setLink(
 		2,
 		std::make_shared<LambdaClickHandler>([=] {
