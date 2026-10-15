@@ -8,6 +8,8 @@ Built in CI for Windows x64, Windows ARM64 and Linux x64.
 
 ## Features
 
+Everything MZGram adds to Telegram, on Desktop and on Android, with the version each feature came in: [FEATURES.md](FEATURES.md).
+
 All MZGram features are in **Settings > MZGram**, grouped by topic. Every MZGram text is available in English and Ukrainian.
 
 ### Archive of deleted and edited messages
