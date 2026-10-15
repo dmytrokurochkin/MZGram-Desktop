@@ -92,6 +92,7 @@ void TestStripHandlesEmpty() {
 void TestEveryPhraseInBothLanguages() {
 	// Read the same in both languages.
 	const auto same = QSet<QString>{ u"settings_title"_q, u"details_id"_q };
+	const auto cyrillic = QRegularExpression(u"[\\x{0400}-\\x{04FF}]"_q);
 	const auto placeholders = [](const QString &text) {
 		auto result = QStringList();
 		auto i = QRegularExpression(u"%[0-9]"_q).globalMatch(text);
@@ -118,6 +119,13 @@ void TestEveryPhraseInBothLanguages() {
 		}
 		if (placeholders(english) != placeholders(ukrainian)) {
 			problems.push_back(key + u": placeholders differ"_q);
+		}
+		// Never part English, part Ukrainian
+		if (english.contains(cyrillic)) {
+			problems.push_back(key + u": Cyrillic in English"_q);
+		}
+		if (!same.contains(key) && !ukrainian.contains(cyrillic)) {
+			problems.push_back(key + u": not Ukrainian"_q);
 		}
 	}
 	std::printf("string table: %d phrases\n", int(keys.size()));
@@ -1023,6 +1031,9 @@ void TestFeaturesFile() {
 	}
 	if (features.contains(QRegularExpression(u"\\b[0-9a-f]{9,40}\\b"_q))) {
 		problems.push_back(u"a commit hash"_q);
+	}
+	if (!features.contains(u"MZGram interface is available in English and Ukrainian"_q)) {
+		problems.push_back(u"the languages are not named"_q);
 	}
 	if (!read(u"../../README.md"_q).contains(u"(FEATURES.md)"_q)) {
 		problems.push_back(u"not linked from the README"_q);
