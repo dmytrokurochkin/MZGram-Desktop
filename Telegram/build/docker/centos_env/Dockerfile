@@ -414,8 +414,19 @@ EOF
 
 FROM builder AS rnnoise
 RUN --mount=type=cache,target=/var/cache/ccache <<EOF
-git clone -b v0.2 --depth=1 https://github.com/xiph/rnnoise.git
-cd rnnoise
+# v0.2 does not build for aarch64: its vec_neon.h includes os_support.h,
+# which rnnoise does not have. On aarch64 the commit right after v0.2 that
+# fixes the includes is used; x86_64 stays on v0.2.
+if [ "$(uname -m)" = aarch64 ]; then
+	git init rnnoise
+	cd rnnoise
+	git remote add origin https://github.com/xiph/rnnoise.git
+	git fetch --depth=1 origin 372f7b4b76cde4ca1ec4605353dd17898a99de38
+	git reset --hard FETCH_HEAD
+else
+	git clone -b v0.2 --depth=1 https://github.com/xiph/rnnoise.git
+	cd rnnoise
+fi
 ./autogen.sh
 ./configure --enable-static --disable-shared
 make -j$(nproc)
