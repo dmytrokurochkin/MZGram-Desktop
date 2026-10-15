@@ -331,6 +331,9 @@ const std::vector<Phrase> kPhrases = {
 	{ "replaced_at", "Replaced %1", "Замінено %1" },
 	{ "empty_text", "(empty)", "(порожньо)" },
 	{ "current_version", "Current", "Поточна" },
+	// Branding (mzgram_branding.cpp, about_box.cpp)
+	{ "brand_about_text", "Unofficial messaging client based on Telegram Desktop {version}.", "Неофіційний клієнт для обміну повідомленнями на базі Telegram Desktop {version}." },
+	{ "brand_intro_about", "Welcome to MZGram Desktop,\nan unofficial client for Telegram.", "Ласкаво просимо до MZGram Desktop,\nнеофіційного клієнта Telegram." },
 };
 
 const std::map<std::string, const Phrase*> &Index() {

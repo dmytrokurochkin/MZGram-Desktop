@@ -22,6 +22,8 @@ nice_target_sources(mzgram_tests ${src_loc}
 PRIVATE
     mzgram/mzgram_archive_rules.cpp
     mzgram/mzgram_archive_rules.h
+    mzgram/mzgram_branding_rules.cpp
+    mzgram/mzgram_branding_rules.h
     mzgram/mzgram_lang.h
     mzgram/mzgram_lang_table.cpp
     mzgram/mzgram_local_pins_rules.cpp

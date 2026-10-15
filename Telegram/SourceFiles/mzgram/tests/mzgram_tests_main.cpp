@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "base/basic_types.h"
 #include "mzgram/mzgram_archive_rules.h"
+#include "mzgram/mzgram_branding_rules.h"
 #include "mzgram/mzgram_lang.h"
 #include "mzgram/mzgram_local_pins_rules.h"
 #include "mzgram/mzgram_presence_rules.h"
@@ -870,6 +871,98 @@ void TestLocalPinsAreWired() {
 		problems.join(u", "_q).toStdString().c_str());
 }
 
+// MZGram's own name (mzgram_branding_rules.h).
+void TestBrandingRules() {
+	using namespace MZGram::Branding;
+	Check(VersionText(1000099) == u"1.0.0"_q, "branding: a stable version", VersionText(1000099).toStdString().c_str());
+	Check(VersionText(1010002) == u"1.1.0 beta 2"_q, "branding: a beta version", VersionText(1010002).toStdString().c_str());
+	Check(VersionText(0).isEmpty(), "branding: no version in a local build", "");
+	Check(Rename(u"Quit Telegram"_q) == u"Quit MZGram"_q, "branding: the app's name", "");
+	Check(Rename(u"Please don't quit Telegram Desktop"_q) == u"Please don't quit MZGram Desktop"_q, "branding: the desktop app's name", "");
+	Check(Rename(QString::fromUtf8("Вийти з Telegram")) == QString::fromUtf8("Вийти з MZGram"), "branding: the name in a cloud pack", "");
+	Check(Rename(u"install it from https://desktop.telegram.org"_q).contains(u"desktop.telegram.org"_q), "branding: links stay", "");
+	auto missing = QStringList();
+	for (const auto &replaced : ReplacedKeys()) {
+		if (MZGram::Translate(replaced.phrase, false) == QString::fromUtf8(replaced.phrase)) {
+			missing.push_back(QString::fromUtf8(replaced.phrase));
+		}
+	}
+	Check(missing.isEmpty() && RenamedKeys().size() > 10, "branding: replaced texts are in the string table", missing.join(u", "_q).toStdString().c_str());
+}
+
+// About and the first screen call MZGram unofficial and never official.
+void TestBrandingPhrases() {
+	const auto officialEnglish = QRegularExpression(u"\\bofficial\\b"_q, QRegularExpression::CaseInsensitiveOption);
+	const auto officialUkrainian = QRegularExpression(QString::fromUtf8("(?<![а-яіїєґА-ЯІЇЄҐ])[оО]фіційн"));
+	auto problems = QStringList();
+	for (const auto key : { "brand_about_text", "brand_intro_about" }) {
+		for (const auto ukrainian : { false, true }) {
+			const auto text = MZGram::Translate(key, ukrainian);
+			if (text.contains(officialEnglish) || text.contains(officialUkrainian)) {
+				problems.push_back(QString::fromUtf8(key) + (ukrainian ? u" uk"_q : u" en"_q) + u": official"_q);
+			}
+		}
+	}
+	if (!MZGram::Translate("brand_about_text", false).contains(u"Unofficial"_q)
+		|| !MZGram::Translate("brand_about_text", true).contains(QString::fromUtf8("Неофіційний"))
+		|| !MZGram::Translate("brand_about_text", false).contains(u"Telegram Desktop {version}"_q)
+		|| !MZGram::Translate("brand_about_text", true).contains(u"Telegram Desktop {version}"_q)) {
+		problems.push_back(u"About does not say unofficial, based on Telegram Desktop"_q);
+	}
+	if (!MZGram::Translate("brand_intro_about", false).contains(u"MZGram"_q)
+		|| !MZGram::Translate("brand_intro_about", true).contains(u"MZGram"_q)) {
+		problems.push_back(u"the first screen does not name MZGram"_q);
+	}
+	Check(problems.isEmpty(), "branding: About is unofficial, in English and Ukrainian", problems.join(u", "_q).toStdString().c_str());
+}
+
+// The name in the windows, About, menus, notifications and the exe.
+void TestBrandingIsWired() {
+	const auto read = [](const QString &path) {
+		auto file = QFile(QString::fromUtf8(MZGRAM_SOURCE_DIR) + '/' + path);
+		return file.open(QIODevice::ReadOnly)
+			? QString::fromUtf8(file.readAll()).replace(u"\r\n"_q, u"\n"_q)
+			: QString();
+	};
+	auto problems = QStringList();
+	if (!read(u"lang/lang_instance.h"_q).contains(u"return MZGramBrandedValue(*this, key, _values[key]);"_q)) {
+		problems.push_back(u"lang texts not renamed"_q);
+	}
+	const auto about = read(u"boxes/about_box.cpp"_q);
+	if (!about.contains(u"MZGram::Tr(\"brand_about_text\")"_q)
+		|| !about.contains(u"MZGram::Branding::kRepositoryUrl"_q)
+		|| !about.contains(u"MZGram::Branding::kLicenseUrl"_q)
+		|| !about.contains(u"MZGram::Branding::CurrentVersionText()"_q)
+		|| about.contains(u"core.telegram.org/api"_q)
+		|| about.contains(u"\"https://github.com/telegramdesktop/tdesktop\""_q)) {
+		problems.push_back(u"About"_q);
+	}
+	for (const auto &path : { u"window/main_window.cpp"_q, u"window/window_saved_windows.cpp"_q, u"window/window_restore_shell.cpp"_q }) {
+		if (read(path).contains(u"u\"Telegram\"_q"_q)) {
+			problems.push_back(path + u": Telegram title"_q);
+		}
+	}
+	for (const auto &path : { u"window/notifications_manager_default.cpp"_q, u"settings/sections/settings_notifications.cpp"_q, u"intro/intro_start.cpp"_q, u"window/window_main_menu.cpp"_q }) {
+		if (read(path).contains(u"u\"Telegram Desktop\"_q"_q)) {
+			problems.push_back(path + u": Telegram Desktop"_q);
+		}
+	}
+	const auto appId = read(u"platform/win/windows_app_user_model_id.cpp"_q);
+	if (!appId.contains(u"L\"MZGram.MZGramDesktop\""_q) || appId.contains(u"L\"Telegram.TelegramDesktop\""_q)) {
+		problems.push_back(u"Windows app id"_q);
+	}
+	const auto rc = read(u"../Resources/winrc/Telegram.rc"_q);
+	if (!rc.contains(u"VALUE \"FileDescription\", \"MZGram Desktop\""_q)
+		|| !rc.contains(u"VALUE \"ProductName\", \"MZGram Desktop\""_q)
+		|| !rc.contains(u"VALUE \"CompanyName\", \"MZGram\""_q)) {
+		problems.push_back(u"exe properties"_q);
+	}
+	if (!read(u"core/version.h"_q).contains(u"AppName = \"MZGram Desktop\"_cs"_q)) {
+		problems.push_back(u"AppName"_q);
+	}
+	Check(problems.isEmpty(), "branding: MZGram in the windows, About, menus, notifications and the exe", problems.join(u", "_q).toStdString().c_str());
+}
+
 // Telegram Desktop's updater is off in the code itself, and the MZGram
 // check starts with the app and shows its bar in the chat list.
 void TestUpdateIsWired() {
@@ -936,6 +1029,9 @@ int main() {
 		TestUpdateOffer,
 		TestUpdateDue,
 		TestUpdateIsWired,
+		TestBrandingRules,
+		TestBrandingPhrases,
+		TestBrandingIsWired,
 		TestLocalPinsRule,
 		TestLocalPinsSortPosition,
 		TestLocalPinsStorage,
