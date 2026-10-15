@@ -155,7 +155,7 @@ jobs:
           -D CMAKE_C_FLAGS_DEBUG="-O0 -fpch-preprocess" \
           -D CMAKE_CXX_FLAGS_DEBUG="-O0 -fpch-preprocess" \
           $MZGRAM_API \
-          -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON \
+          -D DESKTOP_APP_DISABLE_AUTOUPDATE=OFF \
           -D MZGRAM_VERSION_CODE=$MZGRAM_CODE \
           -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON
 
@@ -184,9 +184,10 @@ jobs:
       - name: Collect artifact.
         run: |
           test -f out/Debug/MZGram
+          test -f out/Debug/Updater
           mkdir artifact
-          file out/Debug/MZGram
-          tar -czf artifact/MZGram-Linux-${{ matrix.arch }}-Debug.tar.gz -C out/Debug MZGram
+          file out/Debug/MZGram out/Debug/Updater
+          tar -czf artifact/MZGram-Linux-${{ matrix.arch }}-Debug.tar.gz -C out/Debug MZGram Updater
 
       - name: Upload artifact.
         uses: actions/upload-artifact@v7

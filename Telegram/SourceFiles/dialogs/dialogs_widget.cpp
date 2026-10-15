@@ -680,6 +680,11 @@ Widget::Widget(
 			if (release) {
 				_mzgramUpdate = MZGram::Update::CreateBar(this, *release);
 				_mzgramUpdate->show();
+				// Taller with a longer text (the progress and errors)
+				_mzgramUpdate->heightValue(
+				) | rpl::skip(1) | rpl::on_next([=] {
+					updateControlsGeometry();
+				}, _mzgramUpdate->lifetime());
 				if (_connecting) {
 					_connecting->raise();
 				}

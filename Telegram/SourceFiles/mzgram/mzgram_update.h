@@ -30,6 +30,8 @@ void Start();
 // The release the bar at the bottom of the chat list shows, if any.
 [[nodiscard]] rpl::producer<std::optional<Release>> Available();
 
+// Update in the bar: mzgram_self_update.h.
+
 // Opens the release page in the browser and hides the bar for this run.
 void OpenReleasePage(const Release &release);
 

@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "mzgram/mzgram_update.h"
 
+#include "mzgram/mzgram_self_update.h"
 #include "base/algorithm.h"
 #include "base/call_delayed.h"
 #include "base/options.h"
@@ -37,8 +38,8 @@ const char kOptionCheckUpdates[] = "mzgram-check-updates";
 base::options::toggle OptionCheckUpdates({
 	.id = kOptionCheckUpdates,
 	.name = "Check for MZGram updates",
-	.description = "Look for a newer stable MZGram release on GitHub "
-		"and show a bar with a link to its page",
+	.description = "Look for a newer stable MZGram release on GitHub, "
+		"show a bar about it and install it from GitHub on Update",
 	.defaultValue = true,
 });
 
@@ -184,6 +185,7 @@ qint64 InstalledCode() {
 }
 
 void Start() {
+	CheckRolledBack();
 	Instance().start();
 }
 
@@ -193,10 +195,12 @@ rpl::producer<std::optional<Release>> Available() {
 
 void OpenReleasePage(const Release &release) {
 	File::OpenUrl(release.url);
+	ResetStatus();
 	Instance().hide();
 }
 
 void Dismiss(const Release &release) {
+	ResetStatus();
 	Instance().dismiss(release);
 }
 

@@ -199,7 +199,8 @@ Each item has its own switch.
 
 | Feature | What it does, and how it differs from Telegram | Since |
 |---|---|---|
-| MZGram update bar | Every few hours MZGram checks its latest stable release on GitHub and shows a bar in the chat list when a newer one is out; it opens the release page and downloads nothing. Telegram Desktop's own updater is turned off. Can be switched off. | 1.0.0 |
+| MZGram update bar | Every few hours MZGram checks its latest stable release on GitHub and shows a bar in the chat list when a newer one is out; Close hides that version. Telegram Desktop's own update checks are turned off. Can be switched off. | 1.0.0 |
+| Self-update | Update in the bar downloads the archive of that release for this system and architecture (Windows x64 or ARM64 zip, Linux x64 or ARM64 tar.xz) only from the MZGram-Desktop releases on GitHub over HTTPS, checks its SHA-256 against the release's SHA256SUMS and GitHub's digest, unpacks it and restarts; the Updater copies the new files, backs up every file it replaces and puts them back if a copy fails, so the old version keeps working. The data folder is not touched. Progress is shown in the bar; a file that fails the check is deleted and nothing is installed; on an error: Retry or the release page. When the MZGram folder cannot be written, the bar says so and offers the release page. Turned off with the update bar. The version before it is installed by hand once. | Next release |
 | Own data folder | MZGram keeps its data apart from Telegram Desktop, so both can be installed. | 1.0.0 |
 | MZGram name | Window titles, the About box ("MZGram Desktop X.Y.Z, an unofficial client based on Telegram Desktop", GPL, GitHub), menus, tray, notifications, the Windows app id and Start menu shortcut, and the exe properties say MZGram, in every language. The Telegram service keeps its name. | Next release |
 
@@ -241,6 +242,6 @@ Yes: present. No: absent. Partly: present in a narrower form.
 | UnifiedPush notifications | Yes | No |
 | Interface in English and Ukrainian, complete in both | Next release | Yes |
 | MZGram update banner, Telegram's updater off | Yes | Yes |
-| Self-update from GitHub with a SHA-256 check | Next release | No |
+| Self-update from GitHub with a SHA-256 check | Next release | Next release |
 | MZGram name everywhere | Next release | Next release |
 | ARM64 builds | Yes (the APK) | Windows yes, Linux next release |

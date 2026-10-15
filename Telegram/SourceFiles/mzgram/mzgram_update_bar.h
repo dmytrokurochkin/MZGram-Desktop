@@ -17,7 +17,9 @@ class RpWidget;
 namespace MZGram::Update {
 
 // The bar at the bottom of the chat list: "MZGram X.Y.Z update available",
-// Update (opens the release page) and Close (hides that version for good).
+// Update (downloads and installs it, mzgram_self_update.h, with the
+// progress in the bar) and Close (hides that version for good). After a
+// failure: Retry and the release page.
 [[nodiscard]] object_ptr<Ui::RpWidget> CreateBar(
 	not_null<QWidget*> parent,
 	const Release &release);

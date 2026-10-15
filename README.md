@@ -62,7 +62,9 @@ All MZGram features are in **Settings > MZGram**, grouped by topic. Every MZGram
 
 ## Download
 
-Releases will be published on the [Releases](https://github.com/dmytrokurochkin/MZGram-Desktop/releases) page. There are no releases yet.
+Releases are published on the [Releases](https://github.com/dmytrokurochkin/MZGram-Desktop/releases) page: a zip for Windows x64 and ARM64, a tar.xz for Linux x64 and ARM64, the source and `SHA256SUMS`.
+
+MZGram updates itself from this page: when a newer stable release is out, Update in the bar downloads the archive for this system from GitHub, checks it against `SHA256SUMS` and installs it with the Updater, which backs up the files it replaces and puts them back if anything fails. Your data is not touched. The first version that can do this is installed by hand once. When the MZGram folder cannot be written, the bar offers the release page instead. Settings > MZGram turns the check off.
 
 ## Build
 

@@ -299,7 +299,7 @@ jobs:
           %MZGRAM_API% ^
           -D CMAKE_CONFIGURATION_TYPES=Release ^
           -D CMAKE_MSVC_DEBUG_INFORMATION_FORMAT= ^
-          -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON ^
+          -D DESKTOP_APP_DISABLE_AUTOUPDATE=OFF ^
           -D MZGRAM_VERSION_CODE=${{ needs.version.outputs.code }} ^
           -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON ^
           -D DESKTOP_APP_TEST_APPS=ON
@@ -319,11 +319,15 @@ jobs:
           ls -la "$OUT"
           mkdir -p "$RUNNER_TEMP/pkg/MZGram" dist
           cp "$OUT/MZGram.exe" "$RUNNER_TEMP/pkg/MZGram/"
+          # The Updater installs the next release over this one (self-update)
+          cp "$OUT/Updater.exe" "$RUNNER_TEMP/pkg/MZGram/"
           # d3dcompiler for the OpenGL renderer on systems without it, as upstream ships it
           [ ! -d "$OUT/modules" ] || cp -r "$OUT/modules" "$RUNNER_TEMP/pkg/MZGram/"
           ZIP="MZGram-Desktop-$VERSION-windows-${{ matrix.arch }}.zip"
           pwsh -NoProfile -Command "Compress-Archive -Path '$(cygpath -w "$RUNNER_TEMP/pkg/MZGram")' -DestinationPath '$(cygpath -w "$GITHUB_WORKSPACE/dist/$ZIP")' -CompressionLevel Optimal"
           ls -la dist "$RUNNER_TEMP/pkg/MZGram"
+          # The self-update needs both, under MZGram/
+          python -c "import sys, zipfile; names = zipfile.ZipFile(sys.argv[1]).namelist(); print(names); assert 'MZGram/MZGram.exe' in names and 'MZGram/Updater.exe' in names" "dist/$ZIP"
 
       - name: Upload.
         uses: actions/upload-artifact@v7
@@ -427,7 +431,7 @@ jobs:
           /usr/src/tdesktop/Telegram/build/docker/centos_env/build.sh \
           -D CMAKE_CONFIGURATION_TYPES=Release \
           $MZGRAM_API \
-          -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON \
+          -D DESKTOP_APP_DISABLE_AUTOUPDATE=OFF \
           -D MZGRAM_VERSION_CODE=${{ needs.version.outputs.code }} \
           -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON
 
@@ -438,11 +442,17 @@ jobs:
         run: |
           ls -la out/Release
           test -f out/Release/MZGram
+          test -f out/Release/Updater
           mkdir -p "$RUNNER_TEMP/pkg/MZGram" dist
           cp out/Release/MZGram "$RUNNER_TEMP/pkg/MZGram/"
-          file out/Release/MZGram
+          # The Updater installs the next release over this one (self-update)
+          cp out/Release/Updater "$RUNNER_TEMP/pkg/MZGram/"
+          file out/Release/MZGram out/Release/Updater
           tar -cJf "dist/MZGram-Desktop-$VERSION-linux-${{ matrix.arch }}.tar.xz" -C "$RUNNER_TEMP/pkg" MZGram
           tar -tvJf "dist/MZGram-Desktop-$VERSION-linux-${{ matrix.arch }}.tar.xz"
+          # The self-update needs both, under MZGram/
+          tar -tJf "dist/MZGram-Desktop-$VERSION-linux-${{ matrix.arch }}.tar.xz" | grep -qx 'MZGram/MZGram'
+          tar -tJf "dist/MZGram-Desktop-$VERSION-linux-${{ matrix.arch }}.tar.xz" | grep -q 'MZGram/Updater$'
 
       - name: Upload.
         uses: actions/upload-artifact@v7

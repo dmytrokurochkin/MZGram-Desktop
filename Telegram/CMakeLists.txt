@@ -1552,12 +1552,17 @@ PRIVATE
     mzgram/mzgram_protected_content.h
     mzgram/mzgram_protected_copy.cpp
     mzgram/mzgram_protected_copy.h
+    mzgram/mzgram_self_update.cpp
+    mzgram/mzgram_self_update.h
+    mzgram/mzgram_self_update_rules.cpp
+    mzgram/mzgram_self_update_rules.h
     mzgram/mzgram_text_filters.cpp
     mzgram/mzgram_text_filters.h
     mzgram/mzgram_update.cpp
     mzgram/mzgram_update.h
     mzgram/mzgram_update_bar.cpp
     mzgram/mzgram_update_bar.h
+    mzgram/mzgram_update_install.h
     mzgram/mzgram_update_rules.cpp
     mzgram/mzgram_update_rules.h
     mzgram/mzgram_qr_scan.cpp
@@ -2640,7 +2645,10 @@ if (NOT DESKTOP_APP_DISABLE_AUTOUPDATE AND NOT build_macstore AND NOT build_wins
         _other/updater_linux.cpp
         _other/updater_osx.m
         _other/updater.h
+        mzgram/mzgram_update_install.h
     )
+    # MZGram: the backup and rollback of an update (mzgram_update_install.h)
+    target_include_directories(Updater PRIVATE ${src_loc})
 
     set_target_properties(Updater PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY ${output_folder}

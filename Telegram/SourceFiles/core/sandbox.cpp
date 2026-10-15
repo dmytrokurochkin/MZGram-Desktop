@@ -22,6 +22,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/local_url_handlers.h"
 #include "core/update_checker.h"
 #include "core/deadlock_detector.h"
+#include "mzgram/mzgram_self_update.h"
 #include "base/timer.h"
 #include "base/concurrent_timer.h"
 #include "base/invoke_queued.h"
@@ -431,7 +432,8 @@ void Sandbox::socketError(QLocalSocket::LocalSocketError e) {
 	}
 #endif // !Q_OS_WINRT
 
-	if (!Core::UpdaterDisabled()
+	// MZGram: also an update MZGram prepared, Telegram's updater is off
+	if ((!Core::UpdaterDisabled() || MZGram::Update::PreparedReady())
 		&& !cNoStartUpdate()
 		&& Core::checkReadyUpdate()) {
 		cSetRestartingUpdate(true);

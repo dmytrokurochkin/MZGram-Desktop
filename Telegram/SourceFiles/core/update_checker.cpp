@@ -21,6 +21,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/update_keys.h"
 #include "core/update_verify.h"
 #include "core/version.h"
+#include "mzgram/mzgram_self_update_rules.h"
+#include "mzgram/mzgram_update.h"
 #include "data/data_channel.h"
 #include "data/data_session.h"
 #include "mainwindow.h"
@@ -2252,9 +2254,18 @@ bool checkReadyUpdate() {
 		return false;
 	}
 
+	// MZGram: an update MZGram prepared (mzgram_self_update.h) carries the
+	// MZGram code of its release, not Telegram's version, which they share.
+	const auto mzgramCode = MZGram::Update::PreparedCode(readyPath);
+	if (mzgramCode > 0 && mzgramCode <= MZGram::Update::InstalledCode()) {
+		LOG(("Update Error: cant install MZGram %1 having %2").arg(mzgramCode).arg(MZGram::Update::InstalledCode()));
+		ClearAll();
+		return false;
+	}
+
 	// check ready version
 	QString versionPath = readyPath + u"/tdata/version"_q;
-	{
+	if (mzgramCode <= 0) {
 		QFile fVersion(versionPath);
 		if (!fVersion.open(QIODevice::ReadOnly)) {
 			LOG(("Update Error: cant read version file '%1'").arg(versionPath));

@@ -197,7 +197,7 @@ jobs:
           %MZGRAM_API% ^
           -D CMAKE_CONFIGURATION_TYPES=Debug ^
           -D CMAKE_MSVC_DEBUG_INFORMATION_FORMAT= ^
-          -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON ^
+          -D DESKTOP_APP_DISABLE_AUTOUPDATE=OFF ^
           -D MZGRAM_VERSION_CODE=%MZGRAM_CODE% ^
           -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON ^
           -D DESKTOP_APP_TEST_APPS=ON
@@ -215,6 +215,7 @@ jobs:
           set OUT=%TBUILD%\%REPO_NAME%\out\Debug
           mkdir artifact
           move %OUT%\MZGram.exe artifact\
+          move %OUT%\Updater.exe artifact\
 
       - name: Upload artifact.
         uses: actions/upload-artifact@v7

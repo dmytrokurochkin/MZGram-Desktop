@@ -298,6 +298,42 @@ const std::vector<Phrase> kPhrases = {
 	{ "update_available", "MZGram %1 update available", "Доступне оновлення MZGram %1" },
 	{ "update_open", "Update", "Оновити" },
 	{ "update_close", "Close", "Закрити" },
+	{ "update_retry", "Retry", "Повторити" },
+	{ "update_page", "Release page", "Сторінка релізу" },
+	{ "update_downloading",
+		"Downloading MZGram %1: %2%",
+		"Завантаження MZGram %1: %2%" },
+	{ "update_verifying",
+		"Checking the SHA-256 of MZGram %1...",
+		"Перевірка SHA-256 для MZGram %1..." },
+	{ "update_installing",
+		"Restarting to install MZGram %1...",
+		"Перезапуск для встановлення MZGram %1..." },
+	{ "update_failed_network",
+		"MZGram %1 could not be downloaded. Check the connection and try "
+		"again.",
+		"Не вдалося завантажити MZGram %1. Перевірте з’єднання і спробуйте "
+		"ще раз." },
+	{ "update_failed_checksum",
+		"The MZGram %1 archive did not pass the SHA-256 check and was "
+		"deleted. Nothing was installed.",
+		"Архів MZGram %1 не пройшов перевірку SHA-256 і був видалений. "
+		"Нічого не встановлено." },
+	{ "update_failed_unpack",
+		"The MZGram %1 archive could not be prepared for installing. "
+		"Nothing was installed.",
+		"Архів MZGram %1 не вдалося підготувати до встановлення. Нічого не "
+		"встановлено." },
+	{ "update_not_writable",
+		"MZGram cannot update itself here: its folder cannot be written. "
+		"MZGram %1 can be installed from the release page.",
+		"MZGram не може оновитися тут: у його папку не можна записувати. "
+		"MZGram %1 можна встановити зі сторінки релізу." },
+	{ "update_rolled_back",
+		"MZGram %1 could not be installed, so the previous version was "
+		"put back and kept. It can be installed from the release page.",
+		"Не вдалося встановити MZGram %1, тому попередню версію повернуто "
+		"і збережено. Нову можна встановити зі сторінки релізу." },
 	{ "pin_locally", "Pin in MZGram only", "Закріпити лише в MZGram" },
 	{ "unpin_locally", "Unpin from MZGram", "Відкріпити з MZGram" },
 	{ "pinned_locally",

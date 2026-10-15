@@ -12,11 +12,15 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "mzgram/mzgram_local_pins_rules.h"
 #include "mzgram/mzgram_presence_rules.h"
 #include "mzgram/mzgram_protected_content.h"
+#include "mzgram/mzgram_self_update_rules.h"
 #include "mzgram/mzgram_text_filters.h"
+#include "mzgram/mzgram_update_install.h"
 #include "mzgram/mzgram_update_rules.h"
 
+#include <QtCore/QDir>
 #include <QtCore/QDirIterator>
 #include <QtCore/QFile>
+#include <QtCore/QTemporaryDir>
 #include <QtCore/QRegularExpression>
 #include <QtCore/QSet>
 #include <QtCore/QString>
@@ -26,6 +30,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <cstdio>
 #include <functional>
 #include <string>
+#include <tuple>
 #include <vector>
 
 namespace {
@@ -1041,6 +1046,295 @@ void TestFeaturesFile() {
 	Check(problems.isEmpty(), "FEATURES.md has Android, Desktop and the comparison", problems.join(u", "_q).toStdString().c_str());
 }
 
+// Self-update: the archive for this system and architecture, only from
+// this repository's releases on GitHub over https.
+void TestSelfUpdateArchiveChoice() {
+	using namespace MZGram::Update;
+	const auto asset = [](const QString &name) {
+		return Asset{ .name = name, .url = QString::fromLatin1(kDownloadPrefix) + u"v1.2.0/"_q + name };
+	};
+	const auto assets = std::vector<Asset>{
+		asset(u"MZGram-Desktop-1.2.0-windows-x64.zip"_q),
+		asset(u"MZGram-Desktop-1.2.0-windows-arm64.zip"_q),
+		asset(u"MZGram-Desktop-1.2.0-linux-x64.tar.xz"_q),
+		asset(u"MZGram-Desktop-1.2.0-linux-arm64.tar.xz"_q),
+		asset(u"MZGram-Desktop-1.2.0-source.tar.xz"_q),
+		asset(u"SHA256SUMS"_q),
+	};
+	const auto name = [&](System system, Arch arch) {
+		const auto chosen = ChooseArchive(assets, u"1.2.0"_q, system, arch);
+		return chosen ? chosen->name : QString();
+	};
+	auto problems = QStringList();
+	if (name(System::Windows, Arch::X64) != u"MZGram-Desktop-1.2.0-windows-x64.zip"_q
+		|| name(System::Windows, Arch::Arm64) != u"MZGram-Desktop-1.2.0-windows-arm64.zip"_q
+		|| name(System::Linux, Arch::X64) != u"MZGram-Desktop-1.2.0-linux-x64.tar.xz"_q
+		|| name(System::Linux, Arch::Arm64) != u"MZGram-Desktop-1.2.0-linux-arm64.tar.xz"_q) {
+		problems.push_back(u"wrong archive"_q);
+	}
+	if (!name(System::Other, Arch::X64).isEmpty()
+		|| !name(System::Windows, Arch::Other).isEmpty()
+		|| ChooseArchive(assets, u"1.3.0"_q, System::Windows, Arch::X64)) {
+		problems.push_back(u"an archive for another build"_q);
+	}
+	if (!FindAsset(assets, u"SHA256SUMS"_q)) {
+		problems.push_back(u"no SHA256SUMS"_q);
+	}
+	const auto json = QByteArray(R"({"tag_name":"v1.2.0","assets":[{"name":"SHA256SUMS","browser_download_url":"https://github.com/dmytrokurochkin/MZGram-Desktop/releases/download/v1.2.0/SHA256SUMS","size":200,"digest":"sha256:ab"}]})");
+	const auto parsed = ParseAssets(json);
+	if (parsed.size() != 1 || parsed[0].size != 200 || parsed[0].digest != u"sha256:ab"_q) {
+		problems.push_back(u"assets not parsed"_q);
+	}
+	Check(problems.isEmpty(), "self-update: the archive for each system and architecture", problems.join(u", "_q).toStdString().c_str());
+}
+
+void TestSelfUpdateOnlyThisRepository() {
+	using namespace MZGram::Update;
+	auto problems = QStringList();
+	for (const auto &ok : {
+		u"https://github.com/dmytrokurochkin/MZGram-Desktop/releases/download/v1.2.0/a.zip"_q,
+		u"https://objects.githubusercontent.com/github-production-release-asset/1"_q,
+		u"https://release-assets.githubusercontent.com/github-production-release-asset/1"_q,
+		u"https://api.github.com/repos/dmytrokurochkin/MZGram-Desktop/releases/tags/v1.2.0"_q,
+	}) {
+		if (!AllowedUrl(ok)) {
+			problems.push_back(u"refused "_q + ok);
+		}
+	}
+	for (const auto &bad : {
+		u"http://github.com/dmytrokurochkin/MZGram-Desktop/releases/download/v1.2.0/a.zip"_q,
+		u"https://example.com/a.zip"_q,
+		u"https://github.com.example.com/a.zip"_q,
+		u"https://user@github.com/a.zip"_q,
+		u"https://github.com:8443/a.zip"_q,
+		u"https://updates.tdesktop.com/tsetup/a.zip"_q,
+		u"not an address"_q,
+	}) {
+		if (AllowedUrl(bad)) {
+			problems.push_back(u"allowed "_q + bad);
+		}
+	}
+	const auto prefix = QString::fromLatin1(kDownloadPrefix);
+	if (!ReleaseFile(prefix + u"v1.2.0/a.zip"_q, u"v1.2.0"_q)
+		|| ReleaseFile(prefix + u"v1.1.0/a.zip"_q, u"v1.2.0"_q)
+		|| ReleaseFile(u"https://github.com/someone/MZGram-Desktop/releases/download/v1.2.0/a.zip"_q, u"v1.2.0"_q)
+		|| ReleaseFile(u"https://github.com/telegramdesktop/tdesktop/releases/download/v1.2.0/a.zip"_q, u"v1.2.0"_q)) {
+		problems.push_back(u"a file of another release or repository"_q);
+	}
+	Check(problems.isEmpty(), "self-update: only this repository on GitHub, over https", problems.join(u", "_q).toStdString().c_str());
+}
+
+// The archive must match SHA256SUMS and the GitHub digest.
+void TestSelfUpdateChecksum() {
+	using namespace MZGram::Update;
+	const auto good = QString(64, 'a');
+	const auto other = QString(64, 'b');
+	const auto sums = ParseSums((good + u"  MZGram-Desktop-1.2.0-windows-x64.zip\n"_q
+		+ other.toUpper() + u" *MZGram-Desktop-1.2.0-linux-x64.tar.xz\nbroken\n"_q).toUtf8());
+	auto problems = QStringList();
+	if (sums.size() != 2
+		|| sums.at(u"MZGram-Desktop-1.2.0-windows-x64.zip"_q) != good
+		|| sums.at(u"MZGram-Desktop-1.2.0-linux-x64.tar.xz"_q) != other) {
+		problems.push_back(u"SHA256SUMS not read"_q);
+	}
+	if (!HashMatches(good, good, QString())
+		|| !HashMatches(good, good.toUpper(), u"sha256:"_q + good)) {
+		problems.push_back(u"a good file refused"_q);
+	}
+	if (HashMatches(other, good, QString())
+		|| HashMatches(good, good, u"sha256:"_q + other)
+		|| HashMatches(good, QString(), QString())
+		|| HashMatches(QString(), good, QString())) {
+		problems.push_back(u"a corrupt file accepted"_q);
+	}
+	Check(problems.isEmpty(), "self-update: SHA-256 against SHA256SUMS and the digest", problems.join(u", "_q).toStdString().c_str());
+}
+
+// Archive entries stay inside the app folder and never reach tdata.
+void TestSelfUpdateEntries() {
+	using namespace MZGram::Update;
+	auto problems = QStringList();
+	const auto expect = [&](const QString &entry, const QString &path) {
+		if (EntryPath(entry) != path) {
+			problems.push_back(entry + u" -> "_q + EntryPath(entry));
+		}
+	};
+	expect(u"MZGram/"_q, u"/"_q);
+	expect(u"MZGram/MZGram.exe"_q, u"MZGram.exe"_q);
+	expect(u"MZGram\\Updater.exe"_q, u"Updater.exe"_q);
+	expect(u"MZGram/modules/x64/d3d/d3dcompiler_47.dll"_q, u"modules/x64/d3d/d3dcompiler_47.dll"_q);
+	expect(u"MZGram/modules/"_q, u"modules/"_q);
+	for (const auto &bad : {
+		u"MZGram.exe"_q,
+		u"Other/MZGram.exe"_q,
+		u"/MZGram/MZGram.exe"_q,
+		u"MZGram/../evil.exe"_q,
+		u"MZGram/a/../../evil.exe"_q,
+		u"MZGram/C:/evil.exe"_q,
+		u"MZGram//evil.exe"_q,
+		u"MZGram/tdata/settings"_q,
+		u"MZGram/TData/key_datas"_q,
+		u"MZGram/tdata/"_q,
+	}) {
+		expect(bad, QString());
+	}
+	Check(problems.isEmpty(), "self-update: archive entries stay in the app folder, never tdata", problems.join(u", "_q).toStdString().c_str());
+}
+
+// The MZGram code of a prepared update, in its own tdata (never copied).
+void TestSelfUpdatePreparedCode() {
+	using namespace MZGram::Update;
+	auto folder = QTemporaryDir();
+	auto problems = QStringList();
+	if (PreparedCode(folder.path()) != -1) {
+		problems.push_back(u"a code without the file"_q);
+	}
+	QDir().mkpath(folder.path() + u"/tdata"_q);
+	auto file = QFile(folder.path() + '/' + QString::fromLatin1(kPreparedCodeFile));
+	if (file.open(QIODevice::WriteOnly)) {
+		file.write("1020099");
+		file.close();
+	}
+	if (PreparedCode(folder.path()) != 1020099) {
+		problems.push_back(u"the code not read"_q);
+	}
+	if (QString::fromLatin1(kPreparedCodeFile).left(6) != u"tdata/"_q) {
+		problems.push_back(u"the code would be copied into the app folder"_q);
+	}
+	Check(problems.isEmpty(), "self-update: the prepared update carries the MZGram code", problems.join(u", "_q).toStdString().c_str());
+}
+
+// The Updater backs up every file it replaces and puts everything back
+// when a copy fails (mzgram_update_install.h).
+void TestUpdateInstallRollsBack() {
+	using namespace MZGram::UpdateInstall;
+	auto problems = QStringList();
+	const auto read = [](const std::string &path) {
+		auto file = QFile(QString::fromStdString(path));
+		return file.open(QIODevice::ReadOnly) ? file.readAll() : QByteArray("<none>");
+	};
+	const auto write = [](const std::string &path, const QByteArray &content) {
+		auto file = QFile(QString::fromStdString(path));
+		return file.open(QIODevice::WriteOnly) && (file.write(content) == content.size());
+	};
+	const auto run = [&](int failAt, bool halfWrite) {
+		auto folder = QTemporaryDir();
+		const auto root = folder.path().toStdString();
+		QDir().mkpath(QString::fromStdString(root + "/app"));
+		QDir().mkpath(QString::fromStdString(root + "/update"));
+		QDir().mkpath(QString::fromStdString(root + "/backup"));
+		write(root + "/app/MZGram.exe", "old exe");
+		write(root + "/app/lib.dll", "old lib");
+		write(root + "/app/tdata_marker", "user data");
+		write(root + "/update/MZGram.exe", "new exe");
+		write(root + "/update/lib.dll", "new lib");
+		write(root + "/update/added.dll", "new file");
+		auto steps = std::vector<Step<std::string>>{
+			{ root + "/update/MZGram.exe", root + "/app/MZGram.exe" },
+			{ root + "/update/lib.dll", root + "/app/lib.dll" },
+			{ root + "/update/added.dll", root + "/app/added.dll" },
+		};
+		auto copies = 0;
+		auto files = Files<std::string>();
+		files.exists = [](const std::string &path) {
+			return QFile::exists(QString::fromStdString(path));
+		};
+		files.copy = [&](const std::string &from, const std::string &to) {
+			const auto isUpdate = from.find("/update/") != std::string::npos;
+			if (isUpdate && copies++ == failAt) {
+				if (halfWrite) {
+					write(to, "half");
+				}
+				return false;
+			}
+			QFile::remove(QString::fromStdString(to));
+			return QFile::copy(QString::fromStdString(from), QString::fromStdString(to));
+		};
+		files.remove = [](const std::string &path) {
+			return QFile::remove(QString::fromStdString(path));
+		};
+		files.backup = [&](std::size_t index) {
+			return root + "/backup/" + std::to_string(index);
+		};
+		files.log = [](const char *, const std::string &) {};
+		const auto installed = Install(steps, files);
+		return std::make_tuple(
+			installed,
+			read(root + "/app/MZGram.exe"),
+			read(root + "/app/lib.dll"),
+			read(root + "/app/added.dll"),
+			read(root + "/app/tdata_marker"));
+	};
+	{
+		const auto [installed, exe, lib, added, data] = run(-1, false);
+		if (!installed || exe != "new exe" || lib != "new lib" || added != "new file") {
+			problems.push_back(u"the update is not in place"_q);
+		}
+		if (data != "user data") {
+			problems.push_back(u"other files touched"_q);
+		}
+	}
+	for (const auto failAt : { 0, 1, 2 }) {
+		for (const auto halfWrite : { false, true }) {
+			const auto [installed, exe, lib, added, data] = run(failAt, halfWrite);
+			if (installed || exe != "old exe" || lib != "old lib" || added != "<none>" || data != "user data") {
+				problems.push_back(u"not rolled back at %1%2: %3 %4 %5"_q
+					.arg(failAt)
+					.arg(halfWrite ? u" (half written)"_q : QString())
+					.arg(QString::fromUtf8(exe), QString::fromUtf8(lib), QString::fromUtf8(added)));
+			}
+		}
+	}
+	Check(problems.isEmpty(), "self-update: the Updater backs up and rolls back", problems.join(u", "_q).toStdString().c_str());
+}
+
+// The Updater is built and shipped in every release archive, and wired to
+// roll back; Telegram's own update servers stay off.
+void TestReleasesCarryTheUpdater() {
+	const auto read = [](const QString &path) {
+		auto file = QFile(QString::fromUtf8(MZGRAM_SOURCE_DIR) + '/' + path);
+		return file.open(QIODevice::ReadOnly)
+			? QString::fromUtf8(file.readAll()).replace(u"\r\n"_q, u"\n"_q)
+			: QString();
+	};
+	auto problems = QStringList();
+	for (const auto &workflow : { u"mzgram-windows.yml"_q, u"mzgram-linux.yml"_q, u"mzgram-desktop-release.yml"_q }) {
+		const auto text = read(u"../../.github/workflows/"_q + workflow);
+		if (text.isEmpty() || text.contains(u"DESKTOP_APP_DISABLE_AUTOUPDATE=ON"_q)) {
+			problems.push_back(workflow + u": the Updater is not built"_q);
+		}
+	}
+	const auto release = read(u"../../.github/workflows/mzgram-desktop-release.yml"_q);
+	if (!release.contains(u"cp \"$OUT/Updater.exe\" \"$RUNNER_TEMP/pkg/MZGram/\""_q)
+		|| !release.contains(u"cp out/Release/Updater \"$RUNNER_TEMP/pkg/MZGram/\""_q)
+		|| !release.contains(u"MZGram/Updater.exe"_q)
+		|| !release.contains(u"MZGram/Updater$"_q)) {
+		problems.push_back(u"the Updater is not in the release archives"_q);
+	}
+	for (const auto &updater : { u"_other/updater_win.cpp"_q, u"_other/updater_linux.cpp"_q }) {
+		const auto text = read(updater);
+		if (!text.contains(u"Install(steps, files)"_q) || !text.contains(u"kFailedMarker"_q)) {
+			problems.push_back(updater + u": no rollback"_q);
+		}
+	}
+	if (read(u"_other/updater_win.cpp"_q).contains(u"update()) {\n\t\t\t\t\tupdateRegistry();"_q)) {
+		problems.push_back(u"the Updater writes Telegram's uninstall entry"_q);
+	}
+	const auto checker = read(u"core/update_checker.cpp"_q);
+	if (!checker.contains(u"MZGram::Update::PreparedCode(readyPath)"_q)) {
+		problems.push_back(u"the prepared MZGram version is not checked"_q);
+	}
+	if (!read(u"core/sandbox.cpp"_q).contains(u"MZGram::Update::PreparedReady()"_q)
+		|| !read(u"core/launcher.cpp"_q).contains(u"MZGram::Update::PreparedReady()"_q)) {
+		problems.push_back(u"a prepared update is not installed"_q);
+	}
+	if (read(u"mzgram/mzgram_self_update.cpp"_q).contains(u"tdesktop.com"_q)
+		|| read(u"mzgram/mzgram_self_update_rules.cpp"_q).contains(u"telegram.org"_q)) {
+		problems.push_back(u"Telegram's update servers"_q);
+	}
+	Check(problems.isEmpty(), "self-update: the Updater is in every release and rolls back", problems.join(u", "_q).toStdString().c_str());
+}
+
 // Telegram Desktop's updater is off in the code itself, and the MZGram
 // check starts with the app and shows its bar in the chat list.
 void TestUpdateIsWired() {
@@ -1107,6 +1401,13 @@ int main() {
 		TestUpdateOffer,
 		TestUpdateDue,
 		TestUpdateIsWired,
+		TestSelfUpdateArchiveChoice,
+		TestSelfUpdateOnlyThisRepository,
+		TestSelfUpdateChecksum,
+		TestSelfUpdateEntries,
+		TestSelfUpdatePreparedCode,
+		TestUpdateInstallRollsBack,
+		TestReleasesCarryTheUpdater,
 		TestBrandingRules,
 		TestBrandingPhrases,
 		TestBrandingIsWired,

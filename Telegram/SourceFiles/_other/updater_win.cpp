@@ -8,6 +8,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "updater.h"
 
 #include "base/platform/win/base_windows_safe_library.h"
+#include "mzgram/mzgram_update_install.h"
+
+#include <cstring>
 
 bool _debug = false;
 
@@ -121,6 +124,7 @@ void delFolder() {
 	wstring delPathOld = L"tupdates\\ready", delPath = L"tupdates\\temp", delFolder = L"tupdates";
 	fullClearPath(delPathOld);
 	fullClearPath(delPath);
+	fullClearPath(L"tupdates\\mzgram_backup"); // MZGram: mzgram_update_install.h
 	RemoveDirectory(delFolder.c_str());
 }
 
@@ -245,31 +249,55 @@ bool update() {
 		}
 	}
 
+	// MZGram: every file the update replaces is backed up first and put
+	// back when a copy fails, so a failed update leaves the old version and
+	// the app starts as before; the app then says the update was rolled back
+	// (mzgram_update_install.h). There is no retry box.
+	using namespace MZGram::UpdateInstall;
+	const auto backupFolder = wstring(L"tupdates\\mzgram_backup");
+	if (!CreateDirectory(backupFolder.c_str(), NULL) && GetLastError() != ERROR_ALREADY_EXISTS) {
+		writeLog(L"Error: failed to create the backup folder");
+		delFolder();
+		return false;
+	}
+	auto steps = std::vector<Step<wstring>>();
 	for (size_t i = 0; i < from.size(); ++i) {
-		wstring fname = from[i], tofname = to[i];
-		BOOL copyResult;
-		do {
-			writeLog(L"Copying file '" + fname + L"' to '" + tofname + L"'..");
-			int copyTries = 0;
-			do {
-				copyResult = CopyFile(fname.c_str(), tofname.c_str(), FALSE);
-				if (!copyResult) {
-					++copyTries;
-					Sleep(100);
-				} else {
-					break;
-				}
-			} while (copyTries < 100);
-			if (!copyResult) {
-				writeLog(L"Error: failed to copy, asking to retry..");
-				WCHAR errMsg[2048];
-				wsprintf(errMsg, L"Failed to update Telegram :(\n%s is not accessible.", tofname.c_str());
-				if (MessageBox(0, errMsg, L"Update error!", MB_ICONERROR | MB_RETRYCANCEL) != IDRETRY) {
-					delFolder();
-					return false;
-				}
+		steps.push_back({ from[i], to[i] });
+	}
+	auto files = Files<wstring>();
+	files.exists = [](const wstring &path) {
+		const auto attributes = GetFileAttributes(path.c_str());
+		return (attributes != INVALID_FILE_ATTRIBUTES)
+			&& !(attributes & FILE_ATTRIBUTE_DIRECTORY);
+	};
+	files.copy = [](const wstring &from, const wstring &to) {
+		writeLog(L"Copying file '" + from + L"' to '" + to + L"'..");
+		for (int copyTries = 0; copyTries < 100; ++copyTries) {
+			if (CopyFile(from.c_str(), to.c_str(), FALSE)) {
+				return true;
 			}
-		} while (!copyResult);
+			Sleep(100);
+		}
+		return false;
+	};
+	files.remove = [](const wstring &path) {
+		return DeleteFile(path.c_str()) != FALSE;
+	};
+	files.backup = [&](size_t index) {
+		return backupFolder + L"\\" + std::to_wstring(index);
+	};
+	files.log = [](const char *message, const wstring &path) {
+		writeLog(wstring(message, message + strlen(message)) + L" '" + path + L"'");
+	};
+	if (!Install(steps, files)) {
+		writeLog(L"Error: the update was rolled back");
+		delFolder();
+		const auto marker = wstring(kFailedMarker, kFailedMarker + strlen(kFailedMarker));
+		HANDLE file = CreateFile(marker.c_str(), GENERIC_WRITE, 0, 0, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
+		if (file != INVALID_HANDLE_VALUE) {
+			CloseHandle(file);
+		}
+		return false;
 	}
 
 	writeLog(L"Update succeed! Clearing folder..");
@@ -403,8 +431,10 @@ int APIENTRY wWinMain(HINSTANCE instance, HINSTANCE prevInstance, LPWSTR cmdPara
 					updateTo = updaterDir;
 				}
 				writeLog(L"Update to: " + updateTo);
-				if (needupdate && update()) {
-					updateRegistry();
+				// MZGram: no updateRegistry(), it writes the uninstall entry
+				// of Telegram Desktop's installer; MZGram has no installer.
+				if (needupdate) {
+					update();
 				}
 				if (writeprotected) { // if we can't clear all tupdates\ready (Updater.exe is there) - clear only version
 					if (DeleteFile(L"tupdates\\temp\\tdata\\version") || DeleteFile(L"tupdates\\ready\\tdata\\version")) {

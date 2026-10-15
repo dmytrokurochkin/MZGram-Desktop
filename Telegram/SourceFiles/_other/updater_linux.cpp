@@ -23,6 +23,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <ctime>
 #include <iostream>
 
+#include "mzgram/mzgram_update_install.h"
+
 using std::string;
 using std::deque;
 using std::vector;
@@ -210,6 +212,7 @@ void delFolder() {
 	if (!remove_directory(delPath)) {
 		writeLog("Error: failed to clear path! :(");
 	}
+	remove_directory(workDir + MZGram::UpdateInstall::kBackupFolder); // MZGram
 	rmdir(delFolder.c_str());
 }
 
@@ -299,45 +302,60 @@ bool update() {
 		}
 	}
 
+	// MZGram: every file the update replaces is backed up first and put
+	// back when a copy fails, so a failed update leaves the old version and
+	// the app starts as before; the app then says the update was rolled back
+	// (mzgram_update_install.h).
+	using namespace MZGram::UpdateInstall;
+	const auto backupFolder = workDir + kBackupFolder;
+	if (!mkpath(backupFolder.c_str())) {
+		writeLog("Error: failed to create the backup folder");
+		delFolder();
+		return false;
+	}
+	auto steps = vector<Step<string>>();
 	for (size_t i = 0; i < from.size(); ++i) {
-		string fname = from[i], tofname = to[i];
-
+		steps.push_back({ from[i], to[i] });
+	}
+	auto files = Files<string>();
+	files.exists = [](const string &path) {
+		struct stat statbuf;
+		return !stat(path.c_str(), &statbuf) && !S_ISDIR(statbuf.st_mode);
+	};
+	files.copy = [](const string &from, const string &to) {
 		// it is necessary to remove the old file to not to get an error if appimage file is used by fuse
 		struct stat statbuf;
-		writeLog("Trying to get stat() for '%s'", tofname.c_str());
-		if (!stat(tofname.c_str(), &statbuf)) {
-			if (S_ISDIR(statbuf.st_mode)) {
-				writeLog("Fully clearing path '%s'..", tofname.c_str());
-				if (!remove_directory(tofname.c_str())) {
-					writeLog("Error: failed to clear path '%s'", tofname.c_str());
-					delFolder();
-					return false;
-				}
-			} else {
-				writeLog("Unlinking file '%s'", tofname.c_str());
-				if (unlink(tofname.c_str())) {
-					writeLog("Error: failed to unlink '%s'", tofname.c_str());
-					delFolder();
-					return false;
-				}
+		if (!stat(to.c_str(), &statbuf)) {
+			if (S_ISDIR(statbuf.st_mode) || unlink(to.c_str())) {
+				writeLog("Error: failed to unlink '%s'", to.c_str());
+				return false;
 			}
 		}
-
-		writeLog("Copying file '%s' to '%s'..", fname.c_str(), tofname.c_str());
-		int copyTries = 0, triesLimit = 30;
-		do {
-			if (!copyFile(fname.c_str(), tofname.c_str())) {
-				++copyTries;
-				usleep(100000);
-			} else {
-				break;
+		writeLog("Copying file '%s' to '%s'..", from.c_str(), to.c_str());
+		for (int copyTries = 0; copyTries < 30; ++copyTries) {
+			if (copyFile(from.c_str(), to.c_str())) {
+				return true;
 			}
-		} while (copyTries < triesLimit);
-		if (copyTries == triesLimit) {
-			writeLog("Error: failed to copy, asking to retry..");
-			delFolder();
-			return false;
+			usleep(100000);
 		}
+		return false;
+	};
+	files.remove = [](const string &path) {
+		return !unlink(path.c_str());
+	};
+	files.backup = [&](size_t index) {
+		return backupFolder + "/" + std::to_string(index);
+	};
+	files.log = [](const char *message, const string &path) {
+		writeLog("%s '%s'", message, path.c_str());
+	};
+	if (!Install(steps, files)) {
+		writeLog("Error: the update was rolled back");
+		delFolder();
+		if (FILE *marker = fopen((workDir + kFailedMarker).c_str(), "wb")) {
+			fclose(marker);
+		}
+		return false;
 	}
 
 	writeLog("Update succeed! Clearing folder..");
