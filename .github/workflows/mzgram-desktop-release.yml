@@ -510,13 +510,18 @@ jobs:
             echo
             echo "## Install"
             echo
+            # A release can add lines of its own (.github/release_notes/X.Y.Z.md)
+            if [ -f ".github/release_notes/$VERSION.md" ]; then
+              cat ".github/release_notes/$VERSION.md"
+              echo
+            fi
             echo "- Windows: unpack \`MZGram-Desktop-$VERSION-windows-x64.zip\` (or \`-arm64\` on ARM) and run \`MZGram.exe\`."
             echo "- Linux: unpack \`MZGram-Desktop-$VERSION-linux-x64.tar.xz\` and run \`MZGram\` (glibc 2.28 or newer)."
             echo "- Linux ARM64 (aarch64, e.g. Snapdragon laptops): unpack \`MZGram-Desktop-$VERSION-linux-arm64.tar.xz\` and run \`MZGram\` (glibc 2.28 or newer)."
             echo
             echo "\`MZGram.exe\` is not code-signed, so on the first start Windows SmartScreen may show \"Windows protected your PC\". Check the zip against \`SHA256SUMS\`, then choose **More info** and **Run anyway**."
             echo
-            echo "MZGram keeps its data in its own folder, apart from Telegram Desktop. When a newer release is out, MZGram shows a bar in the chat list; it does not download it: download the next release and replace the files."
+            echo "MZGram keeps its data in its own folder, apart from Telegram Desktop. When a newer release is out, MZGram shows a bar in the chat list; Update installs it from GitHub after checking its SHA-256, and the Updater puts the old files back if anything fails."
             echo
             echo "\`MZGram-Desktop-$VERSION-source.tar.xz\` is the complete source of this release. \`SHA256SUMS\` lists the SHA-256 of every file."
           } > notes.md
