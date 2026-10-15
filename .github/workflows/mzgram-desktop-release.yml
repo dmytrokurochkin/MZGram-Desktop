@@ -3,7 +3,8 @@ name: MZGram Desktop release
 # A tag vX.Y.Z (stable) or vX.Y.Z-beta.N (prerelease) on the mzgram branch
 # builds Release binaries and publishes a GitHub release with:
 #   MZGram-Desktop-X.Y.Z-windows-x64.zip, MZGram-Desktop-X.Y.Z-windows-arm64.zip,
-#   MZGram-Desktop-X.Y.Z-linux-x64.tar.xz, MZGram-Desktop-X.Y.Z-source.tar.xz
+#   MZGram-Desktop-X.Y.Z-linux-x64.tar.xz, MZGram-Desktop-X.Y.Z-linux-arm64.tar.xz,
+#   MZGram-Desktop-X.Y.Z-source.tar.xz
 #   (the complete source with every submodule, for the GPL), SHA256SUMS,
 # and the [mzgram] commits since the previous release as the notes.
 # The release is created as a draft and published only when every file is in
@@ -331,9 +332,14 @@ jobs:
           path: dist/
 
   linux:
-    name: Linux x64
+    name: Linux ${{ matrix.arch }}
     needs: version
-    runs-on: ubuntu-latest
+    # ARM64 (aarch64) builds natively on GitHub's ARM runner, same recipe
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64, arm64]
     env:
       IMAGE_TAG: tdesktop:centos_env
       DOCKER_BUILD_RECORD_UPLOAD: false
@@ -371,8 +377,8 @@ jobs:
           path: |
             ${{ runner.temp }}/.buildx-cache
             ${{ runner.temp }}/.mount-cache
-          key: ${{ runner.OS }}-libs-${{ hashFiles('Telegram/build/docker/centos_env/**') }}
-          restore-keys: ${{ runner.OS }}-libs-
+          key: ${{ runner.OS }}${{ matrix.arch == 'arm64' && '-arm64' || '' }}-libs-${{ hashFiles('Telegram/build/docker/centos_env/**') }}
+          restore-keys: ${{ runner.OS }}${{ matrix.arch == 'arm64' && '-arm64' || '' }}-libs-
 
       - name: Restore Docker cache mounts.
         uses: reproducible-containers/buildkit-cache-dance@5422eac04292c961a382e0f584ea0f03ad9da723
@@ -434,13 +440,14 @@ jobs:
           test -f out/Release/MZGram
           mkdir -p "$RUNNER_TEMP/pkg/MZGram" dist
           cp out/Release/MZGram "$RUNNER_TEMP/pkg/MZGram/"
-          tar -cJf "dist/MZGram-Desktop-$VERSION-linux-x64.tar.xz" -C "$RUNNER_TEMP/pkg" MZGram
-          tar -tvJf "dist/MZGram-Desktop-$VERSION-linux-x64.tar.xz"
+          file out/Release/MZGram
+          tar -cJf "dist/MZGram-Desktop-$VERSION-linux-${{ matrix.arch }}.tar.xz" -C "$RUNNER_TEMP/pkg" MZGram
+          tar -tvJf "dist/MZGram-Desktop-$VERSION-linux-${{ matrix.arch }}.tar.xz"
 
       - name: Upload.
         uses: actions/upload-artifact@v7
         with:
-          name: linux-x64
+          name: linux-${{ matrix.arch }}
           path: dist/
 
   publish:
@@ -460,7 +467,7 @@ jobs:
         uses: actions/download-artifact@v7
         with:
           path: dist
-          pattern: '{windows-x64,windows-arm64,linux-x64}'
+          pattern: '{windows-x64,windows-arm64,linux-x64,linux-arm64}'
           merge-multiple: true
 
       # The complete corresponding source for the GPL: this repository at the
@@ -495,6 +502,7 @@ jobs:
             echo
             echo "- Windows: unpack \`MZGram-Desktop-$VERSION-windows-x64.zip\` (or \`-arm64\` on ARM) and run \`MZGram.exe\`."
             echo "- Linux: unpack \`MZGram-Desktop-$VERSION-linux-x64.tar.xz\` and run \`MZGram\` (glibc 2.28 or newer)."
+            echo "- Linux ARM64 (aarch64, e.g. Snapdragon laptops): unpack \`MZGram-Desktop-$VERSION-linux-arm64.tar.xz\` and run \`MZGram\` (glibc 2.28 or newer)."
             echo
             echo "\`MZGram.exe\` is not code-signed, so on the first start Windows SmartScreen may show \"Windows protected your PC\". Check the zip against \`SHA256SUMS\`, then choose **More info** and **Run anyway**."
             echo

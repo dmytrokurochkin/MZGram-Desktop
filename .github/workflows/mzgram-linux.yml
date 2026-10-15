@@ -1,7 +1,8 @@
 name: MZGram Linux
 
-# Compile check for Linux x64, built as Debug inside the upstream Rocky Linux 8
-# image, the same way upstream CI checks Linux.
+# Compile check for Linux x64 and ARM64 (aarch64), built as Debug inside the
+# upstream Rocky Linux 8 image, the same way upstream CI checks Linux. ARM64
+# builds natively on GitHub's ARM runner, with the same recipe and flags.
 #
 # The image builds every dependency (Qt, WebRTC, FFmpeg and the rest) from
 # source against an old glibc, so the binary also runs on current
@@ -26,8 +27,12 @@ concurrency:
 
 jobs:
   linux:
-    name: Linux x64
-    runs-on: ubuntu-latest
+    name: Linux ${{ matrix.arch }}
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64, arm64]
 
     env:
       IMAGE_TAG: tdesktop:centos_env
@@ -44,8 +49,13 @@ jobs:
         run: |
           sudo apt update
           curl -sSL https://install.python-poetry.org | python3 -
-          curl -sSL https://github.com/ccache/ccache/releases/download/v4.13.6/ccache-4.13.6-linux-x86_64-glibc.tar.xz \
-          | sudo tar xJ -C /usr/local/bin --strip-components=1 ccache-4.13.6-linux-x86_64-glibc/ccache
+          # Only the statistics run ccache outside the image
+          if [ "$(uname -m)" = x86_64 ]; then
+            curl -sSL https://github.com/ccache/ccache/releases/download/v4.13.6/ccache-4.13.6-linux-x86_64-glibc.tar.xz \
+            | sudo tar xJ -C /usr/local/bin --strip-components=1 ccache-4.13.6-linux-x86_64-glibc/ccache
+          else
+            sudo apt install -y ccache
+          fi
           echo "CCACHE_DIR=$RUNNER_TEMP/.tdesktop-cache" >> $GITHUB_ENV
           cd Telegram/build/docker/centos_env
           poetry install
@@ -69,8 +79,8 @@ jobs:
           path: |
             ${{ runner.temp }}/.buildx-cache
             ${{ runner.temp }}/.mount-cache
-          key: ${{ runner.OS }}-libs-${{ hashFiles('Telegram/build/docker/centos_env/**') }}
-          restore-keys: ${{ runner.OS }}-libs-
+          key: ${{ runner.OS }}${{ matrix.arch == 'arm64' && '-arm64' || '' }}-libs-${{ hashFiles('Telegram/build/docker/centos_env/**') }}
+          restore-keys: ${{ runner.OS }}${{ matrix.arch == 'arm64' && '-arm64' || '' }}-libs-
 
       - name: Restore Docker cache mounts.
         uses: reproducible-containers/buildkit-cache-dance@5422eac04292c961a382e0f584ea0f03ad9da723
@@ -99,8 +109,8 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: ${{ env.CCACHE_DIR }}
-          key: ${{ runner.OS }}-tdesktop-${{ github.run_id }}
-          restore-keys: ${{ runner.OS }}-tdesktop-
+          key: ${{ runner.OS }}${{ matrix.arch == 'arm64' && '-arm64' || '' }}-tdesktop-${{ github.run_id }}
+          restore-keys: ${{ runner.OS }}${{ matrix.arch == 'arm64' && '-arm64' || '' }}-tdesktop-
 
       # The release code of the newest v* tag (0 before the first one): the
       # update bar compares it with the latest GitHub release
@@ -158,10 +168,12 @@ jobs:
           echo "ccache misses this run: $MISSES"
 
       # Saved only from the main fork branch, and only when enough changed to
-      # be worth the space in the repository cache quota.
+      # be worth the space in the repository cache quota. Not for arm64: its
+      # library cache already takes the room left in the 10 GB.
       - name: Save Telegram Desktop cache.
         if: >
           github.ref_name == 'mzgram'
+            && matrix.arch == 'x64'
             && fromJSON(steps.ccache-stats.outputs.misses) > 300
         uses: actions/cache/save@v6
         with:
@@ -173,10 +185,11 @@ jobs:
         run: |
           test -f out/Debug/MZGram
           mkdir artifact
-          tar -czf artifact/MZGram-Linux-x64-Debug.tar.gz -C out/Debug MZGram
+          file out/Debug/MZGram
+          tar -czf artifact/MZGram-Linux-${{ matrix.arch }}-Debug.tar.gz -C out/Debug MZGram
 
       - name: Upload artifact.
         uses: actions/upload-artifact@v7
         with:
-          name: MZGram-Linux-x64-Debug
+          name: MZGram-Linux-${{ matrix.arch }}-Debug
           path: artifact/
