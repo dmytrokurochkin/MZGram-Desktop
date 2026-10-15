@@ -992,6 +992,44 @@ void TestLinuxArm64IsBuilt() {
 	Check(problems.isEmpty(), "Linux arm64 is built and released", problems.join(u", "_q).toStdString().c_str());
 }
 
+// FEATURES.md, the list of what MZGram adds, is kept in both repositories
+// with every feature change: it is there, has both platforms and the
+// comparison, names no other clients and no commit hashes, and the README
+// links to it.
+void TestFeaturesFile() {
+	const auto read = [](const QString &path) {
+		auto file = QFile(QString::fromUtf8(MZGRAM_SOURCE_DIR) + '/' + path);
+		return file.open(QIODevice::ReadOnly)
+			? QString::fromUtf8(file.readAll()).replace(u"\r\n"_q, u"\n"_q)
+			: QString();
+	};
+	const auto features = read(u"../../FEATURES.md"_q);
+	auto problems = QStringList();
+	if (features.isEmpty()) {
+		problems.push_back(u"FEATURES.md is missing"_q);
+	}
+	for (const auto &heading : { u"\n## Android\n"_q, u"\n## Desktop\n"_q, u"\n## Android and Desktop compared\n"_q }) {
+		if (!features.contains(heading)) {
+			problems.push_back(heading.trimmed());
+		}
+	}
+	// Kept reversed, as in the release notes script
+	for (const auto &reversed : { u"uya"_q, u"oken"_q, u"yrucrem"_q }) {
+		auto name = reversed;
+		std::reverse(name.begin(), name.end());
+		if (features.contains(name, Qt::CaseInsensitive)) {
+			problems.push_back(u"names another client"_q);
+		}
+	}
+	if (features.contains(QRegularExpression(u"\\b[0-9a-f]{9,40}\\b"_q))) {
+		problems.push_back(u"a commit hash"_q);
+	}
+	if (!read(u"../../README.md"_q).contains(u"(FEATURES.md)"_q)) {
+		problems.push_back(u"not linked from the README"_q);
+	}
+	Check(problems.isEmpty(), "FEATURES.md has Android, Desktop and the comparison", problems.join(u", "_q).toStdString().c_str());
+}
+
 // Telegram Desktop's updater is off in the code itself, and the MZGram
 // check starts with the app and shows its bar in the chat list.
 void TestUpdateIsWired() {
@@ -1062,6 +1100,7 @@ int main() {
 		TestBrandingPhrases,
 		TestBrandingIsWired,
 		TestLinuxArm64IsBuilt,
+		TestFeaturesFile,
 		TestLocalPinsRule,
 		TestLocalPinsSortPosition,
 		TestLocalPinsStorage,
