@@ -1534,6 +1534,7 @@ PRIVATE
     mzgram/mzgram_lang.cpp
     mzgram/mzgram_lang.h
     mzgram/mzgram_lang_table.cpp
+    mzgram/mzgram_lang_translations.cpp
     mzgram/mzgram_local_pins.cpp
     mzgram/mzgram_local_pins.h
     mzgram/mzgram_local_pins_rules.cpp

@@ -27,6 +27,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/layers/generic_box.h"
 #include "ui/toast/toast.h"
 #include "ui/widgets/buttons.h"
+#include "ui/widgets/checkbox.h"
 #include "ui/widgets/fields/input_field.h"
 #include "ui/widgets/labels.h"
 #include "ui/wrap/padding_wrap.h"
@@ -135,6 +136,55 @@ void MarkBox(
 	box->addButton(tr::lng_settings_save(), save);
 	box->addButton(tr::lng_cancel(), [=] {
 		box->closeBox();
+	});
+}
+
+// The MZGram language: System and the languages, each by its own name; a
+// choice applies at once.
+void LanguageBox(not_null<Ui::GenericBox*> box) {
+	const auto option = &base::options::lookup<QString>(
+		MZGram::kOptionLanguage);
+	box->setTitle(Text("mzgram_language"));
+	auto selected = 0;
+	for (auto i = 0; i != MZGram::kLanguageCount; ++i) {
+		if (MZGram::LanguageChoice() == QString::fromLatin1(MZGram::kLanguages[i])) {
+			selected = i + 1;
+		}
+	}
+	const auto group = std::make_shared<Ui::RadiobuttonGroup>(selected);
+	const auto add = [&](int value, const QString &label) {
+		box->addRow(object_ptr<Ui::Radiobutton>(
+			box,
+			group,
+			value,
+			label,
+			st::defaultBoxCheckbox));
+	};
+	add(0, MZGram::TrNow("mzgram_language_system"));
+	for (auto i = 0; i != MZGram::kLanguageCount; ++i) {
+		add(i + 1, QString::fromUtf8(MZGram::kLanguageNames[i]));
+	}
+	group->setChangedCallback([=](int value) {
+		option->set(value
+			? QString::fromLatin1(MZGram::kLanguages[value - 1])
+			: QString());
+		box->closeBox();
+	});
+	box->addButton(tr::lng_cancel(), [=] {
+		box->closeBox();
+	});
+}
+
+// The current choice, by its name.
+[[nodiscard]] rpl::producer<QString> LanguageValue() {
+	return MZGram::Tr("mzgram_language_system") | rpl::map([](QString system) {
+		const auto chosen = MZGram::LanguageChoice();
+		for (auto i = 0; i != MZGram::kLanguageCount; ++i) {
+			if (chosen == QString::fromLatin1(MZGram::kLanguages[i])) {
+				return QString::fromUtf8(MZGram::kLanguageNames[i]);
+			}
+		}
+		return system;
 	});
 }
 
@@ -493,6 +543,21 @@ void BuildInterface(SectionBuilder &builder) {
 	using namespace MZGram;
 
 	builder.addSkip();
+	const auto controller = builder.controller();
+	builder.addButton({
+		.id = u"mzgram/language"_q,
+		.title = Text("mzgram_language"),
+		.st = &st::settingsButtonNoIcon,
+		.label = LanguageValue(),
+		.onClick = [=] {
+			controller->show(Box(LanguageBox));
+		},
+		.keywords = { u"language"_q, u"translation"_q },
+	});
+	builder.addSkip();
+	builder.addDividerText(Text("mzgram_language_info"));
+
+	builder.addSkip();
 	AddOptionToggle(
 		builder,
 		u"mzgram/message-seconds"_q,
@@ -537,6 +602,23 @@ void BuildInterface(SectionBuilder &builder) {
 		"check_updates",
 		kOptionCheckUpdates,
 		{ u"update"_q, u"version"_q, u"release"_q, u"github"_q });
+	builder.addButton({
+		.id = u"mzgram/check-updates-now"_q,
+		.title = Text("check_updates_now"),
+		.st = &st::settingsButtonNoIcon,
+		.onClick = [=] {
+			MZGram::Update::CheckNow([](MZGram::Update::ManualOutcome outcome) {
+				using Result = MZGram::Update::ManualResult;
+				Ui::Toast::Show((outcome.result == Result::Available)
+					? MZGram::TrNow("update_check_available").arg(
+						outcome.release->version())
+					: (outcome.result == Result::Latest)
+					? MZGram::TrNow("update_check_latest")
+					: MZGram::TrNow("update_check_failed"));
+			});
+		},
+		.keywords = { u"update"_q, u"check"_q, u"version"_q },
+	});
 	builder.addSkip();
 	builder.addDividerText(Text("check_updates_info"));
 }

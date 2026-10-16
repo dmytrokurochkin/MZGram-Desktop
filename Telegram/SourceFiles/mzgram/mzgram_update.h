@@ -9,6 +9,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "mzgram/mzgram_update_rules.h"
 
+#include "base/basic_types.h"
+
 #include <rpl/producer.h>
 
 namespace MZGram {
@@ -34,6 +36,10 @@ void Start();
 
 // Opens the release page in the browser and hides the bar for this run.
 void OpenReleasePage(const Release &release);
+
+// "Check for updates" in Settings: a check now, outside the interval and
+// whatever the switch; a newer version also gets the bar.
+void CheckNow(Fn<void(ManualOutcome)> done);
 
 // Hides the bar for this version for good.
 void Dismiss(const Release &release);

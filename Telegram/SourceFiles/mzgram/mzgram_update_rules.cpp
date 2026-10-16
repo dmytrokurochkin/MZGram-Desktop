@@ -92,4 +92,27 @@ std::optional<Release> Offer(
 	return Release{ .tag = state.latestTag, .url = state.latestUrl, .code = code };
 }
 
+ManualOutcome ApplyManual(
+		State &state,
+		bool ok,
+		int status,
+		const QByteArray &body,
+		const QString &etag,
+		qint64 installedCode) {
+	if (status == 200 && ok) {
+		const auto document = QJsonDocument::fromJson(body);
+		if (!document.isObject()
+			|| !document.object().contains(QStringLiteral("tag_name"))) {
+			return {};
+		}
+	} else if (status != 304 && status != 404) {
+		return {};
+	}
+	Apply(state, status, body, etag);
+	if (const auto release = Offer(state, installedCode, true, true)) {
+		return { .result = ManualResult::Available, .release = release };
+	}
+	return { .result = ManualResult::Latest };
+}
+
 } // namespace MZGram::Update

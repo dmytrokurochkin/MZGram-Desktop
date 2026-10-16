@@ -21,8 +21,8 @@ namespace MZGram {
 // says "recently", "within a week" or "within a month"; this device notes
 // the last sign of the person being online (UserData::madeAction: a new
 // message, typing, reading the owner's messages; or a status change the
-// server sends) and the status line shows that time, marked as
-// approximate, while it fits what the server says. Kept in the archive
+// server sends) and the status line shows that time, as any last seen
+// time, while it fits what the server says. Kept in the archive
 // database, so it stays after a restart.
 void RecordSeen(not_null<UserData*> user, TimeId when);
 [[nodiscard]] std::optional<QString> ApproximateOnlineText(

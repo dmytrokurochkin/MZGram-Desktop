@@ -56,7 +56,8 @@ std::optional<QString> ApproximateOnlineText(
 	const auto text = Data::OnlineText(
 		Data::LastseenStatus::OnlineTill(std::min(seen, now)),
 		now);
-	return TrNow("last_seen_approx").arg(text);
+	// Shown as any last seen time, without a mark.
+	return text;
 }
 
 void RecordOutboxRead(not_null<History*> history, int64 maxId) {

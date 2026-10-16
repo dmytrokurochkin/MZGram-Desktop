@@ -22,7 +22,7 @@ enum class HiddenLastSeen {
 };
 
 // Whether a time this device noted as the person being online fits what
-// the server says, so it can be shown, marked as approximate, instead.
+// the server says, so it can be shown instead.
 [[nodiscard]] bool ApproximateFits(
 	HiddenLastSeen hidden,
 	TimeId seen,

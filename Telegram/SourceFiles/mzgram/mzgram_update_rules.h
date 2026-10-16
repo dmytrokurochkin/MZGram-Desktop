@@ -69,4 +69,28 @@ void Apply(State &state, int status, const QByteArray &body, const QString &etag
 	bool enabled,
 	bool force);
 
+// What "Check for updates" found.
+enum class ManualResult {
+	Latest,
+	Available,
+	Failed,
+};
+
+struct ManualOutcome {
+	ManualResult result = ManualResult::Failed;
+	std::optional<Release> release;
+};
+
+// A check the user asked for: puts the answer into the state as Apply does
+// and says what it found, a closed version included. No network, a GitHub
+// error or an answer that is not about a release is Failed, not Latest.
+// ok: the request itself finished without a network error.
+[[nodiscard]] ManualOutcome ApplyManual(
+	State &state,
+	bool ok,
+	int status,
+	const QByteArray &body,
+	const QString &etag,
+	qint64 installedCode);
+
 } // namespace MZGram::Update

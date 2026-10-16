@@ -7,6 +7,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "mzgram/mzgram_lang.h"
 
+#include "base/basic_types.h"
+#include "base/options.h"
+
 #include <cstring>
 #include <map>
 #include <string>
@@ -14,7 +17,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 namespace MZGram {
 namespace {
 
-// Every MZGram text shown to the user, in English and Ukrainian.
+// Every MZGram text shown to the user, in English and Ukrainian; the
+// other languages are in mzgram_lang_translations.cpp.
 // Placeholders are Qt's %1, %2.
 const std::vector<Phrase> kPhrases = {
 	// Settings > MZGram: sections.
@@ -228,7 +232,6 @@ const std::vector<Phrase> kPhrases = {
 		"%1 (when this device learned of it)",
 		"%1 (коли про це дізнався цей пристрій)" },
 	{ "details_read_unknown", "time unknown", "час невідомий" },
-	{ "last_seen_approx", "%1 (approx.)", "%1 (приблизно)" },
 	{ "details_originally_sent", "Originally sent", "Спершу надіслано" },
 	{ "details_views", "Views", "Перегляди" },
 	{ "details_file_size", "File size", "Розмір файлу" },
@@ -266,6 +269,14 @@ const std::vector<Phrase> kPhrases = {
 	{ "send_voice_message_question", "Send this voice message?", "Надіслати це голосове повідомлення?" },
 
 	// Interface.
+	{ "mzgram_language", "MZGram language", "Мова MZGram" },
+	{ "mzgram_language_system", "System", "Як у системі" },
+	{ "mzgram_language_info",
+		"The language of MZGram's own settings and features, apart from "
+		"Telegram's language. System: the system's language when MZGram has "
+		"it, otherwise English.",
+		"Мова власних налаштувань і функцій MZGram, окремо від мови Telegram. "
+		"Як у системі: мова системи, якщо MZGram її має, інакше англійська." },
 	{ "message_seconds", "Show seconds in message time", "Показувати секунди в часі повідомлень" },
 	{ "hide_stories", "Hide Stories", "Приховати історії" },
 	{ "disable_greeting_sticker", "Disable greeting sticker", "Вимкнути вітальний стікер" },
@@ -287,14 +298,25 @@ const std::vector<Phrase> kPhrases = {
 	{ "check_updates_info",
 		"Every few hours MZGram looks for its latest stable release on GitHub "
 		"and shows a bar at the bottom of the chat list when it is newer. "
-		"Update opens the release page; nothing is downloaded or installed "
-		"by the app. The updater of Telegram Desktop is off: it installs the "
-		"official app.",
+		"Update downloads that release from GitHub, checks its SHA-256 and "
+		"installs it on restart, keeping the old files until the new ones "
+		"are in place. Check for updates looks at once and says what it "
+		"found, also when this is off. The updater of Telegram Desktop is "
+		"off: it installs the official app.",
 		"Раз на кілька годин MZGram шукає свій останній стабільний реліз на "
 		"GitHub і показує плашку внизу списку чатів, якщо він новіший. Оновити "
-		"відкриває сторінку релізу; застосунок нічого не завантажує і не "
-		"встановлює. Оновлювач Telegram Desktop вимкнений: він встановлює "
-		"офіційний застосунок." },
+		"завантажує цей реліз із GitHub, перевіряє його SHA-256 і встановлює "
+		"під час перезапуску, зберігаючи старі файли, доки нові не стануть на "
+		"місце. Перевірити оновлення шукає одразу і каже, що знайшло, навіть "
+		"коли це вимкнено. Оновлювач Telegram Desktop вимкнений: він "
+		"встановлює офіційний застосунок." },
+	{ "check_updates_now", "Check for updates", "Перевірити оновлення" },
+	{ "update_check_latest", "You have the latest version of MZGram", "У вас остання версія MZGram" },
+	{ "update_check_available", "MZGram %1 is available", "Доступна версія MZGram %1" },
+	{ "update_check_failed",
+		"Could not check for updates. Check the connection and try again.",
+		"Не вдалося перевірити оновлення. Перевірте з'єднання і спробуйте ще "
+		"раз." },
 	{ "update_available", "MZGram %1 update available", "Доступне оновлення MZGram %1" },
 	{ "update_open", "Update", "Оновити" },
 	{ "update_close", "Close", "Закрити" },
@@ -387,6 +409,63 @@ const std::map<std::string, const Phrase*> &Index() {
 
 const std::vector<Phrase> &Phrases() {
 	return kPhrases;
+}
+
+const char kOptionLanguage[] = "mzgram-language";
+
+base::options::option<QString> OptionLanguage({
+	.id = kOptionLanguage,
+	.name = "MZGram language",
+	.description = "The language of MZGram's own settings and features: "
+		"empty for the system's language, or en, uk, ru, pl, es, de, fr, "
+		"pt-BR, tr, ar, be, kk",
+	.defaultValue = QString(),
+});
+
+QString LanguageChoice() {
+	const auto value = OptionLanguage.value();
+	for (const auto code : kLanguages) {
+		if (value == QString::fromLatin1(code)) {
+			return value;
+		}
+	}
+	return QString();
+}
+
+QString SupportedLanguage(const QString &localeName) {
+	const auto language = localeName.section(QChar('_'), 0, 0)
+		.section(QChar('-'), 0, 0)
+		.toLower();
+	if (language == u"pt"_q) {
+		// Brazilian is MZGram's only Portuguese
+		return u"pt-BR"_q;
+	}
+	for (const auto code : kLanguages) {
+		if (language == QString::fromLatin1(code)) {
+			return language;
+		}
+	}
+	return u"en"_q;
+}
+
+QString TranslateTo(const char *key, const QString &language) {
+	if (language == u"uk"_q) {
+		return Translate(key, true);
+	}
+	// Asked while painting: an index per language, made once.
+	static auto indexes = std::map<QString, std::map<std::string, const char*>>();
+	auto i = indexes.find(language);
+	if (i == end(indexes)) {
+		auto index = std::map<std::string, const char*>();
+		for (const auto &translation : Translations(language)) {
+			index.emplace(translation.key, translation.text);
+		}
+		i = indexes.emplace(language, std::move(index)).first;
+	}
+	const auto j = i->second.find(key);
+	return (j != end(i->second))
+		? QString::fromUtf8(j->second)
+		: Translate(key, false);
 }
 
 QString Translate(const char *key, bool ukrainian) {

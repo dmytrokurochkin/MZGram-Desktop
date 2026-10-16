@@ -81,6 +81,15 @@ public:
 		_available = std::nullopt;
 	}
 
+	// "Check for updates": now, whatever the interval and the switch; a
+	// check already on its way answers it too.
+	void checkNow(Fn<void(ManualOutcome)> done) {
+		_waiting.push_back(std::move(done));
+		if (!_reply) {
+			request(true);
+		}
+	}
+
 	void dismiss(const Release &release) {
 		_state.dismissedTag = release.tag;
 		save();
@@ -93,6 +102,11 @@ private:
 		if (_reply || !Due(_state, now, CheckUpdates(), force)) {
 			return;
 		}
+		request(force);
+	}
+
+	void request(bool force) {
+		const auto now = QDateTime::currentMSecsSinceEpoch();
 		_state.lastCheck = now;
 		save();
 		auto request = QNetworkRequest(QUrl(QString::fromLatin1(kLatestReleaseUrl)));
@@ -107,19 +121,22 @@ private:
 			const auto reply = base::take(_reply);
 			const auto status = reply->attribute(
 				QNetworkRequest::HttpStatusCodeAttribute).toInt();
-			if (reply->error() == QNetworkReply::NoError
-				|| status == 304
-				|| status == 404) {
-				Apply(
-					_state,
-					status,
-					(status == 200) ? reply->readAll() : QByteArray(),
-					QString::fromUtf8(reply->rawHeader("ETag")));
-				save();
-			}
-			// Anything else (no network, the rate limit): silent
+			// Anything but an answer (no network, the rate limit) is
+			// silent for the periodic check, Failed for the user's one.
+			const auto outcome = ApplyManual(
+				_state,
+				reply->error() == QNetworkReply::NoError,
+				status,
+				(status == 200) ? reply->readAll() : QByteArray(),
+				QString::fromUtf8(reply->rawHeader("ETag")),
+				InstalledCode());
+			save();
 			reply->deleteLater();
-			refresh(force);
+			const auto waiting = base::take(_waiting);
+			refresh(force || !waiting.empty());
+			for (const auto &done : waiting) {
+				done(outcome);
+			}
 		});
 	}
 
@@ -167,6 +184,7 @@ private:
 	base::Timer _timer;
 	base::has_weak_ptr _guard;
 	rpl::variable<std::optional<Release>> _available;
+	std::vector<Fn<void(ManualOutcome)>> _waiting;
 	rpl::lifetime _lifetime;
 
 };
@@ -197,6 +215,10 @@ void OpenReleasePage(const Release &release) {
 	File::OpenUrl(release.url);
 	ResetStatus();
 	Instance().hide();
+}
+
+void CheckNow(Fn<void(ManualOutcome)> done) {
+	Instance().checkNow(std::move(done));
 }
 
 void Dismiss(const Release &release) {

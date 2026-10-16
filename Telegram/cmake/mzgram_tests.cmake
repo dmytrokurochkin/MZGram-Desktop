@@ -26,6 +26,7 @@ PRIVATE
     mzgram/mzgram_branding_rules.h
     mzgram/mzgram_lang.h
     mzgram/mzgram_lang_table.cpp
+    mzgram/mzgram_lang_translations.cpp
     mzgram/mzgram_local_pins_rules.cpp
     mzgram/mzgram_local_pins_rules.h
     mzgram/mzgram_presence_rules.cpp

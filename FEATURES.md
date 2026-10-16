@@ -2,7 +2,7 @@
 
 What MZGram adds to the regular Telegram apps, and how it differs from them. MZGram is an unofficial client: MZGram for Android is based on Telegram for Android, MZGram Desktop on Telegram Desktop. Everything here is in the code today; nothing planned is listed.
 
-"Since" is the first MZGram release with the feature. "Next release" means it is done and tested but not released yet (Android 1.0.2, Desktop 1.0.1).
+"Since" is the first MZGram release with the feature. "Next release" means it is done and tested but not released yet (Android 1.0.4, Desktop 1.0.2).
 
 Most switches are under **Settings > MZGram**, grouped into topic pages. This file is the same in both repositories; it is updated together with every change to a feature.
 
@@ -19,6 +19,7 @@ Most switches are under **Settings > MZGram**, grouped into topic pages. This fi
 | Deleted messages are kept | In every private chat, group, channel and secret chat, another person's message stays in the chat after they delete it, from a local copy. Telegram removes it. Your own messages are never kept. On by default. | 1.0.0 |
 | Edit history | Every earlier version of another person's edited message is kept; the message history screen shows the revisions, and a tap copies one. Telegram shows only the last version. | 1.0.0 |
 | View-once media kept | View-once photos and videos are kept with their file, also unopened ones. Deleted messages and removed media also stay in topics, threads and secret chats. | 1.0.0 |
+| Chats with only deleted messages stay | When the other side deletes the only message of a chat or its whole history (also by clearing it), the chat stays in the chat list and shows the newest kept message, also after a restart. Telegram removes such a chat. Without kept messages the chat goes as usual. | Next release |
 | Archive switches | Separate switches for deleted messages, edit history, media files, formatting, reactions and chats with bots. | 1.0.0 |
 | Media without limits | Files of kept messages are copied to Downloads/MZGram/Saved Attachments, of any size and with no total limit, so they stay after the sender removes them. | 1.0.0 |
 | Marks for deleted and edited messages | A mark before the time of a deleted or edited message (any text, or none); kept deleted messages are drawn at 75% opacity. | 1.0.0 |
@@ -34,7 +35,7 @@ Most switches are under **Settings > MZGram**, grouped into topic pages. This fi
 | Send without sound | While ghost mode is on, every outgoing message is sent without a notification sound. | 1.0.0 |
 | Ghost mode before stories | Before you open a story, MZGram offers to turn ghost mode on, so the story is not marked as seen. | 1.0.0 |
 | Read time | Message details show when the other person read your message. | 1.0.0 |
-| Approximate last seen | For a person who hides their last seen, MZGram shows an estimate from what this device saw (for example, their new messages), marked "(approx.)". | 1.0.0 |
+| Approximate last seen | For a person who hides their last seen, MZGram shows an estimate from what this device saw (for example, their new messages), like any last seen time; up to 1.0.3 it was marked "(approx.)". | 1.0.0 |
 | Protected content | In chats and channels that restrict saving, you can forward, save and copy messages and media and take screenshots. Messages that cannot be forwarded are sent as new copies. Off by default. | 1.0.0 |
 
 ### Message menu
@@ -78,14 +79,15 @@ Each item has its own switch.
 |---|---|---|
 | Folder tabs at the bottom | Chat folder tabs sit at the bottom of the chat list, within reach of the thumb. | 1.0.0 |
 | No bottom navigation bar | Removes the tab bar under the chat list; its pages move to the chat list menu. | 1.0.0 |
-| Accounts in the chat list menu | The menu of the three dots at the top of the chat list ends with every signed-in account (avatar and name, the current one marked, the unread count of the others); a tap switches to it at once, without opening Settings. Add Account is there while there is room for one (more with Premium). The standard items stay. On by default, can be switched off. | Next release |
+| Accounts in the chat list menu | The menu of the three dots at the top of the chat list ends with every signed-in account (avatar and name, the current one marked, the unread count of the others); a tap switches to it at once, without opening Settings. Add Account is there while there is room for one (more with Premium). The standard items stay. On by default, can be switched off. | 1.0.3 |
 | Hide stories | Removes the stories row from the chat list. | 1.0.0 |
 | Seconds in message time | Message times show seconds, such as 12:34:56. | 1.0.0 |
 | Exact numbers | Views, reactions and members show exact counts (4777 instead of 4.8K). | 1.0.0 |
 | No greeting sticker | An empty chat shows no suggested sticker. | 1.0.0 |
 | Hide channel bottom button | In channels where you cannot post, hides the bottom bar with the mute button. | 1.0.0 |
 | Animation switches | Switches for the predictive back animation and the gooey avatar animation in profiles. | 1.0.0 |
-| English and Ukrainian | The MZGram interface is available in English and Ukrainian: every MZGram switch, setting, menu item, dialog, error, the update banner and the push diagnostics are complete in both. With any other app language, the MZGram parts are in English, never a mix. | Next release |
+| 12 languages | The MZGram interface is available in 12 languages: English, Ukrainian, Russian, Polish, Spanish, German, French, Portuguese (Brazil), Turkish, Arabic, Belarusian and Kazakh. Every MZGram switch, setting, menu item, dialog, error, the update banner and the push diagnostics are complete in each; for any other language they are in English, never a mix. English and Ukrainian since 1.0.2. | Next release |
+| MZGram language | Settings > MZGram > Interface > MZGram language: System (the phone's language when MZGram has it, otherwise English) or one of the 12, apart from Telegram's language. Before, some MZGram texts could switch to the phone's language. | Next release |
 | Standard color themes | The color theme row in Appearance always lists the home theme and 8 standard themes built on the device, also without a server answer and after an update; themes from the server are added after them. The theme in use stays selected after Switch to Night Mode. | 1.0.1 |
 
 ### Ads and filters
@@ -114,8 +116,9 @@ Each item has its own switch.
 | Feature | What it does, and how it differs from Telegram | Since |
 |---|---|---|
 | MZGram update banner | Every few hours MZGram checks its latest stable release on GitHub and shows a banner when a newer one is out; Close hides that version. Telegram's own update check is turned off. Can be switched off. | 1.0.1 |
-| Self-update | Update in the banner downloads the APK of that release (for the device's architecture, else the universal one) only from the MZGram-Android releases on GitHub over HTTPS, checks its SHA-256 against the release's SHA256SUMS and GitHub's digest, and installs it with Android's package installer; Android may ask to confirm, and the first time asks to allow installing apps from MZGram. Progress is shown in the banner; a broken download resumes; a file that fails the check is deleted and nothing is installed. On an error: Retry or the release page. When a release has no APK that can be checked, the release page opens. Turned off with the update banner. The version before it is installed by hand once. | Next release |
-| MZGram name | The app calls itself MZGram in dialogs, permission requests, call notifications, contacts and in the version line of Settings ("MZGram 1.0.2 (based on Telegram 12.10.1)"), in every language. The Telegram service keeps its name. | Next release |
+| Self-update | Update in the banner downloads the APK of that release (for the device's architecture, else the universal one) only from the MZGram-Android releases on GitHub over HTTPS, checks its SHA-256 against the release's SHA256SUMS and GitHub's digest, and installs it with Android's package installer; Android may ask to confirm, and the first time asks to allow installing apps from MZGram. Progress is shown in the banner; a broken download resumes; a file that fails the check is deleted and nothing is installed. On an error: Retry or the release page. When a release has no APK that can be checked, the release page opens. Turned off with the update banner. The version before it is installed by hand once. | 1.0.2 |
+| Check for updates | Settings > MZGram > Other > Check for updates looks at once, outside the interval and also with the banner switched off, and says what it found: the latest version is installed, a newer one is available (it also gets the banner), or the check failed (no network, a GitHub error). | Next release |
+| MZGram name | The app calls itself MZGram in dialogs, permission requests, call notifications, contacts and in the version line of Settings ("MZGram 1.0.2 (based on Telegram 12.10.1)"), in every language. The Telegram service keeps its name. | 1.0.2 |
 
 ### Releases
 
@@ -132,6 +135,7 @@ Each item has its own switch.
 | Deleted messages are kept | In every chat, another person's message stays after they delete it, from a local copy. Telegram removes it. Your own messages are never kept. On by default. | 1.0.0 |
 | Edit history | Every earlier version of another person's edited message is kept and shown in an edit history window opened from the message. | 1.0.0 |
 | View-once media kept | View-once media of other people is kept with its file. | 1.0.0 |
+| Chats with only deleted messages stay | When the other side deletes the only message of a chat or its whole history, the chat stays in the chat list with the newest kept message while the app runs. After a restart the chat list comes from the server, which no longer lists such a chat; the kept messages are there again when the chat is opened. | Next release |
 | Archive switches | Separate switches for deleted messages, edit history, media files, formatting, reactions and chats with bots. | 1.0.0 |
 | Media without limits | Files of kept messages are saved in a Saved Attachments folder, of any size and with no total limit. | 1.0.0 |
 | Marks for deleted and edited messages | A mark before the time of a deleted or edited message (any text, or none); kept deleted messages are dimmed. | 1.0.0 |
@@ -147,7 +151,7 @@ Each item has its own switch.
 | Send without sound | While ghost mode is on, every outgoing message is sent without a notification sound. | 1.0.0 |
 | Ghost mode before stories | Before you open a story, MZGram offers to turn ghost mode on. | 1.0.0 |
 | Read time | Message details show when the other person read your message. | 1.0.0 |
-| Approximate last seen | For a person who hides their last seen, MZGram shows an estimate from what this computer saw. | 1.0.0 |
+| Approximate last seen | For a person who hides their last seen, MZGram shows an estimate from what this computer saw, like any last seen time; up to 1.0.1 it was marked "(approx.)". | 1.0.0 |
 | Protected content | In chats and channels that restrict saving, you can forward, save and copy their messages and media; they are sent as new messages without the original sender. Off by default. | 1.0.0 |
 
 ### Message menu
@@ -187,7 +191,8 @@ Each item has its own switch.
 | Hide stories | Removes stories from the chat list. | 1.0.0 |
 | No greeting sticker | An empty chat shows no suggested sticker. | 1.0.0 |
 | Hide channel bottom button | Hides the bottom button of channels where you cannot post. | 1.0.0 |
-| English and Ukrainian | The MZGram interface is available in English and Ukrainian: every MZGram setting, menu item, dialog and the update bar are complete in both. With any other app language, the MZGram parts are in English, never a mix. | 1.0.0 |
+| 12 languages | The MZGram interface is available in 12 languages: English, Ukrainian, Russian, Polish, Spanish, German, French, Portuguese (Brazil), Turkish, Arabic, Belarusian and Kazakh. Every MZGram setting, menu item, dialog and the update bar are complete in each; for any other language they are in English, never a mix. English and Ukrainian since 1.0.0. | Next release |
+| MZGram language | Settings > MZGram > Interface > MZGram language: System (the system's language when MZGram has it, otherwise English) or one of the 12, apart from Telegram Desktop's language. | Next release |
 
 ### Ads and filters
 
@@ -201,9 +206,10 @@ Each item has its own switch.
 | Feature | What it does, and how it differs from Telegram | Since |
 |---|---|---|
 | MZGram update bar | Every few hours MZGram checks its latest stable release on GitHub and shows a bar in the chat list when a newer one is out; Close hides that version. Telegram Desktop's own update checks are turned off. Can be switched off. | 1.0.0 |
-| Self-update | Update in the bar downloads the archive of that release for this system and architecture (Windows x64 or ARM64 zip, Linux x64 or ARM64 tar.xz) only from the MZGram-Desktop releases on GitHub over HTTPS, checks its SHA-256 against the release's SHA256SUMS and GitHub's digest, unpacks it and restarts; the Updater copies the new files, backs up every file it replaces and puts them back if a copy fails, so the old version keeps working. The data folder is not touched. Progress is shown in the bar; a file that fails the check is deleted and nothing is installed; on an error: Retry or the release page. When the MZGram folder cannot be written, the bar says so and offers the release page. Turned off with the update bar. The version before it is installed by hand once. | Next release |
+| Self-update | Update in the bar downloads the archive of that release for this system and architecture (Windows x64 or ARM64 zip, Linux x64 or ARM64 tar.xz) only from the MZGram-Desktop releases on GitHub over HTTPS, checks its SHA-256 against the release's SHA256SUMS and GitHub's digest, unpacks it and restarts; the Updater copies the new files, backs up every file it replaces and puts them back if a copy fails, so the old version keeps working. The data folder is not touched. Progress is shown in the bar; a file that fails the check is deleted and nothing is installed; on an error: Retry or the release page. When the MZGram folder cannot be written, the bar says so and offers the release page. Turned off with the update bar. The version before it is installed by hand once. | 1.0.1 |
+| Check for updates | Settings > MZGram > Interface > Check for updates looks at once, outside the interval and also with the bar switched off, and says what it found: the latest version is installed, a newer one is available (it also gets the bar), or the check failed. | Next release |
 | Own data folder | MZGram keeps its data apart from Telegram Desktop, so both can be installed. | 1.0.0 |
-| MZGram name | Window titles, the About box ("MZGram Desktop X.Y.Z, an unofficial client based on Telegram Desktop", GPL, GitHub), menus, tray, notifications, the Windows app id and Start menu shortcut, and the exe properties say MZGram, in every language. The Telegram service keeps its name. | Next release |
+| MZGram name | Window titles, the About box ("MZGram Desktop X.Y.Z, an unofficial client based on Telegram Desktop", GPL, GitHub), menus, tray, notifications, the Windows app id and Start menu shortcut, and the exe properties say MZGram, in every language. The Telegram service keeps its name. | 1.0.1 |
 
 ### Releases
 
@@ -211,7 +217,7 @@ Each item has its own switch.
 |---|---|---|
 | Windows x64 and ARM64 | A zip for each, with `MZGram.exe`. | 1.0.0 |
 | Linux x64 | A tar.xz, built against glibc 2.28 so it runs on current distributions. | 1.0.0 |
-| Linux ARM64 | A tar.xz for aarch64 machines such as Snapdragon laptops. | Next release |
+| Linux ARM64 | A tar.xz for aarch64 machines such as Snapdragon laptops. | 1.0.1 |
 | Source archive and checksums | Every release has the complete source (`-source.tar.xz`) and `SHA256SUMS`. | 1.0.0 |
 
 ## Android and Desktop compared
@@ -221,6 +227,7 @@ Yes: present. No: absent. Partly: present in a narrower form.
 | Feature | Android | Desktop |
 |---|---|---|
 | Deleted messages, edit history, view-once media kept | Yes | Yes |
+| A chat with only deleted messages stays in the list | Next release | Next release (until a restart) |
 | Archive export, import, wipe | Yes | Yes |
 | Ghost mode: read receipts and typing | Yes | Yes |
 | Ghost mode: online status | No | Yes |
@@ -235,15 +242,16 @@ Yes: present. No: absent. Partly: present in a narrower form.
 | Instant camera and camera tile switches | Yes | No |
 | Original video quality | Yes | No |
 | Folder tabs at the bottom, no bottom bar | Yes | No |
-| Accounts in the menu, one tap to switch | Next release | Yes (Telegram Desktop's side menu) |
+| Accounts in the menu, one tap to switch | Yes | Yes (Telegram Desktop's side menu) |
 | Exact numbers, animation switches | Yes | No |
 | Seconds in time, hide stories, no greeting sticker, channel button | Yes | Yes |
 | No sponsored messages, Zalgo filter | Yes | Yes |
 | Standard color themes without the server | Yes | No (Telegram Desktop has them built in) |
 | 1 GB cache limit | Yes | No (Telegram Desktop already offers it) |
 | UnifiedPush notifications | Yes | No |
-| Interface in English and Ukrainian, complete in both | Next release | Yes |
+| Interface in 12 languages, complete in each, chosen apart from Telegram's | Next release | Next release |
 | MZGram update banner, Telegram's updater off | Yes | Yes |
-| Self-update from GitHub with a SHA-256 check | Next release | Next release |
-| MZGram name everywhere | Next release | Next release |
-| ARM64 builds | Yes (the APK) | Windows yes, Linux next release |
+| Check for updates by hand, with the result | Next release | Next release |
+| Self-update from GitHub with a SHA-256 check | Yes | Yes |
+| MZGram name everywhere | Yes | Yes |
+| ARM64 builds | Yes (the APK) | Yes |
