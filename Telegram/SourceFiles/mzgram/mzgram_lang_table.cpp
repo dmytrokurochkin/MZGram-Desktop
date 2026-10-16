@@ -253,7 +253,7 @@ const std::vector<Phrase> kPhrases = {
 		"peek. When the last message is a photo or video, this shows it "
 		"directly instead.",
 		"Утримання аватара чату зазвичай відкриває попередній перегляд "
-		"чату. Якщо останнє повідомлення — фото або відео, натомість "
+		"чату. Якщо останнє повідомлення це фото або відео, натомість "
 		"показується саме воно." },
 	{ "auto_pause_video", "Auto pause video", "Автопауза відео" },
 	{ "confirm_voice", "Confirm before sending voice messages", "Підтверджувати надсилання голосових" },

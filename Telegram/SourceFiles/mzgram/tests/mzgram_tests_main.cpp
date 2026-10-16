@@ -1408,8 +1408,13 @@ void TestEveryPhraseInEveryLanguage() {
 	const auto same = QSet<QString>{ u"settings_title"_q, u"details_id"_q };
 	auto problems = QStringList();
 	auto english = std::map<QString, QString>();
+	const auto longDash = QChar(0x2014);
 	for (const auto &phrase : MZGram::Phrases()) {
 		english.emplace(QString::fromUtf8(phrase.key), QString::fromUtf8(phrase.english));
+		if (QString::fromUtf8(phrase.english).contains(longDash)
+			|| QString::fromUtf8(phrase.ukrainian).contains(longDash)) {
+			problems.push_back(QString::fromUtf8(phrase.key) + u": long dash"_q);
+		}
 	}
 	for (const auto code : MZGram::kLanguages) {
 		const auto language = QString::fromLatin1(code);
@@ -1445,6 +1450,9 @@ void TestEveryPhraseInEveryLanguage() {
 				++identical;
 			}
 			letters += text;
+			if (text.contains(longDash)) {
+				problems.push_back(language + ' ' + key + u": long dash"_q);
+			}
 			if (!cyrillicLanguage && text.contains(cyrillic)) {
 				problems.push_back(language + ' ' + key + u": Cyrillic"_q);
 			}
