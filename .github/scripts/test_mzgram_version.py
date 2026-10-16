@@ -119,6 +119,14 @@ class NotesTest(unittest.TestCase):
         self.assertEqual(notes(["[mzgram] Testing mode for the archive", "[mzgram] CIrcle videos: keep the sound"]),
                          ["- Testing mode for the archive", "- CIrcle videos: keep the sound"])
 
+    def test_features_md_lines_are_left_out(self):
+        subjects = [
+            "[mzgram] FEATURES.md: self-update on Desktop, same file as in MZGram-Android",
+            "[mzgram] 12 languages: a check of every phrase, FEATURES.md names the languages",
+            "[mzgram] MZGram language in Settings",
+        ]
+        self.assertEqual(notes(subjects), ["- MZGram language in Settings"])
+
     def test_lines_naming_other_clients_are_left_out(self):
         # The names are written reversed, as in the script
         first, second, third = ("UYA", "oken", "yrucreM")

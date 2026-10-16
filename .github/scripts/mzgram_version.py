@@ -34,7 +34,8 @@ INTERNAL = re.compile(r"^(CI|Test|Tests|Release workflow|Release notes|Docs|Spec
 # "Topic pages test: ...", "Build Linux x64 in CI", "Install ATL so the
 # Release breakpad build links". Whole words only ("CIrcle" stays).
 INTERNAL_PREFIX = re.compile(r"^[^:]*\b(CI|tests?)\s*:", re.IGNORECASE)
-INTERNAL_WORDS = re.compile(r"\b(CI|workflow|breakpad|unit tests?|builds|Qt6|Qt Network|superseded|README|upstream|comments)\b")
+# FEATURES.md is updated with every feature: its lines are noise in the notes.
+INTERNAL_WORDS = re.compile(r"\b(CI|workflow|breakpad|unit tests?|builds|Qt6|Qt Network|superseded|README|upstream|comments|FEATURES\.md)\b")
 NO_CHANGES = "- Build, test and CI changes only."
 # Names of other clients never go into the notes, whatever case. Kept
 # reversed so the names themselves do not appear in this repository.
