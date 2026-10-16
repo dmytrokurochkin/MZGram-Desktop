@@ -116,15 +116,16 @@ Each item has its own switch.
 | Feature | What it does, and how it differs from Telegram | Since |
 |---|---|---|
 | MZGram update banner | Every few hours MZGram checks its latest stable release on GitHub and shows a banner when a newer one is out; Close hides that version. Telegram's own update check is turned off. Can be switched off. | 1.0.1 |
-| Self-update | Update in the banner downloads the APK of that release (for the device's architecture, else the universal one) only from the MZGram-Android releases on GitHub over HTTPS, checks its SHA-256 against the release's SHA256SUMS and GitHub's digest, and installs it with Android's package installer; Android may ask to confirm, and the first time asks to allow installing apps from MZGram. Progress is shown in the banner; a broken download resumes; a file that fails the check is deleted and nothing is installed. On an error: Retry or the release page. When a release has no APK that can be checked, the release page opens. Turned off with the update banner. The version before it is installed by hand once. | 1.0.2 |
+| Self-update | Update in the banner downloads the APK of that release (for the device's architecture, else the universal one) only from the MZGram-Android releases on GitHub over HTTPS, checks its SHA-256 against the release's SHA256SUMS and GitHub's digest, and installs it with Android's package installer; Android may ask to confirm, and the first time asks to allow installing apps from MZGram. Progress is shown in the banner; a broken download resumes; a file that fails the check is deleted and nothing is installed. On an error: Retry or the release page. When a release has no APK that can be checked, the release page opens. Only an APK of MZGram's own package is installed. Turned off with the update banner. The version before it is installed by hand once. | 1.0.2 |
 | Check for updates | Settings > MZGram > Other > Check for updates looks at once, outside the interval and also with the banner switched off, and says what it found: the latest version is installed, a newer one is available (it also gets the banner), or the check failed (no network, a GitHub error). | Next release |
 | MZGram name | The app calls itself MZGram in dialogs, permission requests, call notifications, contacts and in the version line of Settings ("MZGram 1.0.2 (based on Telegram 12.10.1)"), in every language. The Telegram service keeps its name. | 1.0.2 |
+| Own package | MZGram is org.mzgram.messenger, a separate app beside Telegram from Google Play and from telegram.org (up to 1.0.3 MZGram had the package of Telegram from telegram.org, so Android took it for that app's update and did not install it). Its content providers, permissions and contacts account are its own, and its launcher icon is violet, not Telegram's blue. tg:// and t.me links may ask which app opens them. MZGram 1.0.3 and older do not update to it: install it by hand once, sign in, move the archive with Export and Import, then remove the old MZGram. | Next release |
 
 ### Releases
 
 | Feature | What it does | Since |
 |---|---|---|
-| Signed releases | Every release APK is signed with the MZGram key, with a key rotation from the earlier key so it installs over earlier MZGram builds and keeps their data. `SHA256SUMS` and the signing certificate are published with each release. | 1.0.0 |
+| Signed releases | Every release APK is signed with the MZGram key, with a key rotation from the earlier key so it installs over earlier MZGram builds and keeps their data (up to 1.0.3; the next release has its own package and is installed beside them). `SHA256SUMS` and the signing certificate are published with each release. | 1.0.0 |
 
 ## Desktop
 
