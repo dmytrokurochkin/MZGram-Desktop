@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "mzgram/mzgram_message_store.h"
 
+class History;
 class HistoryItem;
 struct TextWithEntities;
 
@@ -29,6 +30,11 @@ namespace MZGram {
 void FilterPreserved(std::vector<not_null<HistoryItem*>> &toDestroy);
 
 [[nodiscard]] bool IsPreservedDeleted(not_null<const HistoryItem*> item);
+
+// History::setLastServerMessage, when the server says a chat has no last
+// message: the newest kept deleted message loaded in it (KeptChatListMessage),
+// so the chat stays in the chat list showing it; nullptr for none.
+[[nodiscard]] HistoryItem *NewestPreservedItem(not_null<History*> history);
 
 // Called before an edition overwrites the text, while the old one is intact.
 void RecordEditBefore(

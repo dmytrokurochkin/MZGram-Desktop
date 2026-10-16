@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "history/history.h"
 
+#include "mzgram/mzgram_anti_recall.h"
 #include "mzgram/mzgram_archive.h"
 #include "mzgram/mzgram_options.h"
 
@@ -3109,6 +3110,11 @@ void History::clearSharedMedia() {
 }
 
 void History::setLastServerMessage(HistoryItem *item) {
+	if (!item) {
+		// MZGram: a chat whose own messages are all gone keeps its newest
+		// kept deleted message, and stays in the chat list.
+		item = MZGram::NewestPreservedItem(this);
+	}
 	_lastServerMessage = item;
 	if (_lastMessage
 		&& *_lastMessage

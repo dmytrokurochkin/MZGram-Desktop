@@ -15,6 +15,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history.h"
 #include "history/history_item.h"
 #include "history/history_item_components.h"
+#include "history/view/history_view_element.h"
 #include "main/main_session.h"
 #include "mzgram/mzgram_archive.h"
 #include "mzgram/mzgram_edit_history_box.h"
@@ -73,6 +74,35 @@ void FilterPreserved(std::vector<not_null<HistoryItem*>> &toDestroy) {
 
 bool IsPreservedDeleted(not_null<const HistoryItem*> item) {
 	return AntiRecall() && MessageStore::Instance().isDeleted(KeyFor(item));
+}
+
+HistoryItem *NewestPreservedItem(not_null<History*> history) {
+	if (!AntiRecall()) {
+		return nullptr;
+	}
+	auto items = std::vector<not_null<HistoryItem*>>();
+	auto candidates = std::vector<ChatListCandidate>();
+	const auto add = [&](not_null<HistoryItem*> item) {
+		items.push_back(item);
+		candidates.push_back({
+			.id = item->id.bare,
+			.keptDeleted = item->isRegular() && IsPreservedDeleted(item),
+			.service = item->isService(),
+		});
+	};
+	// The chat list's own message, also when the chat was never opened.
+	if (history->lastMessageKnown()) {
+		if (const auto last = history->lastMessage()) {
+			add(last);
+		}
+	}
+	for (const auto &block : history->blocks) {
+		for (const auto &view : block->messages) {
+			add(view->data());
+		}
+	}
+	const auto index = KeptChatListMessage(candidates);
+	return (index >= 0) ? items[index].get() : nullptr;
 }
 
 void RecordEditBefore(

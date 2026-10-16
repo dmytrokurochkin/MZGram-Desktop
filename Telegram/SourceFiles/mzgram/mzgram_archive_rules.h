@@ -11,6 +11,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <QtCore/QString>
 
+#include <vector>
+
 namespace MZGram {
 
 // Settings > MZGram > Archive. Other people's deleted messages (with their
@@ -59,5 +61,19 @@ inline constexpr auto kDeletedOpacity = 0.75;
 [[nodiscard]] bool KeepsDeleted(bool service, bool own, bool bot);
 // The same for the earlier version of an edited message.
 [[nodiscard]] bool KeepsEdit(bool service, bool own, bool bot);
+
+// A message of a chat, as the chat list sees it.
+struct ChatListCandidate {
+	int64 id = 0;
+	bool keptDeleted = false;
+	bool service = false;
+};
+
+// A chat whose own messages are all gone (the only one or the whole
+// history deleted or cleared by the other side) stays in the chat list
+// with its newest kept deleted message: its index in items, -1 for none
+// (the chat goes as usual).
+[[nodiscard]] int KeptChatListMessage(
+	const std::vector<ChatListCandidate> &items);
 
 } // namespace MZGram

@@ -140,4 +140,20 @@ bool KeepsEdit(bool service, bool own, bool bot) {
 		&& (!bot || SaveForBots());
 }
 
+int KeptChatListMessage(const std::vector<ChatListCandidate> &items) {
+	if (!SaveDeletedMessages()) {
+		return -1;
+	}
+	auto result = -1;
+	for (auto i = 0; i != int(items.size()); ++i) {
+		const auto &item = items[i];
+		if (item.keptDeleted
+			&& !item.service
+			&& (result < 0 || item.id > items[result].id)) {
+			result = i;
+		}
+	}
+	return result;
+}
+
 } // namespace MZGram
