@@ -29,6 +29,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <cstdio>
 #include <functional>
+#include <map>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -1037,7 +1038,7 @@ void TestFeaturesFile() {
 	if (features.contains(QRegularExpression(u"\\b[0-9a-f]{9,40}\\b"_q))) {
 		problems.push_back(u"a commit hash"_q);
 	}
-	if (!features.contains(u"MZGram interface is available in English and Ukrainian"_q)) {
+	if (!features.contains(u"MZGram interface is available in 12 languages"_q)) {
 		problems.push_back(u"the languages are not named"_q);
 	}
 	if (!read(u"../../README.md"_q).contains(u"(FEATURES.md)"_q)) {
@@ -1374,6 +1375,318 @@ void TestUpdateDue() {
 	Check(Due(state, 1001, false, true), "update: the user's own check is always due", "");
 }
 
+[[nodiscard]] QString ReadSource(const char *path) {
+	auto file = QFile(QString::fromUtf8(MZGRAM_SOURCE_DIR) + '/' + path);
+	return file.open(QIODevice::ReadOnly)
+		? QString::fromUtf8(file.readAll()).replace(u"\r\n"_q, u"\n"_q)
+		: QString();
+}
+
+[[nodiscard]] QStringList PlaceholdersOf(const QString &text) {
+	auto result = QStringList();
+	auto i = QRegularExpression(u"%[0-9]|\\{[a-z_]+\\}"_q).globalMatch(text);
+	while (i.hasNext()) {
+		result.push_back(i.next().captured());
+	}
+	result.sort();
+	return result;
+}
+
+// Every MZGram phrase is in each of the twelve languages, in that language:
+// every key, nothing more, the same %1 and {name} placeholders, and the
+// language's own script and letters.
+void TestEveryPhraseInEveryLanguage() {
+	const auto cyrillic = QRegularExpression(u"[\\x{0400}-\\x{04FF}]"_q);
+	const auto arabic = QRegularExpression(u"[\\x{0600}-\\x{06FF}]"_q);
+	// Letters of the Cyrillic ones that only that language uses
+	const auto russianOnly = QRegularExpression(QString::fromUtf8("[ыэъЫЭЪ]"));
+	const auto ukrainianOnly = QRegularExpression(QString::fromUtf8("[іїєґІЇЄҐ]"));
+	const auto notBelarusian = QRegularExpression(QString::fromUtf8("[ъщиЪЩИїєґЇЄҐ]"));
+	const auto belarusianOnly = QRegularExpression(QString::fromUtf8("[ўЎ]"));
+	const auto kazakhOnly = QRegularExpression(QString::fromUtf8("[әғқңөұүһӘҒҚҢӨҰҮҺ]"));
+	// Texts that read the same in every language: names, ids
+	const auto same = QSet<QString>{ u"settings_title"_q, u"details_id"_q };
+	auto problems = QStringList();
+	auto english = std::map<QString, QString>();
+	for (const auto &phrase : MZGram::Phrases()) {
+		english.emplace(QString::fromUtf8(phrase.key), QString::fromUtf8(phrase.english));
+	}
+	for (const auto code : MZGram::kLanguages) {
+		const auto language = QString::fromLatin1(code);
+		if (language == u"en"_q || language == u"uk"_q) {
+			if (!MZGram::Translations(language).empty()) {
+				problems.push_back(language + u": in the other tables"_q);
+			}
+			continue;
+		}
+		const auto cyrillicLanguage = (language == u"ru"_q)
+			|| (language == u"be"_q)
+			|| (language == u"kk"_q);
+		auto seen = QSet<QString>();
+		auto letters = QString();
+		auto identical = 0;
+		for (const auto &translation : MZGram::Translations(language)) {
+			const auto key = QString::fromUtf8(translation.key);
+			const auto text = QString::fromUtf8(translation.text);
+			if (seen.contains(key)) {
+				problems.push_back(language + ' ' + key + u": twice"_q);
+			}
+			seen.insert(key);
+			const auto i = english.find(key);
+			if (i == end(english)) {
+				problems.push_back(language + ' ' + key + u": not an MZGram key"_q);
+				continue;
+			} else if (text.trimmed().isEmpty()) {
+				problems.push_back(language + ' ' + key + u": empty"_q);
+			} else if (PlaceholdersOf(text) != PlaceholdersOf(i->second)) {
+				problems.push_back(language + ' ' + key + u": placeholders differ"_q);
+			}
+			if (text == i->second && !same.contains(key)) {
+				++identical;
+			}
+			letters += text;
+			if (!cyrillicLanguage && text.contains(cyrillic)) {
+				problems.push_back(language + ' ' + key + u": Cyrillic"_q);
+			}
+			if (language == u"ru"_q && text.contains(ukrainianOnly)) {
+				problems.push_back(language + ' ' + key + u": Ukrainian letters"_q);
+			} else if (language == u"be"_q && text.contains(notBelarusian)) {
+				problems.push_back(language + ' ' + key + u": not Belarusian letters"_q);
+			}
+		}
+		for (const auto &[key, text] : english) {
+			if (!seen.contains(key)) {
+				problems.push_back(language + ' ' + key + u": missing"_q);
+			}
+		}
+		// The language as a whole, not word by word
+		const auto check = [&](bool good, const char *what) {
+			if (!good) {
+				problems.push_back(language + u": "_q + QString::fromUtf8(what));
+			}
+		};
+		const auto has = [&](const char *pattern) {
+			return letters.contains(QRegularExpression(QString::fromUtf8(pattern)));
+		};
+		if (language == u"ru"_q) {
+			check(letters.contains(russianOnly), "not Russian");
+		} else if (language == u"be"_q) {
+			check(letters.contains(belarusianOnly) && has("і"), "not Belarusian");
+		} else if (language == u"kk"_q) {
+			check(letters.contains(kazakhOnly), "not Kazakh");
+		} else if (language == u"ar"_q) {
+			check(letters.contains(arabic), "not Arabic");
+		} else if (language == u"pl"_q) {
+			check(has("[ąęłśżźćń]"), "not Polish");
+		} else if (language == u"de"_q) {
+			check(has("[äöüß]"), "not German");
+		} else if (language == u"fr"_q) {
+			check(has("[éèàçê]"), "not French");
+		} else if (language == u"es"_q) {
+			check(has("[ñáéíóú]"), "not Spanish");
+		} else if (language == u"pt-BR"_q) {
+			check(has("[ãõçáéê]"), "not Portuguese");
+		} else if (language == u"tr"_q) {
+			check(has("[ığşçöü]"), "not Turkish");
+		} else {
+			check(false, "an unknown language");
+		}
+		// A few names (MZGram, GitHub) read the same; whole English texts
+		// are not translations.
+		check(identical * 10 < int(english.size()), "many texts left in English");
+	}
+	Check(
+		problems.isEmpty(),
+		"every MZGram phrase is in all twelve languages",
+		problems.join(u", "_q).toStdString().c_str());
+}
+
+// The MZGram language: the choice in Settings, else the system's language
+// when MZGram has it, else English; a missing text is English too.
+void TestLanguageChoice() {
+	auto problems = QStringList();
+	const auto expect = [&](const QString &locale, const QString &language) {
+		if (MZGram::SupportedLanguage(locale) != language) {
+			problems.push_back(locale + u" -> "_q + MZGram::SupportedLanguage(locale));
+		}
+	};
+	expect(u"de_AT"_q, u"de"_q);
+	expect(u"pt-PT"_q, u"pt-BR"_q);
+	expect(u"pt_BR"_q, u"pt-BR"_q);
+	expect(u"kk"_q, u"kk"_q);
+	expect(u"be-BY"_q, u"be"_q);
+	expect(u"uk-UA"_q, u"uk"_q);
+	expect(u"ar-EG"_q, u"ar"_q);
+	expect(u"zh_CN"_q, u"en"_q);
+	expect(u"it"_q, u"en"_q);
+	expect(QString(), u"en"_q);
+	auto &option = base::options::lookup<QString>(MZGram::kOptionLanguage);
+	if (!option.value().isEmpty() || !MZGram::LanguageChoice().isEmpty()) {
+		problems.push_back(u"not System by default"_q);
+	}
+	option.set(u"pl"_q);
+	if (MZGram::LanguageChoice() != u"pl"_q) {
+		problems.push_back(u"the choice is not kept"_q);
+	}
+	option.set(u"xx"_q);
+	if (!MZGram::LanguageChoice().isEmpty()) {
+		problems.push_back(u"an unknown choice is not System"_q);
+	}
+	option.set(QString());
+	if (MZGram::TranslateTo("section_archive", u"de"_q) == MZGram::Translate("section_archive", false)) {
+		problems.push_back(u"German is English"_q);
+	}
+	if (MZGram::TranslateTo("section_archive", u"it"_q) != u"Archive"_q
+		|| MZGram::TranslateTo("section_archive", u"uk"_q) != MZGram::Translate("section_archive", true)) {
+		problems.push_back(u"an unknown language is not English"_q);
+	}
+	Check(
+		problems.isEmpty(),
+		"the MZGram language: the choice, else the system's, else English",
+		problems.join(u", "_q).toStdString().c_str());
+}
+
+// The picker in Settings > MZGram > Interface, and the texts follow it.
+void TestLanguagePickerIsWired() {
+	auto missing = QStringList();
+	const auto wired = std::vector<std::pair<const char*, QString>>{
+		{ "mzgram/mzgram_settings.cpp", u"Box(LanguageBox)"_q },
+		{ "mzgram/mzgram_settings.cpp", u"Text(\"mzgram_language\")"_q },
+		{ "mzgram/mzgram_lang.cpp", u"lookup<QString>(kOptionLanguage).changes()"_q },
+		{ "mzgram/mzgram_lang.cpp", u"TranslateTo(key, CurrentLanguage())"_q },
+		{ "../CMakeLists.txt", u"mzgram/mzgram_lang_translations.cpp"_q },
+		{ "../cmake/mzgram_tests.cmake", u"mzgram/mzgram_lang_translations.cpp"_q },
+	};
+	for (const auto &[path, text] : wired) {
+		if (!ReadSource(path).contains(text)) {
+			missing.push_back(QString::fromUtf8(path) + u": "_q + text);
+		}
+	}
+	Check(
+		missing.isEmpty(),
+		"the MZGram language picker is in Settings and the texts follow it",
+		missing.join(u", "_q).toStdString().c_str());
+}
+
+// A hidden last seen is shown as any last seen time: no "(approx.)".
+void TestLastSeenIsPlain() {
+	auto problems = QStringList();
+	for (const auto &phrase : MZGram::Phrases()) {
+		if (QString::fromUtf8(phrase.key).contains(u"approx"_q)) {
+			problems.push_back(QString::fromUtf8(phrase.key));
+		}
+	}
+	const auto presence = ReadSource("mzgram/mzgram_presence.cpp");
+	if (presence.contains(u"approx\""_q) || !presence.contains(u"return text;"_q)) {
+		problems.push_back(u"mzgram_presence.cpp marks the time"_q);
+	}
+	Check(
+		problems.isEmpty(),
+		"a hidden last seen is shown as a plain time",
+		problems.join(u", "_q).toStdString().c_str());
+}
+
+// A chat whose own messages are all gone stays in the chat list with its
+// newest kept deleted message.
+void TestDeletedChatStays() {
+	using MZGram::ChatListCandidate;
+	auto problems = QStringList();
+	const auto kept = [](int64 id) {
+		return ChatListCandidate{ .id = id, .keptDeleted = true };
+	};
+	if (MZGram::KeptChatListMessage({ kept(5) }) != 0) {
+		problems.push_back(u"the only message, deleted"_q);
+	}
+	if (MZGram::KeptChatListMessage({ kept(5), kept(9), kept(7) }) != 1) {
+		problems.push_back(u"the newest of the whole history"_q);
+	}
+	if (MZGram::KeptChatListMessage({ ChatListCandidate{ .id = 9, .keptDeleted = true, .service = true }, kept(3) }) != 1) {
+		problems.push_back(u"a service message"_q);
+	}
+	if (MZGram::KeptChatListMessage({ ChatListCandidate{ .id = 9 } }) != -1
+		|| MZGram::KeptChatListMessage({}) != -1) {
+		problems.push_back(u"nothing kept"_q);
+	}
+	auto &deleted = base::options::lookup<bool>(MZGram::kOptionSaveDeletedMessages);
+	deleted.set(false);
+	if (MZGram::KeptChatListMessage({ kept(5) }) != -1) {
+		problems.push_back(u"kept with the switch off"_q);
+	}
+	deleted.set(true);
+	const auto history = ReadSource("history/history.cpp");
+	const auto hook = history.indexOf(u"item = MZGram::NewestPreservedItem(this);"_q);
+	const auto setter = history.indexOf(u"void History::setLastServerMessage(HistoryItem *item) {"_q);
+	if (hook < 0 || setter < 0 || hook < setter || hook > setter + 400) {
+		problems.push_back(u"History::setLastServerMessage does not keep it"_q);
+	}
+	if (!ReadSource("mzgram/mzgram_anti_recall.cpp").contains(u"KeptChatListMessage(candidates)"_q)) {
+		problems.push_back(u"NewestPreservedItem does not use the rule"_q);
+	}
+	Check(
+		problems.isEmpty(),
+		"a chat with only kept deleted messages stays in the chat list",
+		problems.join(u", "_q).toStdString().c_str());
+}
+
+// "Check for updates": says latest, available or failed; an error is not
+// "the latest version".
+void TestManualUpdateCheck() {
+	using namespace MZGram::Update;
+	auto problems = QStringList();
+	const auto installed = StableCode(u"v1.0.1"_q);
+	const auto release = [](const QByteArray &tag) {
+		return QByteArray("{\"tag_name\":\"") + tag
+			+ "\",\"draft\":false,\"prerelease\":false,\"html_url\":\"https://github.com/dmytrokurochkin/MZGram-Desktop/releases/tag/"
+			+ tag + "\"}";
+	};
+	auto state = State();
+	auto outcome = ApplyManual(state, true, 200, release("v1.0.2"), u"\"e1\""_q, installed);
+	if (outcome.result != ManualResult::Available || !outcome.release || outcome.release->tag != u"v1.0.2"_q) {
+		problems.push_back(u"a newer version"_q);
+	}
+	state.dismissedTag = u"v1.0.2"_q;
+	outcome = ApplyManual(state, true, 304, QByteArray(), QString(), installed);
+	if (outcome.result != ManualResult::Available) {
+		problems.push_back(u"a closed newer version, unchanged answer"_q);
+	}
+	state = State();
+	if (ApplyManual(state, true, 200, release("v1.0.1"), QString(), installed).result != ManualResult::Latest) {
+		problems.push_back(u"the installed version"_q);
+	}
+	if (ApplyManual(state, true, 404, QByteArray(), QString(), installed).result != ManualResult::Latest) {
+		problems.push_back(u"no release yet"_q);
+	}
+	state.latestTag = u"v1.0.5"_q;
+	state.latestUrl = u"https://github.com/dmytrokurochkin/MZGram-Desktop/releases/tag/v1.0.5"_q;
+	const auto errors = std::vector<std::tuple<bool, int, QByteArray>>{
+		{ false, 0, QByteArray() },
+		{ false, 403, QByteArray() },
+		{ false, 500, QByteArray() },
+		{ true, 200, QByteArray("<html>") },
+	};
+	for (const auto &[ok, status, body] : errors) {
+		if (ApplyManual(state, ok, status, body, QString(), installed).result != ManualResult::Failed) {
+			problems.push_back(u"an error at "_q + QString::number(status));
+		}
+	}
+	if (state.latestTag != u"v1.0.5"_q) {
+		problems.push_back(u"an error changed the saved release"_q);
+	}
+	const auto settings = ReadSource("mzgram/mzgram_settings.cpp");
+	if (!settings.contains(u"Text(\"check_updates_now\")"_q)
+		|| !settings.contains(u"MZGram::Update::CheckNow("_q)
+		|| !settings.contains(u"update_check_failed"_q)) {
+		problems.push_back(u"no button in Settings"_q);
+	}
+	if (!ReadSource("mzgram/mzgram_update.cpp").contains(u"ApplyManual("_q)) {
+		problems.push_back(u"the check does not use the rule"_q);
+	}
+	Check(
+		problems.isEmpty(),
+		"Check for updates says latest, available or failed",
+		problems.join(u", "_q).toStdString().c_str());
+}
+
 } // namespace
 
 int main() {
@@ -1417,6 +1730,12 @@ int main() {
 		TestLocalPinsSortPosition,
 		TestLocalPinsStorage,
 		TestLocalPinsAreWired,
+		TestEveryPhraseInEveryLanguage,
+		TestLanguageChoice,
+		TestLanguagePickerIsWired,
+		TestLastSeenIsPlain,
+		TestDeletedChatStays,
+		TestManualUpdateCheck,
 	};
 	for (const auto &test : tests) {
 		test();
