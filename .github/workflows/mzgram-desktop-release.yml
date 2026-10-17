@@ -474,7 +474,7 @@ jobs:
       # Only the builds: the Docker step of the Linux job leaves a build record
       # artifact too, which does not download as a file
       - name: Download the builds.
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           path: dist
           pattern: '{windows-x64,windows-arm64,linux-x64,linux-arm64}'
