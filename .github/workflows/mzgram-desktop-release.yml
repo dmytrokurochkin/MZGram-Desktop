@@ -283,7 +283,7 @@ jobs:
       # larger page file on the free drive gives it room.
       - name: Page file.
         if: matrix.arch == 'x64'
-        uses: al-cheb/configure-pagefile-action@a3b6ebd6b634da88790d9c58d4b37a7f4a7b8708
+        uses: al-cheb/configure-pagefile-action@9b6da52fb72a3c6147c1aad2df22d8d905681adc
         with:
           minimum-size: 16GB
           maximum-size: 40GB
