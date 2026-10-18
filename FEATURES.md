@@ -24,6 +24,7 @@ Most switches are under **Settings > MZGram**, grouped into topic pages. This fi
 | Media without limits | Files of kept messages are copied to Downloads/MZGram/Saved Attachments, of any size and with no total limit, so they stay after the sender removes them. | 1.0.0 |
 | Marks for deleted and edited messages | A mark before the time of a deleted or edited message (any text, or none); kept deleted messages are drawn at 75% opacity. | 1.0.0 |
 | Export, import and wipe | Export the archive database to a file, import it back (replacing the current archive), or delete the whole archive and its saved media after a confirmation. | 1.0.0 |
+| Export with Save as | Export opens Android's Save as, so the archive file goes where you choose (Downloads, a file manager, a cloud drive), and says when it is saved. Import takes only an MZGram archive file and keeps the current archive otherwise. Up to 1.0.4 Export closed the app. | Next release |
 | Clear the local database | Clears Telegram's cache on the device (messages, chat list); it loads again from the server. The MZGram archive is kept. | 1.0.0 |
 
 ### Privacy and ghost mode
@@ -86,6 +87,7 @@ Each item has its own switch.
 | No greeting sticker | An empty chat shows no suggested sticker. | 1.0.0 |
 | Hide channel bottom button | In channels where you cannot post, hides the bottom bar with the mute button. | 1.0.0 |
 | Animation switches | Switches for the predictive back animation and the gooey avatar animation in profiles. | 1.0.0 |
+| MZGram first in Settings | The MZGram row ("Features of this client") is the first row of Telegram's Settings, above the accounts and every Telegram setting. | Next release |
 | 12 languages | The MZGram interface is available in 12 languages: English, Ukrainian, Russian, Polish, Spanish, German, French, Portuguese (Brazil), Turkish, Arabic, Belarusian and Kazakh. Every MZGram switch, setting, menu item, dialog, error, the update banner and the push diagnostics are complete in each; for any other language they are in English, never a mix. English and Ukrainian since 1.0.2. | Next release |
 | MZGram language | Settings > MZGram > Interface > MZGram language: System (the phone's language when MZGram has it, otherwise English) or one of the 12, apart from Telegram's language. Before, some MZGram texts could switch to the phone's language. | Next release |
 | Standard color themes | The color theme row in Appearance always lists the home theme and 8 standard themes built on the device, also without a server answer and after an update; themes from the server are added after them. The theme in use stays selected after Switch to Night Mode. | 1.0.1 |
