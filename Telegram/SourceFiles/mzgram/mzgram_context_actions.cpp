@@ -44,7 +44,8 @@ namespace {
 		return QString();
 	}
 	const auto when = base::unixtime::parse(date);
-	return QLocale().toString(when, QLocale::ShortFormat);
+	// In the MZGram language, as the rest of the box
+	return MZGram::CurrentLocale().toString(when, QLocale::ShortFormat);
 }
 
 [[nodiscard]] int64 MediaByteSize(not_null<Data::Media*> media) {
@@ -164,7 +165,7 @@ void AddMessageDetailsAction(
 		controller->show(Box([=](not_null<Ui::GenericBox*> box) {
 			box->setTitle(MZGram::Tr("message_details"));
 			box->setWidth(st::boxWideWidth);
-			box->addButton(tr::lng_box_ok(), [=] { box->closeBox(); });
+			box->addButton(MZGram::Tr("button_ok"), [=] { box->closeBox(); });
 
 			const auto addRow = [&](const QString &label, const QString &value) {
 				if (value.isEmpty()) {

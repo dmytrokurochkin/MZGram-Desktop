@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
+#include <QtCore/QLocale>
 #include <QtCore/QString>
 #include <rpl/producer.h>
 
@@ -80,6 +81,8 @@ extern const char kOptionLanguage[];
 // mzgram_lang.cpp: in the MZGram language now.
 [[nodiscard]] QString CurrentLanguage();
 [[nodiscard]] QString TrNow(const char *key);
+// For dates and times on MZGram's boxes: Telegram's follow Telegram's language.
+[[nodiscard]] QLocale CurrentLocale();
 [[nodiscard]] rpl::producer<QString> Tr(const char *key);
 
 } // namespace MZGram

@@ -106,8 +106,24 @@ object_ptr<Ui::RpWidget> CreateBar(
 		label->moveToLeft(skip, (height - label->height()) / 2, width);
 	};
 
-	StatusValue(
-	) | rpl::on_next([=](const Status &status) {
+	// The labels were set once, when the bar was made, so after the MZGram
+	// language changed they kept the old one: each follows it now.
+	const auto follow = [=](not_null<Ui::LinkButton*> button, const char *key) {
+		Tr(key) | rpl::on_next([=](const QString &text) {
+			button->setText(text);
+			layout();
+		}, button->lifetime());
+	};
+	follow(page, "update_page");
+	follow(update, "update_open");
+	follow(retry, "update_retry");
+	follow(close, "update_close");
+
+	// The text is said again when the step or the language changes
+	rpl::combine(
+		StatusValue(),
+		Tr("update_available")
+	) | rpl::on_next([=](const Status &status, const QString &) {
 		const auto step = status.step;
 		const auto failed = (step == Step::Failed);
 		const auto stopped = failed

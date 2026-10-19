@@ -30,6 +30,10 @@ QString TrNow(const char *key) {
 	return TranslateTo(key, CurrentLanguage());
 }
 
+QLocale CurrentLocale() {
+	return QLocale(QString(CurrentLanguage()).replace('-', '_'));
+}
+
 // A new value each time the MZGram language or the app's language changes.
 rpl::producer<QString> Tr(const char *key) {
 	return rpl::single(

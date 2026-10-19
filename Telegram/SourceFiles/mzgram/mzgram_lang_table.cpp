@@ -389,6 +389,13 @@ const std::vector<Phrase> kPhrases = {
 	{ "replaced_at", "Replaced %1", "Замінено %1" },
 	{ "empty_text", "(empty)", "(порожньо)" },
 	{ "current_version", "Current", "Поточна" },
+	// Buttons of the boxes MZGram shows (not Telegram's, so they follow the MZGram language).
+	{ "button_cancel", "Cancel", "Скасувати" },
+	{ "button_ok", "OK", "Гаразд" },
+	{ "button_save", "Save", "Зберегти" },
+	{ "button_delete", "Delete", "Видалити" },
+	{ "button_close", "Close", "Закрити" },
+	{ "button_send", "Send", "Надіслати" },
 	// Branding (mzgram_branding.cpp, about_box.cpp)
 	{ "brand_about_text", "Unofficial messaging client based on Telegram Desktop {version}.", "Неофіційний клієнт для обміну повідомленнями на базі Telegram Desktop {version}." },
 	{ "brand_intro_about", "Welcome to MZGram Desktop,\nan unofficial client for Telegram.", "Ласкаво просимо до MZGram Desktop,\nнеофіційного клієнта Telegram." },

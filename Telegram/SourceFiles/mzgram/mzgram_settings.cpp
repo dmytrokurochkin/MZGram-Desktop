@@ -133,8 +133,8 @@ void MarkBox(
 	box->setFocusCallback([=] {
 		input->setFocusFast();
 	});
-	box->addButton(tr::lng_settings_save(), save);
-	box->addButton(tr::lng_cancel(), [=] {
+	box->addButton(Text("button_save"), save);
+	box->addButton(Text("button_cancel"), [=] {
 		box->closeBox();
 	});
 }
@@ -170,7 +170,7 @@ void LanguageBox(not_null<Ui::GenericBox*> box) {
 			: QString());
 		box->closeBox();
 	});
-	box->addButton(tr::lng_cancel(), [=] {
+	box->addButton(Text("button_cancel"), [=] {
 		box->closeBox();
 	});
 }
@@ -323,6 +323,7 @@ void BuildArchive(SectionBuilder &builder) {
 						});
 				}),
 				.confirmText = MZGram::TrNow("import"),
+				.cancelText = Text("button_cancel"),
 				.confirmStyle = &st::attentionBoxButton,
 			}));
 		},
@@ -342,7 +343,8 @@ void BuildArchive(SectionBuilder &builder) {
 				.confirmed = [=] {
 					MessageStore::Instance().wipeAll();
 				},
-				.confirmText = tr::lng_box_delete(),
+				.confirmText = Text("button_delete"),
+				.cancelText = Text("button_cancel"),
 				.confirmStyle = &st::attentionBoxButton,
 			}));
 		},
@@ -372,6 +374,7 @@ void BuildArchive(SectionBuilder &builder) {
 					Core::Restart();
 				},
 				.confirmText = MZGram::Tr("erase_local_database_button"),
+				.cancelText = Text("button_cancel"),
 				.confirmStyle = &st::attentionBoxButton,
 			}));
 		},

@@ -20,7 +20,8 @@ namespace {
 
 [[nodiscard]] QString FormatWhen(int64 unixtime) {
 	const auto when = base::unixtime::parse(TimeId(unixtime));
-	return QLocale().toString(when, QLocale::ShortFormat);
+	// In the MZGram language, as the rest of the box
+	return MZGram::CurrentLocale().toString(when, QLocale::ShortFormat);
 }
 
 } // namespace
@@ -29,10 +30,9 @@ void EditHistoryBox(
 		not_null<Ui::GenericBox*> box,
 		MessageKey key,
 		QString currentText) {
-	// Strings are hardcoded until MZGram has its own lang keys.
 	box->setTitle(MZGram::Tr("edit_history"));
 	box->setWidth(st::boxWideWidth);
-	box->addButton(tr::lng_box_ok(), [=] { box->closeBox(); });
+	box->addButton(MZGram::Tr("button_ok"), [=] { box->closeBox(); });
 
 	const auto addLabel = [&](const QString &text) {
 		box->addRow(object_ptr<Ui::FlatLabel>(

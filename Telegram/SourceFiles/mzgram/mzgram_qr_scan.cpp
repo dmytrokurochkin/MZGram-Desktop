@@ -89,7 +89,7 @@ void ShowQrResultBox(
 			QGuiApplication::clipboard()->setText(text);
 			box->closeBox();
 		});
-		box->addButton(tr::lng_close(), [=] { box->closeBox(); });
+		box->addButton(MZGram::Tr("button_close"), [=] { box->closeBox(); });
 	}));
 }
 
@@ -100,7 +100,7 @@ void ShowNoQrCodeFoundBox(not_null<Window::SessionController*> controller) {
 			box,
 			MZGram::Tr("no_qr_code"),
 			st::boxLabel));
-		box->addButton(tr::lng_box_ok(), [=] { box->closeBox(); });
+		box->addButton(MZGram::Tr("button_ok"), [=] { box->closeBox(); });
 	}));
 }
 

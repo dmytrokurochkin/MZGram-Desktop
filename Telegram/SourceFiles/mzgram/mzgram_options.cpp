@@ -293,6 +293,7 @@ bool MessageSeconds() {
 	return OptionMessageSeconds.value();
 }
 
+// Telegram's own text: message times are part of the chat, in Telegram's language.
 QString FormatMessageTime(const QTime &time) {
 	if (!MessageSeconds()) {
 		return QLocale().toString(time, QLocale::ShortFormat);

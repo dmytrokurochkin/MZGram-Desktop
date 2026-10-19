@@ -3025,7 +3025,8 @@ void VoiceRecordBar::stopRecording(StopType type, bool ttlBeforeHide) {
 							_show->showBox(Ui::MakeConfirmBox({
 								.text = MZGram::TrNow("send_video_message_question"),
 								.confirmed = std::move(sendRoundCallback),
-								.confirmText = tr::lng_send_button(),
+								.confirmText = MZGram::Tr("button_send"),
+								.cancelText = MZGram::Tr("button_cancel"),
 							}));
 						} else {
 							sendRoundCallback([] {});
@@ -3069,7 +3070,8 @@ void VoiceRecordBar::stopRecording(StopType type, bool ttlBeforeHide) {
 				_show->showBox(Ui::MakeConfirmBox({
 					.text = MZGram::TrNow("send_voice_message_question"),
 					.confirmed = std::move(sendVoiceCallback),
-					.confirmText = tr::lng_send_button(),
+					.confirmText = MZGram::Tr("button_send"),
+					.cancelText = MZGram::Tr("button_cancel"),
 				}));
 			} else {
 				sendVoiceCallback([] {});
@@ -3162,7 +3164,8 @@ void VoiceRecordBar::requestToSendWithOptions(Api::SendOptions options) {
 					? MZGram::TrNow("send_video_message_question")
 					: MZGram::TrNow("send_voice_message_question")),
 				.confirmed = std::move(sendVoiceCallback),
-				.confirmText = tr::lng_send_button(),
+				.confirmText = MZGram::Tr("button_send"),
+				.cancelText = MZGram::Tr("button_cancel"),
 			}));
 		} else {
 			sendVoiceCallback([] {});
