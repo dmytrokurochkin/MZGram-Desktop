@@ -20,6 +20,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QDir>
 #include <QtCore/QDirIterator>
 #include <QtCore/QFile>
+#include <QtCore/QFileInfo>
 #include <QtCore/QTemporaryDir>
 #include <QtCore/QRegularExpression>
 #include <QtCore/QSet>
@@ -27,6 +28,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "base/options.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <functional>
 #include <map>
@@ -1695,6 +1697,115 @@ void TestManualUpdateCheck() {
 		problems.join(u", "_q).toStdString().c_str());
 }
 
+// What MZGram shows comes from MZGram's phrases, in the MZGram language:
+// Telegram's phrases (tr::lng_*) follow Telegram's language, so a Cancel or
+// OK of Telegram's on an MZGram box was in another language than the box.
+// MZGram's sources use no tr::lng_ phrase, every confirmation box of MZGram
+// names its own Cancel (the box's default is Telegram's), dates on MZGram's
+// boxes use the MZGram language, and the update bar's texts follow a change
+// of the language. A place that shows Telegram's text on purpose says why:
+// "Telegram's own text: <why>" on that line or up to ten lines above it.
+void TestMZGramTextsAreInTheMZGramLanguage() {
+	auto problems = QStringList();
+	const auto allowed = [](const QStringList &lines, int index) {
+		for (auto i = std::max(0, index - 10); i <= index; ++i) {
+			if (lines[i].contains(u"Telegram's own text: "_q)) {
+				return true;
+			}
+		}
+		return false;
+	};
+	const auto confirmBoxes = [&](const QString &path, const QString &text, bool onlyMZGram) {
+		auto from = 0;
+		while ((from = text.indexOf(u"MakeConfirmBox({"_q, from)) >= 0) {
+			const auto till = text.indexOf(u"}));"_q, from);
+			const auto box = text.mid(from, (till < 0 ? text.size() : till) - from);
+			from += 16;
+			if (onlyMZGram && !box.contains(u"MZGram::Tr"_q)) {
+				continue;
+			}
+			if (!box.contains(u".cancelText = "_q)) {
+				problems.push_back(path + u": a confirmation box with Telegram's Cancel"_q);
+			}
+			if (box.contains(u"tr::lng_"_q)) {
+				problems.push_back(path + u": Telegram's phrase in an MZGram box"_q);
+			}
+		}
+	};
+	auto files = QDirIterator(
+		QString::fromUtf8(MZGRAM_SOURCE_DIR) + u"/mzgram"_q,
+		{ u"*.cpp"_q },
+		QDir::Files);
+	auto checked = 0;
+	while (files.hasNext()) {
+		const auto path = files.next();
+		const auto name = QFileInfo(path).fileName();
+		if (name == u"mzgram_lang_table.cpp"_q
+			|| name == u"mzgram_lang_translations.cpp"_q) {
+			continue;
+		}
+		auto file = QFile(path);
+		if (!file.open(QIODevice::ReadOnly)) {
+			continue;
+		}
+		++checked;
+		const auto text = QString::fromUtf8(file.readAll()).replace(u"\r\n"_q, u"\n"_q);
+		const auto lines = text.split('\n');
+		for (auto i = 0; i != lines.size(); ++i) {
+			const auto &line = lines[i];
+			if (line.trimmed().startsWith(u"//"_q) || allowed(lines, i)) {
+				continue;
+			}
+			if (line.contains(u"tr::lng_"_q)) {
+				problems.push_back(name + ':' + QString::number(i + 1) + u": Telegram's phrase"_q);
+			}
+			if (line.contains(u"QLocale()"_q)) {
+				problems.push_back(name + ':' + QString::number(i + 1) + u": a date in the system's language"_q);
+			}
+		}
+		confirmBoxes(name, text, false);
+	}
+	// MZGram's boxes in Telegram's sources
+	const auto voice = "history/view/controls/history_view_voice_record_bar.cpp";
+	const auto voiceText = ReadSource(voice);
+	if (!voiceText.contains(u"send_voice_message_question"_q)) {
+		problems.push_back(u"the voice message confirmation is not found"_q);
+	}
+	confirmBoxes(QString::fromUtf8(voice), voiceText, true);
+	confirmBoxes(
+		u"media_view_overlay_widget.cpp"_q,
+		ReadSource("media/view/media_view_overlay_widget.cpp"),
+		true);
+	// The update bar follows the language
+	const auto bar = ReadSource("mzgram/mzgram_update_bar.cpp");
+	for (const auto key : { "update_page", "update_open", "update_retry", "update_close" }) {
+		if (!bar.contains(u"follow("_q) || !bar.contains(u"\""_q + QString::fromLatin1(key) + u"\");"_q)) {
+			problems.push_back(u"update bar: "_q + QString::fromLatin1(key) + u" does not follow the language"_q);
+		}
+	}
+	if (!bar.contains(u"Tr(\"update_available\")"_q)) {
+		problems.push_back(u"update bar: the text does not follow the language"_q);
+	}
+	// Every button phrase is in every language
+	for (const auto code : MZGram::kLanguages) {
+		const auto language = QString::fromLatin1(code);
+		for (const auto key : { "button_cancel", "button_ok", "button_save", "button_delete", "button_close", "button_send" }) {
+			const auto text = MZGram::TranslateTo(key, language);
+			if (text.isEmpty() || text == QString::fromLatin1(key)) {
+				problems.push_back(language + ' ' + QString::fromLatin1(key) + u": missing"_q);
+			} else if (language != u"en"_q
+				&& QString::fromLatin1(key) != u"button_ok"_q
+				&& text == MZGram::TranslateTo(key, u"en"_q)) {
+				problems.push_back(language + ' ' + QString::fromLatin1(key) + u": English"_q);
+			}
+		}
+	}
+	Check(
+		problems.isEmpty() && checked > 10,
+		"MZGram's boxes, buttons, dates and update bar are in the MZGram language",
+		problems.join(u", "_q).toStdString().c_str());
+}
+
 } // namespace
 
 int main() {
@@ -1744,6 +1855,7 @@ int main() {
 		TestLastSeenIsPlain,
 		TestDeletedChatStays,
 		TestManualUpdateCheck,
+		TestMZGramTextsAreInTheMZGramLanguage,
 	};
 	for (const auto &test : tests) {
 		test();
