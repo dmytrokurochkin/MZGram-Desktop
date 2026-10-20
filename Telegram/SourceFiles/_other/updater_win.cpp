@@ -12,6 +12,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <cstring>
 
+#include <limits>
+#include <memory>
+
 bool _debug = false;
 
 wstring updaterName, updaterDir, updateTo, exeName, customWorkingDir, customKeyFile;
@@ -20,28 +23,28 @@ bool equal(const wstring &a, const wstring &b) {
 	return !_wcsicmp(a.c_str(), b.c_str());
 }
 
-void updateError(const WCHAR *msg, DWORD errorCode) {
-	WCHAR errMsg[2048];
-	LPWSTR errorTextFormatted = nullptr;
-	auto formatFlags = FORMAT_MESSAGE_FROM_SYSTEM
-		| FORMAT_MESSAGE_ALLOCATE_BUFFER
-		| FORMAT_MESSAGE_IGNORE_INSERTS;
+wstring FormatUpdateError(const wstring &message, DWORD errorCode) {
+	auto errorText = LPWSTR(nullptr);
 	FormatMessage(
-		formatFlags,
-		NULL,
+		FORMAT_MESSAGE_FROM_SYSTEM
+			| FORMAT_MESSAGE_ALLOCATE_BUFFER
+			| FORMAT_MESSAGE_IGNORE_INSERTS,
+		nullptr,
 		errorCode,
 		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-		(LPWSTR)&errorTextFormatted,
+		reinterpret_cast<LPWSTR>(&errorText),
 		0,
-		0);
-	auto errorText = errorTextFormatted
-		? errorTextFormatted
-		: L"(Unknown error)";
-	wsprintf(errMsg, L"%s, error code: %d\nError message: %s", msg, errorCode, errorText);
+		nullptr);
+	const auto guard = std::unique_ptr<void, decltype(&LocalFree)>(
+		errorText,
+		&LocalFree);
+	return message + L"\nError code: " + std::to_wstring(errorCode)
+		+ L"\nError message: " + (errorText ? errorText : L"(Unknown error)");
+}
 
-	MessageBox(0, errMsg, L"Update error!", MB_ICONERROR);
-
-	LocalFree(errorTextFormatted);
+void updateError(const WCHAR *msg, DWORD errorCode) {
+	const auto text = FormatUpdateError(msg, errorCode);
+	MessageBox(0, text.c_str(), L"Update error!", MB_ICONERROR);
 }
 
 HANDLE _logFile = 0;
@@ -97,6 +100,114 @@ void writeLog(const wstring &msg) {
 		closeLog();
 		return;
 	}
+}
+
+namespace {
+
+constexpr auto kProcessExitTimeout = DWORD(5000);
+
+bool ParsePositiveInteger(const WCHAR *text, ULONGLONG &result) {
+	result = 0;
+	for (; *text; ++text) {
+		if (*text < L'0' || *text > L'9') {
+			return false;
+		}
+		const auto digit = ULONGLONG(*text - L'0');
+		if (result > (std::numeric_limits<ULONGLONG>::max() - digit) / 10) {
+			return false;
+		}
+		result = result * 10 + digit;
+	}
+	return result != 0;
+}
+
+} // namespace
+
+bool ParseUpdateProcess(
+		const WCHAR *id,
+		const WCHAR *created,
+		DWORD &processId,
+		ULONGLONG &creationTime) {
+	auto parsedId = ULONGLONG(0);
+	auto parsedTime = ULONGLONG(0);
+	if (!ParsePositiveInteger(id, parsedId)
+		|| parsedId > std::numeric_limits<DWORD>::max()
+		|| !ParsePositiveInteger(created, parsedTime)) {
+		return false;
+	}
+	processId = DWORD(parsedId);
+	creationTime = parsedTime;
+	return true;
+}
+
+DWORD FinishUpdateProcess(DWORD processId, ULONGLONG creationTime) {
+	if (!processId || !creationTime || processId == GetCurrentProcessId()) {
+		return ERROR_INVALID_PARAMETER;
+	}
+	writeLog(L"Waiting for update parent " + std::to_wstring(processId)
+		+ L" (created " + std::to_wstring(creationTime) + L").");
+	const auto process = std::unique_ptr<void, decltype(&CloseHandle)>(
+		OpenProcess(
+			SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION,
+			FALSE,
+			processId),
+		&CloseHandle);
+	if (!process) {
+		const auto error = GetLastError();
+		return (error == ERROR_INVALID_PARAMETER) ? ERROR_SUCCESS : error;
+	}
+	auto created = FILETIME();
+	auto exited = FILETIME();
+	auto kernel = FILETIME();
+	auto user = FILETIME();
+	if (!GetProcessTimes(process.get(), &created, &exited, &kernel, &user)) {
+		return GetLastError();
+	}
+	const auto actualTime = (ULONGLONG(created.dwHighDateTime) << 32)
+		| created.dwLowDateTime;
+	if (actualTime != creationTime) {
+		writeLog(L"Update parent already exited; process id was reused.");
+		return ERROR_SUCCESS;
+	}
+	auto wait = WaitForSingleObject(process.get(), kProcessExitTimeout);
+	if (wait == WAIT_TIMEOUT) {
+		const auto termination = std::unique_ptr<void, decltype(&CloseHandle)>(
+			OpenProcess(
+				PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_TERMINATE,
+				FALSE,
+				processId),
+			&CloseHandle);
+		if (!termination) {
+			return GetLastError();
+		}
+		if (!GetProcessTimes(
+				termination.get(),
+				&created,
+				&exited,
+				&kernel,
+				&user)) {
+			return GetLastError();
+		}
+		const auto terminationTime = (ULONGLONG(created.dwHighDateTime) << 32)
+			| created.dwLowDateTime;
+		if (terminationTime != creationTime) {
+			return ERROR_SUCCESS;
+		}
+		writeLog(L"Update parent teardown timed out; terminating it.");
+		if (!TerminateProcess(termination.get(), ERROR_PROCESS_ABORTED)) {
+			const auto error = GetLastError();
+			wait = WaitForSingleObject(process.get(), kProcessExitTimeout);
+			return (wait == WAIT_OBJECT_0)
+				? ERROR_SUCCESS
+				: error;
+		}
+		wait = WaitForSingleObject(process.get(), kProcessExitTimeout);
+	}
+	return (wait == WAIT_OBJECT_0)
+		? ERROR_SUCCESS
+		: (wait == WAIT_TIMEOUT)
+		? ERROR_TIMEOUT
+		: GetLastError();
 }
 
 void fullClearPath(const wstring &dir) {
@@ -272,12 +383,17 @@ bool update() {
 	};
 	files.copy = [](const wstring &from, const wstring &to) {
 		writeLog(L"Copying file '" + from + L"' to '" + to + L"'..");
+		auto errorCode = DWORD(0);
 		for (int copyTries = 0; copyTries < 100; ++copyTries) {
 			if (CopyFile(from.c_str(), to.c_str(), FALSE)) {
 				return true;
 			}
+			errorCode = GetLastError();
 			Sleep(100);
 		}
+		writeLog(FormatUpdateError(
+			L"Could not copy:\n" + from + L"\nTo:\n" + to,
+			errorCode));
 		return false;
 	};
 	files.remove = [](const wstring &path) {
@@ -370,16 +486,34 @@ int APIENTRY wWinMain(HINSTANCE instance, HINSTANCE prevInstance, LPWSTR cmdPara
 
 	writeLog(L"Updaters started..");
 
-	LPWSTR *args;
-	int argsCount;
+	auto argsCount = 0;
+	auto processId = DWORD(0);
+	auto processCreated = ULONGLONG(0);
+	auto processArgumentsValid = true;
 
 	bool needupdate = false, autostart = false, debug = false, writeprotected = false, startintray = false;
-	args = CommandLineToArgvW(GetCommandLine(), &argsCount);
+	const auto args = CommandLineToArgvW(GetCommandLine(), &argsCount);
+	const auto argsGuard = std::unique_ptr<void, decltype(&LocalFree)>(
+		args,
+		&LocalFree);
 	if (args) {
 		for (int i = 1; i < argsCount; ++i) {
 			writeLog(std::wstring(L"Argument: ") + args[i]);
 			if (equal(args[i], L"-update")) {
 				needupdate = true;
+			} else if (equal(args[i], L"-finishprocess")) {
+				if (processId
+					|| i + 2 >= argsCount
+					|| !ParseUpdateProcess(
+						args[i + 1],
+						args[i + 2],
+						processId,
+						processCreated)) {
+					processArgumentsValid = false;
+				} else {
+					writeLog(std::wstring(L"Argument: ") + args[++i]);
+					writeLog(std::wstring(L"Argument: ") + args[++i]);
+				}
 			} else if (equal(args[i], L"-autostart")) {
 				autostart = true;
 			} else if (equal(args[i], L"-debug")) {
@@ -416,6 +550,10 @@ int APIENTRY wWinMain(HINSTANCE instance, HINSTANCE prevInstance, LPWSTR cmdPara
 		if (exeName.empty()) {
 			exeName = L"MZGram.exe"; // MZGram: was "Telegram.exe"
 		}
+		if (!processArgumentsValid) {
+			writeLog(L"Invalid update process arguments; "
+				L"continuing without process handoff.");
+		}
 		if (needupdate) writeLog(L"Need to update!");
 		if (autostart) writeLog(L"From autostart!");
 		if (writeprotected) writeLog(L"Write Protected folder!");
@@ -431,6 +569,16 @@ int APIENTRY wWinMain(HINSTANCE instance, HINSTANCE prevInstance, LPWSTR cmdPara
 					updateTo = updaterDir;
 				}
 				writeLog(L"Update to: " + updateTo);
+				if (needupdate && processId && processArgumentsValid) {
+					const auto error = FinishUpdateProcess(
+						processId,
+						processCreated);
+					if (error != ERROR_SUCCESS) {
+						writeLog(FormatUpdateError(
+							L"Could not finish closing Telegram; continuing with copy retries.",
+							error));
+					}
+				}
 				// MZGram: no updateRegistry(), it writes the uninstall entry
 				// of Telegram Desktop's installer; MZGram has no installer.
 				if (needupdate) {
@@ -449,7 +597,6 @@ int APIENTRY wWinMain(HINSTANCE instance, HINSTANCE prevInstance, LPWSTR cmdPara
 		} else {
 			writeLog(L"Error: short exe name!");
 		}
-		LocalFree(args);
 	} else {
 		writeLog(L"Error: No command line arguments!");
 	}

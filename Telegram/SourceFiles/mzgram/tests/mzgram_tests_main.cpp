@@ -1902,9 +1902,9 @@ void TestIpcRulesAreWired() {
 	auto missing = QStringList();
 	for (const auto &call : {
 			u"commands += MZGram::IpcOpenRecord(url);"_q,
-			u"MZGram::IpcRecords(i->buffer)"_q,
+			u"MZGram::IpcRecords(client->buffer)"_q,
 			u"MZGram::IpcOpenUrl(cmd.mid(5))"_q,
-			u"i->externalUrlReceived);"_q,
+			u"alive->externalUrlReceived = externalUrlReceived;"_q,
 			u"for (const auto &url : filtered.open) {"_q,
 		}) {
 		if (!text.contains(call)) {

@@ -93,7 +93,7 @@ CI builds Windows x64, Windows ARM64 and Linux x64 on every push to `mzgram` (`.
 
 ## Upstream
 
-MZGram Desktop is based on Telegram Desktop **7.2.8** from [telegramdesktop/tdesktop](https://github.com/telegramdesktop/tdesktop), with the security fix from 7.2.9 (links another launch of the app passes on to the running one, upstream commit `db3405699f`). Upstream updates are taken from that repository: the `mzgram` branch shares upstream's history from the `v7.2.8` tag on, so a newer upstream release tag is merged into it and the fork stays a readable set of patches on top of it.
+MZGram Desktop is based on Telegram Desktop **7.3.1** from [telegramdesktop/tdesktop](https://github.com/telegramdesktop/tdesktop). Upstream updates are taken from that repository: the `mzgram` branch shares upstream's history from the `v7.2.8` tag on, so a newer upstream release tag is merged into it and the fork stays a readable set of patches on top of it.
 
 Every fork commit has the `[mzgram]` prefix; an upstream commit taken in on its own keeps its message and says where it was cherry-picked from. To list all changes against upstream:
 
@@ -132,6 +132,8 @@ MZGram for Android is licensed under GPL v2, see its [repository](https://github
 * CMake ([New BSD License](https://github.com/Kitware/CMake/blob/master/Copyright.txt))
 * Hunspell ([LGPL](https://github.com/hunspell/hunspell/blob/master/COPYING.LESSER))
 * Ada ([Apache License 2.0](https://github.com/ada-url/ada/blob/main/LICENSE-APACHE))
+* zxcvbn-c ([MIT License](https://github.com/tsyrogit/zxcvbn-c/blob/master/LICENSE.txt))
+* FrequencyWords by Hermit Dave ([Creative Commons Attribution-ShareAlike 4.0](https://creativecommons.org/licenses/by-sa/4.0/))
 * quirc ([ISC License](Telegram/SourceFiles/mzgram/quirc/LICENSE-quirc.txt)), used by MZGram for QR code scanning
 
 ## Credits

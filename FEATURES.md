@@ -223,7 +223,7 @@ Each item has its own switch.
 | Linux x64 | A tar.xz, built against glibc 2.28 so it runs on current distributions. | 1.0.0 |
 | Linux ARM64 | A tar.xz for aarch64 machines such as Snapdragon laptops. | 1.0.1 |
 | Source archive and checksums | Every release has the complete source (`-source.tar.xz`) and `SHA256SUMS`. | 1.0.0 |
-| Telegram Desktop base | Based on Telegram Desktop 7.2.8 with the security fix of 7.2.9: a link that another launch of the app passes on to the running one (a tg:// link opened in a browser, for example) stays one link even with `;` in it, and local files that come together with a link are not opened or sent. Up to 1.0.4 such a link could make the running app send local files to a chat. | Next release |
+| Telegram Desktop base | Based on Telegram Desktop 7.3.1, with its security fix of 7.2.9: a link that another launch of the app passes on to the running one (a tg:// link opened in a browser, for example) stays one link even with `;` in it, and local files that come together with a link are not opened or sent. Up to 1.0.4 (Telegram Desktop 7.2.8) such a link could make the running app send local files to a chat. | Next release |
 
 ## Android and Desktop compared
 
