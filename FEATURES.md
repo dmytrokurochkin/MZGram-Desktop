@@ -128,6 +128,7 @@ Each item has its own switch.
 | Feature | What it does | Since |
 |---|---|---|
 | Signed releases | Every release APK is signed with the MZGram key, with a key rotation from the earlier key so it installs over earlier MZGram builds and keeps their data (up to 1.0.3; the next release has its own package and is installed beside them). `SHA256SUMS` and the signing certificate are published with each release. | 1.0.0 |
+| Telegram for Android base | Based on Telegram for Android 13.0.3. It needs Android 6.0 or newer: Telegram 13.0 dropped Android 5. | Next release |
 
 ## Desktop
 
