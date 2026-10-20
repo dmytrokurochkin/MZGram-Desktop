@@ -181,9 +181,12 @@ jobs:
           done
           df -h /c
 
+      # Keeps what the build reads from Libraries. Since Telegram Desktop 7.3.1
+      # that includes the generated tdesktop_rust/out/src/wallet_engine/
+      # wallet_engine.cpp (cmake/external/wallet_engine), which is no header.
       - name: Free up some disk space.
         shell: bash
-        run: find $LibrariesPath '(' '(' ! '(' -name '*.lib' -o -name '*.a' -o -name '*.exe' -o -name '*.h' -o -name '*.hpp' -o -name '*.inc' -o -name '*.cmake' -o -name '*.pc' -o -path '*/include/*' -o -path '*/objects-*' -o -path '*/cache_keys/*' -o -path '*/patches/*' -o -path '*/nv-codec-headers/*' ')' -type f ')' -o -empty ')' -delete
+        run: find $LibrariesPath '(' '(' ! '(' -name '*.lib' -o -name '*.a' -o -name '*.exe' -o -name '*.h' -o -name '*.hpp' -o -name '*.inc' -o -name '*.cmake' -o -name '*.pc' -o -path '*/include/*' -o -path '*/objects-*' -o -path '*/cache_keys/*' -o -path '*/patches/*' -o -path '*/nv-codec-headers/*' -o -path '*/tdesktop_rust/out/src/*' ')' -type f ')' -o -empty ')' -delete
 
       # An empty debug information format keeps PDBs from eating the disk the
       # dependency tree already left thin, as upstream does.
