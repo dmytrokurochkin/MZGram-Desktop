@@ -151,6 +151,12 @@ PRIVATE
     Qt6::QSQLiteDriverPlugin
 )
 
+# A static Qt links every SQL driver it was built with into the app. Qt's
+# configure builds the PostgreSQL one wherever PostgreSQL is installed, as on
+# the Windows x64 runners: MZGram.exe up to 1.0.4 imported libpq.dll and did
+# not start without it, and ODBC's driver came along too. SQLite only.
+qt6_import_plugins(Telegram INCLUDE_BY_TYPE sqldrivers Qt6::QSQLiteDriverPlugin)
+
 if (NOT DESKTOP_APP_DISABLE_SWIFT6)
     telegram_add_apple_swift_runtime(Telegram)
 endif()

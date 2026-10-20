@@ -219,6 +219,7 @@ Each item has its own switch.
 | Feature | What it does | Since |
 |---|---|---|
 | Windows x64 and ARM64 | A zip for each, with `MZGram.exe`. | 1.0.0 |
+| Windows x64 without extra DLLs | `MZGram.exe` needs nothing but Windows. Up to 1.0.4 the x64 one also needed `libpq.dll` (PostgreSQL's client library, never used) and did not start on a computer without it; ARM64 and Linux were not affected. CI checks every DLL the executables import and starts the new build with Windows only. | Next release |
 | Linux x64 | A tar.xz, built against glibc 2.28 so it runs on current distributions. | 1.0.0 |
 | Linux ARM64 | A tar.xz for aarch64 machines such as Snapdragon laptops. | 1.0.1 |
 | Source archive and checksums | Every release has the complete source (`-source.tar.xz`) and `SHA256SUMS`. | 1.0.0 |
