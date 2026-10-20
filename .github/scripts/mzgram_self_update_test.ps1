@@ -11,8 +11,13 @@
 #
 # First the new build starts alone, as from its zip on a computer with
 # nothing but Windows: no PostgreSQL in PATH (mzgram_check_imports.py).
-# MZGram x64 up to 1.0.4 imports libpq.dll and starts only where
-# PostgreSQL's bin folder is in PATH; that release gets the runner's.
+#
+# MZGram x64 up to 1.0.4 imports libpq.dll, and MZGram.exe takes the DLLs
+# it imports from System32 only (DependentLoadFlags 0x800), so that release
+# starts nowhere and cannot update itself: its users install the next one by
+# hand. For such a release the test updates this build over a copy of
+# itself instead (the new files marked so the copy can be told apart): what
+# the next release installs over this one goes through the same path.
 param(
 	[Parameter(Mandatory = $true)][string]$Build,
 	[Parameter(Mandatory = $true)][string]$Arch,
@@ -34,7 +39,6 @@ function StopTestProcesses {
 	Get-Process MZGram, Updater -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$work*" } | Stop-Process -Force
 	Start-Sleep -Seconds 2
 }
-$plainPath = ($env:PATH -split ';' | Where-Object { $_ -and $_ -notmatch 'PostgreSQL' }) -join ';'
 
 # The new build alone, with Windows only
 $clean = Join-Path $work 'clean'
@@ -42,7 +46,7 @@ New-Item -ItemType Directory (Join-Path $clean 'app'), (Join-Path $clean 'data')
 foreach ($name in 'MZGram.exe', 'Updater.exe') {
 	Copy-Item (Join-Path $Build $name) (Join-Path $clean 'app')
 }
-$env:PATH = $plainPath
+$env:PATH = ($env:PATH -split ';' | Where-Object { $_ -and $_ -notmatch 'PostgreSQL' }) -join ';'
 Start-Process (Join-Path $clean 'app\MZGram.exe') -ArgumentList @('-workdir', (WorkdirArgument (Join-Path $clean 'data')))
 $started = $false
 $deadline = (Get-Date).AddSeconds(120)
@@ -81,6 +85,18 @@ if (-not $expected -or $expected -ne $actual) { throw "$zip does not match SHA25
 Expand-Archive (Join-Path $work $zip) -DestinationPath (Join-Path $work 'install')
 $app = Join-Path $work 'install\MZGram'
 
+# A release that does not start with Windows only is replaced by this build
+$oldImports = python (Join-Path $PSScriptRoot 'mzgram_check_imports.py') (Join-Path $app 'MZGram.exe')
+$fromName = $from
+if ($LASTEXITCODE) {
+	Write-Host "$from windows-${Arch}: $oldImports"
+	Write-Host "$from windows-$Arch starts nowhere and cannot update itself; its users install $to by hand. Updating this build over a copy of itself."
+	foreach ($name in 'MZGram.exe', 'Updater.exe') {
+		Copy-Item (Join-Path $Build $name) $app -Force
+	}
+	$fromName = 'this build'
+}
+
 # The working folder with data the update must keep
 $data = Join-Path $work 'data'
 New-Item -ItemType Directory (Join-Path $data 'tdata') | Out-Null
@@ -92,27 +108,22 @@ $ready = Join-Path $data 'tupdates\temp'
 New-Item -ItemType Directory (Join-Path $ready 'tdata') | Out-Null
 foreach ($name in 'MZGram.exe', 'Updater.exe') {
 	Copy-Item (Join-Path $Build $name) $ready
+	if ($fromName -ne $from) {
+		# Bytes after the end of a PE file change nothing in how it runs
+		$file = [IO.File]::Open((Join-Path $ready $name), 'Append')
+		$bytes = [Text.Encoding]::ASCII.GetBytes('MZGram self-update test')
+		$file.Write($bytes, 0, $bytes.Length)
+		$file.Close()
+	}
 }
 [IO.File]::WriteAllText((Join-Path $ready 'tdata\mzgram_version'), "$toCode")
 [IO.File]::WriteAllText((Join-Path $ready 'ready'), '1')
 
-$newHash = (Get-FileHash (Join-Path $Build 'MZGram.exe')).Hash
-$newUpdater = (Get-FileHash (Join-Path $Build 'Updater.exe')).Hash
-if ($newHash -eq (Get-FileHash (Join-Path $app 'MZGram.exe')).Hash) { throw 'the build is the release itself' }
+$newHash = (Get-FileHash (Join-Path $ready 'MZGram.exe')).Hash
+$newUpdater = (Get-FileHash (Join-Path $ready 'Updater.exe')).Hash
+if ($newHash -eq (Get-FileHash (Join-Path $app 'MZGram.exe')).Hash) { throw 'the update is the installed version itself' }
 
-# A release that imports libpq.dll gets PostgreSQL's bin folder in PATH
-$oldImports = python (Join-Path $PSScriptRoot 'mzgram_check_imports.py') (Join-Path $app 'MZGram.exe')
-if ($oldImports -match 'libpq\.dll') {
-	$pgBin = $env:PGBIN
-	if (-not $pgBin) {
-		$pgBin = Get-ChildItem 'C:\Program Files\PostgreSQL\*in' -Directory -ErrorAction SilentlyContinue | Select-Object -Last 1 -ExpandProperty FullName
-	}
-	if (-not $pgBin -or -not (Test-Path (Join-Path $pgBin 'libpq.dll'))) { throw "$from imports libpq.dll and the runner has no PostgreSQL" }
-	Write-Host "$from imports libpq.dll: started with $pgBin in PATH"
-	$env:PATH = "$pgBin;$plainPath"
-}
 Start-Process (Join-Path $app 'MZGram.exe') -ArgumentList @('-debug', '-workdir', (WorkdirArgument $data))
-$env:PATH = $plainPath
 
 $exe = Join-Path $app 'MZGram.exe'
 $installed = $false
@@ -143,4 +154,4 @@ if ($problems.Count) {
 	foreach ($problem in $problems) { Write-Host "FAIL: $problem" }
 	exit 1
 }
-Write-Host "PASS: $from installed $to over itself, the data stayed"
+Write-Host "PASS: $fromName installed $to over itself, the data stayed"
