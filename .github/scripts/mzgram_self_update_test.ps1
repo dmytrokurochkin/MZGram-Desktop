@@ -10,7 +10,9 @@
 # the working folder is still there.
 param(
 	[Parameter(Mandatory = $true)][string]$Build,
-	[Parameter(Mandatory = $true)][string]$Arch
+	[Parameter(Mandatory = $true)][string]$Arch,
+	# The release to update from; the latest one by default
+	[string]$From
 )
 
 $ErrorActionPreference = 'Stop'
@@ -19,8 +21,11 @@ $work = Join-Path $env:RUNNER_TEMP 'mzgram-self-update'
 if (Test-Path $work) { Remove-Item -Recurse -Force $work }
 New-Item -ItemType Directory $work | Out-Null
 
-$from = gh release view -R $repo --json tagName -q .tagName
-if ($LASTEXITCODE) { throw 'no latest release' }
+$from = $From
+if (-not $from) {
+	$from = gh release view -R $repo --json tagName -q .tagName
+	if ($LASTEXITCODE) { throw 'no latest release' }
+}
 if ($from -notmatch '^v(\d+)\.(\d+)\.(\d+)$') { throw "latest release $from is not vX.Y.Z" }
 $to = "v$($Matches[1]).$($Matches[2]).$([int]$Matches[3] + 1)"
 $toCode = [int]$Matches[1] * 1000000 + [int]$Matches[2] * 10000 + ([int]$Matches[3] + 1) * 100 + 99
@@ -55,7 +60,9 @@ $newHash = (Get-FileHash (Join-Path $Build 'MZGram.exe')).Hash
 $newUpdater = (Get-FileHash (Join-Path $Build 'Updater.exe')).Hash
 if ($newHash -eq (Get-FileHash (Join-Path $app 'MZGram.exe')).Hash) { throw 'the build is the release itself' }
 
-Start-Process (Join-Path $app 'MZGram.exe') -ArgumentList @('-debug', '-workdir', "`"$data\`"")
+# Forward slashes: a backslash before the closing quote would escape it
+$workdir = $data.Replace([char]92, [char]47) + '/'
+Start-Process (Join-Path $app 'MZGram.exe') -ArgumentList @('-debug', '-workdir', "`"$workdir`"")
 
 $exe = Join-Path $app 'MZGram.exe'
 $installed = $false
@@ -75,11 +82,13 @@ if ((Get-FileHash (Join-Path $app 'Updater.exe')).Hash -ne $newUpdater) { $probl
 if (-not (Test-Path $marker) -or (Get-Content $marker) -ne 'kept') { $problems += 'the data in the working folder is gone' }
 if (Test-Path (Join-Path $ready 'ready')) { $problems += 'the update is still waiting in tupdates/temp' }
 
-Get-Process MZGram -ErrorAction SilentlyContinue | Stop-Process -Force
+# Only the copies in the test folder
+Get-Process MZGram, Updater -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$work*" } | Stop-Process -Force
 Start-Sleep -Seconds 2
 
 if ($problems.Count) {
-	foreach ($log in Get-ChildItem $data -Recurse -Filter '*.txt' -ErrorAction SilentlyContinue) {
+	Get-ChildItem $work -Recurse -Exclude '*.dll' | Select-Object -First 60 | ForEach-Object { Write-Host $_.FullName }
+	foreach ($log in Get-ChildItem $work -Recurse -Filter '*.txt' -ErrorAction SilentlyContinue) {
 		Write-Host "--- $($log.FullName)"
 		Get-Content $log.FullName -Tail 40
 	}
