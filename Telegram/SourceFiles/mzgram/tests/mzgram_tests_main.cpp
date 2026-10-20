@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/basic_types.h"
 #include "mzgram/mzgram_archive_rules.h"
 #include "mzgram/mzgram_branding_rules.h"
+#include "mzgram/mzgram_ipc_rules.h"
 #include "mzgram/mzgram_lang.h"
 #include "mzgram/mzgram_local_pins_rules.h"
 #include "mzgram/mzgram_presence_rules.h"
@@ -1806,6 +1807,119 @@ void TestMZGramTextsAreInTheMZGramLanguage() {
 		problems.join(u", "_q).toStdString().c_str());
 }
 
+// Another launch of MZGram passes its links to the running one as records
+// ending with ';' (mzgram_ipc_rules.h). A link with ';' or '%' in it stays
+// one OPEN record, in 7 bits, and comes back as the same link.
+void TestIpcLinkStaysOneRecord() {
+	using namespace MZGram;
+	const auto links = std::vector<QString>{
+		u"tg://join?invite=AbC_dEf"_q,
+		u"tg://resolve?domain=mzgram&text=a;b"_q,
+		u"tg://resolve?domain=mzgram;OPEN:file:///C:/notes.txt"_q,
+		u"tg://msg_url?url=https://example.com/a%3Bb&text=100%25;"_q,
+		u"tg://resolve?domain=mzgram&text=%D0%BF%D1%80%D0%B8%D0%B2%D1%96%D1%82"_q,
+	};
+	auto problems = QStringList();
+	for (const auto &link : links) {
+		const auto url = QUrl(link);
+		const auto record = IpcOpenRecord(url);
+		auto buffer = record.toLatin1();
+		const auto records = IpcRecords(buffer);
+		const auto sevenBit = std::all_of(
+			record.begin(),
+			record.end(),
+			[](QChar ch) { return ch.unicode() >= 32 && ch.unicode() < 128; });
+		if (records.size() != 1 || !buffer.isEmpty()) {
+			problems.push_back(link + u": "_q
+				+ QString::number(records.size()) + u" records"_q);
+		} else if (!records[0].startsWith(u"OPEN:"_q)
+			|| IpcOpenUrl(records[0].mid(5)) != url) {
+			problems.push_back(link + u": comes back as "_q
+				+ IpcOpenUrl(records[0].mid(5)).toString());
+		} else if (!sevenBit) {
+			problems.push_back(link + u": not 7 bits"_q);
+		}
+	}
+	// What follows the last ';' waits for the next read.
+	auto buffer = (IpcOpenRecord(QUrl(links[0])) + u"OPEN:tg:"_q).toLatin1();
+	if (IpcRecords(buffer).size() != 1 || buffer != "OPEN:tg:") {
+		problems.push_back(u"the rest of a record is not kept"_q);
+	}
+	Check(
+		problems.isEmpty(),
+		"a link with ';' stays one record between two launches",
+		problems.join(u", "_q).toStdString().c_str());
+}
+
+// A launch with a link passes that link, a launch to send files passes only
+// local files. Local files coming in the same connection as a link are left
+// out, in that read and in the next reads of that connection.
+void TestIpcLocalFilesWithLinkAreDropped() {
+	using namespace MZGram;
+	const auto link = QUrl(u"tg://resolve?domain=mzgram"_q);
+	const auto file = QUrl::fromLocalFile(u"C:/notes.txt"_q);
+	const auto other = QUrl::fromLocalFile(u"C:/photo.jpg"_q);
+	auto problems = QStringList();
+
+	auto withLink = false;
+	const auto first = IpcFilterStartUrls({ file, link }, withLink);
+	if (first.open != QList<QUrl>{ link }
+		|| first.dropped != QList<QUrl>{ file }
+		|| !withLink) {
+		problems.push_back(u"a local file with a link is opened"_q);
+	}
+	const auto next = IpcFilterStartUrls({ other }, withLink);
+	if (!next.open.isEmpty() || next.dropped != QList<QUrl>{ other }) {
+		problems.push_back(u"a local file after a link is opened"_q);
+	}
+
+	auto onlyFiles = false;
+	const auto files = IpcFilterStartUrls({ file, other }, onlyFiles);
+	if (files.open != QList<QUrl>{ file, other }
+		|| !files.dropped.isEmpty()
+		|| onlyFiles) {
+		problems.push_back(u"local files alone are not opened"_q);
+	}
+	auto onlyLink = false;
+	const auto links = IpcFilterStartUrls({ link }, onlyLink);
+	if (links.open != QList<QUrl>{ link } || !links.dropped.isEmpty()) {
+		problems.push_back(u"a link alone is not opened"_q);
+	}
+	Check(
+		problems.isEmpty(),
+		"local files coming with a link from another launch are left out",
+		problems.join(u", "_q).toStdString().c_str());
+}
+
+// The running app reads and writes those records with these rules, and keeps
+// "a link came" for the whole connection.
+void TestIpcRulesAreWired() {
+	auto file = QFile(
+		QString::fromUtf8(MZGRAM_SOURCE_DIR) + u"/core/sandbox.cpp"_q);
+	const auto text = file.open(QIODevice::ReadOnly)
+		? QString::fromUtf8(file.readAll())
+		: QString();
+	auto missing = QStringList();
+	for (const auto &call : {
+			u"commands += MZGram::IpcOpenRecord(url);"_q,
+			u"MZGram::IpcRecords(i->buffer)"_q,
+			u"MZGram::IpcOpenUrl(cmd.mid(5))"_q,
+			u"i->externalUrlReceived);"_q,
+			u"for (const auto &url : filtered.open) {"_q,
+		}) {
+		if (!text.contains(call)) {
+			missing.push_back(call);
+		}
+	}
+	if (text.contains(u"url.toString(QUrl::FullyEncoded) + ';'"_q)) {
+		missing.push_back(u"a link written as it is"_q);
+	}
+	Check(
+		missing.isEmpty(),
+		"the running app uses the rules for links from another launch",
+		missing.join(u", "_q).toStdString().c_str());
+}
+
 } // namespace
 
 int main() {
@@ -1856,6 +1970,9 @@ int main() {
 		TestDeletedChatStays,
 		TestManualUpdateCheck,
 		TestMZGramTextsAreInTheMZGramLanguage,
+		TestIpcLinkStaysOneRecord,
+		TestIpcLocalFilesWithLinkAreDropped,
+		TestIpcRulesAreWired,
 	};
 	for (const auto &test : tests) {
 		test();

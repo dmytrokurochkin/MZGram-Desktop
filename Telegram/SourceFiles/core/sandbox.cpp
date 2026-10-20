@@ -22,6 +22,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/local_url_handlers.h"
 #include "core/update_checker.h"
 #include "core/deadlock_detector.h"
+#include "mzgram/mzgram_ipc_rules.h"
 #include "mzgram/mzgram_self_update.h"
 #include "base/timer.h"
 #include "base/concurrent_timer.h"
@@ -52,58 +53,6 @@ base::options::toggle OptionDeadlockDetector({
 
 constexpr auto kCleanupIpcTimeout = 10 * crl::time(1000);
 constexpr auto kCleanupQuitTimeout = 30 * crl::time(1000);
-
-[[nodiscard]] QChar HexDigit(ushort value) {
-	value &= 0x000F;
-	return QChar::fromLatin1((value >= 10) ? ('a' + (value - 10)) : ('0' + value));
-}
-
-[[nodiscard]] ushort HexDigitValue(QChar ch) {
-	const auto code = ch.unicode();
-	return ((code >= uchar('a'))
-		? (code - uchar('a') + 10)
-		: (code - uchar('0'))) & 0x000F;
-}
-
-[[nodiscard]] QString EscapeTo7bit(const QString &value) {
-	auto result = QString();
-	result.reserve(value.size() * 2);
-	for (const auto ch : value) {
-		const auto code = ch.unicode();
-		if (code < 32
-			|| code > 127
-			|| ch == QChar('%')
-			|| ch == QChar(';')) {
-			result.append('%');
-			result.append(HexDigit(code >> 12));
-			result.append(HexDigit(code >> 8));
-			result.append(HexDigit(code >> 4));
-			result.append(HexDigit(code));
-		} else {
-			result.append(ch);
-		}
-	}
-	return result;
-}
-
-[[nodiscard]] QString EscapeFrom7bit(const QString &value) {
-	auto result = QString();
-	result.reserve(value.size());
-	for (auto i = 0; i != value.size(); ++i) {
-		const auto ch = value.at(i);
-		if (ch == QChar('%') && (i + 4 < value.size())) {
-			result.append(QChar(ushort(
-				(HexDigitValue(value.at(i + 1)) << 12)
-				| (HexDigitValue(value.at(i + 2)) << 8)
-				| (HexDigitValue(value.at(i + 3)) << 4)
-				| HexDigitValue(value.at(i + 4)))));
-			i += 4;
-		} else {
-			result.append(ch);
-		}
-	}
-	return result;
-}
 
 } // namespace
 
@@ -413,9 +362,7 @@ void Sandbox::socketConnected() {
 		commands += u"XDG_ACTIVATION_TOKEN:"_q + qgetenv("XDG_ACTIVATION_TOKEN").toBase64() + ';';
 	}
 	for (const auto &url : cRefStartUrls()) {
-		commands += u"OPEN:"_q
-			+ EscapeTo7bit(url.toString(QUrl::FullyEncoded))
-			+ ';';
+		commands += MZGram::IpcOpenRecord(url);
 	}
 	if (cQuit()) {
 		commands += u"CMD:quit;"_q;
@@ -570,16 +517,7 @@ void Sandbox::readClients() {
 	for (auto i = _localClients.begin(), e = _localClients.end(); i != e; ++i) {
 		i->buffer.append(i->socket->readAll());
 		if (i->buffer.size()) {
-			QString cmds(QString::fromLatin1(i->buffer));
-			int32 from = 0, l = cmds.length();
-			auto records = QStringList();
-			for (int32 to = cmds.indexOf(QChar(';'), from); to >= from; to = (from < l) ? cmds.indexOf(QChar(';'), from) : -1) {
-				records.push_back(cmds.mid(from, to - from));
-				from = to + 1;
-			}
-			if (from > 0) {
-				i->buffer = i->buffer.mid(from);
-			}
+			const auto records = MZGram::IpcRecords(i->buffer);
 			auto hasOpen = false;
 			for (const auto &cmd : records) {
 				if (cmd.startsWith(u"OPEN:"_q)) {
@@ -600,7 +538,7 @@ void Sandbox::readClients() {
 				} else if (cmd.startsWith(u"XDG_ACTIVATION_TOKEN:"_q)) {
 					qputenv("XDG_ACTIVATION_TOKEN", QByteArray::fromBase64(cmd.mid(21).toLatin1()));
 				} else if (cmd.startsWith(u"OPEN:"_q)) {
-					urls.append(EscapeFrom7bit(cmd.mid(5)).mid(0, 8192));
+					urls.append(MZGram::IpcOpenUrl(cmd.mid(5)));
 				} else if (cmd.startsWith(u"CTRL:"_q)) {
 					if (hasOpen) {
 						continue;
@@ -614,24 +552,17 @@ void Sandbox::readClients() {
 					LOG(("Sandbox Error: unknown command %1 passed in local socket").arg(cmd));
 				}
 			}
-			// A link launch carries a single non-file url and a send-files
-			// launch carries only local paths, so a connection mixing both
-			// means the sender failed to escape the record separator and a
-			// crafted url smuggled extra records. Once such a connection
-			// shows a non-file url its local paths are dropped for good.
-			for (const auto &url : urls) {
-				if (!url.isLocalFile()) {
-					i->externalUrlReceived = true;
-				}
+			// MZGram: the rules of Telegram Desktop 7.2.9, in mzgram_ipc_rules.h
+			const auto filtered = MZGram::IpcFilterStartUrls(
+				urls,
+				i->externalUrlReceived);
+			for (const auto &url : filtered.dropped) {
+				LOG(("Sandbox Warning: local file dropped, "
+					"the same launch carries an external url: %1"
+					).arg(url.toString()));
 			}
 			auto activationRequired = false;
-			for (const auto &url : urls) {
-				if (i->externalUrlReceived && url.isLocalFile()) {
-					LOG(("Sandbox Warning: local file dropped, "
-						"the same launch carries an external url: %1"
-						).arg(url.toString()));
-					continue;
-				}
+			for (const auto &url : filtered.open) {
 				startUrls.append(url);
 				if (!activationRequired) {
 					activationRequired = StartUrlRequiresActivate(url.toString());

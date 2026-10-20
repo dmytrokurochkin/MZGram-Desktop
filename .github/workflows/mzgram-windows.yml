@@ -210,6 +210,15 @@ jobs:
         run: |
           %TBUILD%\%REPO_NAME%\out\Debug\mzgram_tests.exe
 
+      # The latest release installs this build over itself with its own
+      # Updater, the data staying (.github/scripts/mzgram_self_update_test.ps1).
+      - name: Self-update test.
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          & "$env:TBUILD\$env:REPO_NAME\.github\scripts\mzgram_self_update_test.ps1" -Build "$env:TBUILD\$env:REPO_NAME\out\Debug" -Arch ${{ matrix.arch }}
+
       - name: Collect artifact.
         run: |
           set OUT=%TBUILD%\%REPO_NAME%\out\Debug

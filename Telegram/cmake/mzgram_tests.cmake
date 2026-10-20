@@ -6,7 +6,8 @@
 #
 # Headless unit tests for MZGram's own logic that has no session/history/
 # network dependency: the Zalgo filter, the English and Ukrainian string
-# table, the protected content switch and the archive rules. Deliberately not a
+# table, the protected content switch, the archive rules and the records
+# another launch passes to the running app. Deliberately not a
 # GUI app like test_text below it: no QApplication, prints PASS/FAIL lines
 # and exits non-zero on the first failure, so it can be run in CI with
 # nothing more than the built binary.
@@ -24,6 +25,8 @@ PRIVATE
     mzgram/mzgram_archive_rules.h
     mzgram/mzgram_branding_rules.cpp
     mzgram/mzgram_branding_rules.h
+    mzgram/mzgram_ipc_rules.cpp
+    mzgram/mzgram_ipc_rules.h
     mzgram/mzgram_lang.h
     mzgram/mzgram_lang_table.cpp
     mzgram/mzgram_lang_translations.cpp

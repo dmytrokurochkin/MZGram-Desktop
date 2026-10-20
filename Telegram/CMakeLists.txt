@@ -1531,6 +1531,8 @@ PRIVATE
     mzgram/mzgram_context_actions.h
     mzgram/mzgram_edit_history_box.cpp
     mzgram/mzgram_edit_history_box.h
+    mzgram/mzgram_ipc_rules.cpp
+    mzgram/mzgram_ipc_rules.h
     mzgram/mzgram_lang.cpp
     mzgram/mzgram_lang.h
     mzgram/mzgram_lang_table.cpp
