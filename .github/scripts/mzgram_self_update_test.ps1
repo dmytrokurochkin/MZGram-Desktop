@@ -155,3 +155,6 @@ if ($problems.Count) {
 	exit 1
 }
 Write-Host "PASS: $fromName installed $to over itself, the data stayed"
+# GitHub's pwsh step ends with "exit $LASTEXITCODE", still the code of the
+# failed import check of a release that starts nowhere
+exit 0
