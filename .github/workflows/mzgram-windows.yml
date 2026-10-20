@@ -210,6 +210,14 @@ jobs:
         run: |
           %TBUILD%\%REPO_NAME%\out\Debug\mzgram_tests.exe
 
+      # Every DLL MZGram.exe and Updater.exe import comes with Windows: the zip
+      # carries nothing else (.github/scripts/mzgram_check_imports.py).
+      - name: Check imports.
+        shell: bash
+        run: |
+          python "$TBUILD/$REPO_NAME/.github/scripts/test_mzgram_check_imports.py"
+          python "$TBUILD/$REPO_NAME/.github/scripts/mzgram_check_imports.py" "$TBUILD/$REPO_NAME/out/Debug/MZGram.exe" "$TBUILD/$REPO_NAME/out/Debug/Updater.exe"
+
       # The latest release installs this build over itself with its own
       # Updater, the data staying (.github/scripts/mzgram_self_update_test.ps1).
       - name: Self-update test.

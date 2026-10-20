@@ -8,6 +8,11 @@
 # with its Updater. Passes when the new MZGram.exe and Updater.exe replaced
 # the old ones, the new MZGram.exe runs from the app folder and the data in
 # the working folder is still there.
+#
+# First the new build starts alone, as from its zip on a computer with
+# nothing but Windows: no PostgreSQL in PATH (mzgram_check_imports.py).
+# MZGram x64 up to 1.0.4 imports libpq.dll and starts only where
+# PostgreSQL's bin folder is in PATH; that release gets the runner's.
 param(
 	[Parameter(Mandatory = $true)][string]$Build,
 	[Parameter(Mandatory = $true)][string]$Arch,
@@ -20,6 +25,41 @@ $repo = $env:GITHUB_REPOSITORY
 $work = Join-Path $env:RUNNER_TEMP 'mzgram-self-update'
 if (Test-Path $work) { Remove-Item -Recurse -Force $work }
 New-Item -ItemType Directory $work | Out-Null
+
+# Forward slashes: a backslash before the closing quote would escape it
+function WorkdirArgument([string]$folder) {
+	return '"' + $folder.Replace([char]92, [char]47) + '/"'
+}
+function StopTestProcesses {
+	Get-Process MZGram, Updater -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$work*" } | Stop-Process -Force
+	Start-Sleep -Seconds 2
+}
+$plainPath = ($env:PATH -split ';' | Where-Object { $_ -and $_ -notmatch 'PostgreSQL' }) -join ';'
+
+# The new build alone, with Windows only
+$clean = Join-Path $work 'clean'
+New-Item -ItemType Directory (Join-Path $clean 'app'), (Join-Path $clean 'data') | Out-Null
+foreach ($name in 'MZGram.exe', 'Updater.exe') {
+	Copy-Item (Join-Path $Build $name) (Join-Path $clean 'app')
+}
+$env:PATH = $plainPath
+Start-Process (Join-Path $clean 'app\MZGram.exe') -ArgumentList @('-workdir', (WorkdirArgument (Join-Path $clean 'data')))
+$started = $false
+$deadline = (Get-Date).AddSeconds(120)
+while ((Get-Date) -lt $deadline) {
+	Start-Sleep -Seconds 3
+	$logs = Get-ChildItem (Join-Path $clean 'data') -Recurse -Filter 'log*.txt' -ErrorAction SilentlyContinue
+	if ($logs -and (Select-String -Path $logs.FullName -Pattern 'Launched version' -Quiet)) {
+		$started = $true
+		break
+	}
+}
+StopTestProcesses
+if (-not $started) {
+	Write-Host "FAIL: the new MZGram.exe does not start with Windows only (no log in $clean)"
+	exit 1
+}
+Write-Host 'PASS: the new MZGram.exe starts with Windows only'
 
 $from = $From
 if (-not $from) {
@@ -60,9 +100,19 @@ $newHash = (Get-FileHash (Join-Path $Build 'MZGram.exe')).Hash
 $newUpdater = (Get-FileHash (Join-Path $Build 'Updater.exe')).Hash
 if ($newHash -eq (Get-FileHash (Join-Path $app 'MZGram.exe')).Hash) { throw 'the build is the release itself' }
 
-# Forward slashes: a backslash before the closing quote would escape it
-$workdir = $data.Replace([char]92, [char]47) + '/'
-Start-Process (Join-Path $app 'MZGram.exe') -ArgumentList @('-debug', '-workdir', "`"$workdir`"")
+# A release that imports libpq.dll gets PostgreSQL's bin folder in PATH
+$oldImports = python (Join-Path $PSScriptRoot 'mzgram_check_imports.py') (Join-Path $app 'MZGram.exe')
+if ($oldImports -match 'libpq\.dll') {
+	$pgBin = $env:PGBIN
+	if (-not $pgBin) {
+		$pgBin = Get-ChildItem 'C:\Program Files\PostgreSQL\*in' -Directory -ErrorAction SilentlyContinue | Select-Object -Last 1 -ExpandProperty FullName
+	}
+	if (-not $pgBin -or -not (Test-Path (Join-Path $pgBin 'libpq.dll'))) { throw "$from imports libpq.dll and the runner has no PostgreSQL" }
+	Write-Host "$from imports libpq.dll: started with $pgBin in PATH"
+	$env:PATH = "$pgBin;$plainPath"
+}
+Start-Process (Join-Path $app 'MZGram.exe') -ArgumentList @('-debug', '-workdir', (WorkdirArgument $data))
+$env:PATH = $plainPath
 
 $exe = Join-Path $app 'MZGram.exe'
 $installed = $false
@@ -82,9 +132,7 @@ if ((Get-FileHash (Join-Path $app 'Updater.exe')).Hash -ne $newUpdater) { $probl
 if (-not (Test-Path $marker) -or (Get-Content $marker) -ne 'kept') { $problems += 'the data in the working folder is gone' }
 if (Test-Path (Join-Path $ready 'ready')) { $problems += 'the update is still waiting in tupdates/temp' }
 
-# Only the copies in the test folder
-Get-Process MZGram, Updater -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$work*" } | Stop-Process -Force
-Start-Sleep -Seconds 2
+StopTestProcesses
 
 if ($problems.Count) {
 	Get-ChildItem $work -Recurse -Exclude '*.dll' | Select-Object -First 60 | ForEach-Object { Write-Host $_.FullName }
