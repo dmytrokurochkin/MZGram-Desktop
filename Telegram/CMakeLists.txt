@@ -1626,6 +1626,8 @@ PRIVATE
     mzgram/mzgram_update_install.h
     mzgram/mzgram_update_rules.cpp
     mzgram/mzgram_update_rules.h
+    mzgram/mzgram_url_scheme.cpp
+    mzgram/mzgram_url_scheme.h
     mzgram/mzgram_qr_scan.cpp
     mzgram/mzgram_qr_scan.h
     mzgram/mzgram_settings.cpp

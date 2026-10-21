@@ -17,6 +17,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "mzgram/mzgram_text_filters.h"
 #include "mzgram/mzgram_update_install.h"
 #include "mzgram/mzgram_update_rules.h"
+#include "mzgram/mzgram_url_scheme.h"
 
 #include <QtCore/QDir>
 #include <QtCore/QDirIterator>
@@ -36,6 +37,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <string>
 #include <tuple>
 #include <vector>
+
+#ifdef _WIN32
+#include <windows.h>
+#endif // _WIN32
 
 namespace {
 
@@ -1920,6 +1925,281 @@ void TestIpcRulesAreWired() {
 		missing.join(u", "_q).toStdString().c_str());
 }
 
+// tg://, tonsite:// and ton:// on Windows: the executable of a handler's
+// command, and when MZGram may take a protocol over.
+void TestUrlSchemeRules() {
+	using namespace MZGram;
+	auto problems = QStringList();
+	const auto quoted = u"\"C:\\Program Files\\MZGram\\MZGram.exe\" -workdir \"C:/data/\" -- \"%1\""_q;
+	if (CommandExecutable(quoted) != u"C:\\Program Files\\MZGram\\MZGram.exe"_q) {
+		problems.push_back(u"quoted: "_q + CommandExecutable(quoted));
+	}
+	if (CommandExecutable(u"C:\\Telegram\\Telegram.exe -- \"%1\""_q) != u"C:\\Telegram\\Telegram.exe"_q
+		|| !CommandExecutable(QString()).isEmpty()) {
+		problems.push_back(u"not quoted or empty"_q);
+	}
+	if (!IsMZGramExecutable(u"C:\\Temp\\x.zip.610\\MZGram\\mzgram.EXE"_q)
+		|| IsMZGramExecutable(u"C:\\Telegram\\Telegram.exe"_q)
+		|| IsMZGramExecutable(u"C:\\MZGram\\NotMZGram.exe"_q)) {
+		problems.push_back(u"MZGram.exe told apart wrong"_q);
+	}
+	const auto all = [](const QString &) { return true; };
+	const auto none = [](const QString &) { return false; };
+	const auto telegram = u"\"C:\\Telegram\\Telegram.exe\" -- \"%1\""_q;
+	if (MayTakeUrlScheme(telegram, all)) {
+		problems.push_back(u"takes Telegram Desktop's links"_q);
+	}
+	if (!MayTakeUrlScheme(telegram, none)) {
+		problems.push_back(u"leaves a handler that is not there any more"_q);
+	}
+	if (!MayTakeUrlScheme(QString(), all)
+		|| !MayTakeUrlScheme(u"\"D:\\old\\MZGram.exe\" -- \"%1\""_q, all)) {
+		problems.push_back(u"leaves no handler or an older MZGram"_q);
+	}
+	Check(
+		problems.isEmpty(),
+		"MZGram takes tg:// only from nobody or from MZGram",
+		problems.join(u", "_q).toStdString().c_str());
+}
+
+#ifdef _WIN32
+
+// The registration goes into HKEY_CURRENT_USER under a key of the test's
+// own instead of Software, next to the keys Telegram Desktop 7.3.1 writes
+// (lib_base, base_url_scheme_win.cpp).
+const auto kUrlSchemeTestRoot = u"Software\\MZGramTests\\UrlScheme\\"_q;
+
+QString TestRegRead(const QString &key, const QString &name = QString()) {
+	const auto wkey = (kUrlSchemeTestRoot + key).toStdWString();
+	const auto wname = name.toStdWString();
+	auto buffer = std::wstring(4096, L'\0');
+	auto size = DWORD(buffer.size() * sizeof(WCHAR));
+	if (RegGetValue(HKEY_CURRENT_USER, wkey.c_str(), wname.c_str(), RRF_RT_REG_SZ, nullptr, buffer.data(), &size) != ERROR_SUCCESS) {
+		return u"(none)"_q;
+	}
+	return QString::fromWCharArray(buffer.c_str());
+}
+
+void TestRegWrite(const QString &key, const QString &name, const QString &value) {
+	const auto wkey = (kUrlSchemeTestRoot + key).toStdWString();
+	const auto wname = name.toStdWString();
+	const auto wvalue = value.toStdWString();
+	auto handle = HKEY();
+	if (RegCreateKeyEx(HKEY_CURRENT_USER, wkey.c_str(), 0, nullptr, 0, KEY_SET_VALUE, nullptr, &handle, nullptr) != ERROR_SUCCESS) {
+		return;
+	}
+	RegSetValueEx(handle, wname.empty() ? nullptr : wname.c_str(), 0, REG_SZ, reinterpret_cast<const BYTE*>(wvalue.c_str()), DWORD((wvalue.size() + 1) * sizeof(WCHAR)));
+	RegCloseKey(handle);
+}
+
+bool TestRegExists(const QString &key) {
+	const auto wkey = (kUrlSchemeTestRoot + key).toStdWString();
+	auto handle = HKEY();
+	if (RegOpenKeyEx(HKEY_CURRENT_USER, wkey.c_str(), 0, KEY_READ, &handle) != ERROR_SUCCESS) {
+		return false;
+	}
+	RegCloseKey(handle);
+	return true;
+}
+
+void TestRegClear() {
+	const auto wkey = kUrlSchemeTestRoot.toStdWString();
+	RegDeleteTree(HKEY_CURRENT_USER, wkey.c_str());
+}
+
+QString TestOpenCommand(const QString &exe) {
+	return '"' + QDir::toNativeSeparators(exe) + u"\"  -- \"%1\""_q;
+}
+
+void TestTouch(const QString &path) {
+	QDir().mkpath(QFileInfo(path).path());
+	auto file = QFile(path);
+	if (file.open(QIODevice::WriteOnly)) {
+		file.close();
+	}
+}
+
+// Telegram Desktop as it registers itself, or MZGram up to 1.0.4 that did
+// the same with its own name and path.
+void TestRegisterAsTelegram(const QString &exe, const QString &name, bool legacy) {
+	for (const auto &scheme : MZGram::UrlSchemes()) {
+		const auto named = u"tdesktop."_q + scheme.protocol;
+		TestRegWrite(u"Classes\\"_q + named + u"\\shell\\open\\command"_q, QString(), TestOpenCommand(exe));
+		TestRegWrite(u"TelegramDesktop\\Capabilities\\UrlAssociations"_q, scheme.protocol, named);
+		if (legacy) {
+			TestRegWrite(u"Classes\\"_q + scheme.protocol + u"\\shell\\open\\command"_q, QString(), TestOpenCommand(exe));
+		}
+	}
+	TestRegWrite(u"TelegramDesktop\\Capabilities"_q, u"ApplicationName"_q, name);
+	TestRegWrite(u"TelegramDesktop\\Capabilities"_q, u"ApplicationDescription"_q, name);
+	TestRegWrite(u"RegisteredApplications"_q, name, u"SOFTWARE\\TelegramDesktop\\Capabilities"_q);
+}
+
+void TestRegisterMZGram(const QString &exe, bool force = false) {
+	MZGram::RegisterUrlSchemes({
+		.root = kUrlSchemeTestRoot,
+		.executable = QDir::toNativeSeparators(exe),
+		.arguments = QString(),
+		.appName = u"MZGram Desktop"_q,
+		.force = force,
+	});
+}
+
+// MZGram registers its own entry for Windows Settings > Default apps and
+// leaves Telegram Desktop's registration and handler as they are.
+void TestUrlSchemeKeepsTelegramDesktop() {
+	auto dir = QTemporaryDir();
+	const auto telegramExe = dir.path() + u"/Telegram/Telegram.exe"_q;
+	const auto mzgramExe = dir.path() + u"/MZGram/MZGram.exe"_q;
+	TestTouch(telegramExe);
+	TestTouch(mzgramExe);
+	const auto telegram = TestOpenCommand(telegramExe);
+	const auto mzgram = TestOpenCommand(mzgramExe);
+	auto problems = QStringList();
+
+	TestRegClear();
+	TestRegisterAsTelegram(telegramExe, u"Telegram Desktop"_q, true);
+	TestRegisterMZGram(mzgramExe);
+	for (const auto &scheme : MZGram::UrlSchemes()) {
+		const auto p = scheme.protocol;
+		if (TestRegRead(u"Classes\\tdesktop."_q + p + u"\\shell\\open\\command"_q) != telegram) {
+			problems.push_back(u"tdesktop."_q + p + u" changed"_q);
+		}
+		if (TestRegRead(u"Classes\\"_q + p + u"\\shell\\open\\command"_q) != telegram) {
+			problems.push_back(p + u":// taken from Telegram Desktop"_q);
+		}
+		if (TestRegRead(u"Classes\\mzgram."_q + p + u"\\shell\\open\\command"_q) != mzgram
+			|| TestRegRead(u"MZGramDesktop\\Capabilities\\UrlAssociations"_q, p) != u"mzgram."_q + p) {
+			problems.push_back(u"no own "_q + p);
+		}
+	}
+	if (TestRegRead(u"TelegramDesktop\\Capabilities"_q, u"ApplicationName"_q) != u"Telegram Desktop"_q) {
+		problems.push_back(u"Telegram Desktop's entry renamed"_q);
+	}
+	if (TestRegRead(u"RegisteredApplications"_q, u"MZGram Desktop"_q) != kUrlSchemeTestRoot + u"MZGramDesktop\\Capabilities"_q
+		|| TestRegRead(u"MZGramDesktop\\Capabilities"_q, u"ApplicationName"_q) != u"MZGram Desktop"_q) {
+		problems.push_back(u"no own Default apps entry"_q);
+	}
+
+	TestRegisterMZGram(mzgramExe, true);
+	if (TestRegRead(u"Classes\\tg\\shell\\open\\command"_q) != mzgram
+		|| TestRegRead(u"Classes\\tdesktop.tg\\shell\\open\\command"_q) != telegram) {
+		problems.push_back(u"registertg does not take tg://"_q);
+	}
+
+	TestRegClear();
+	TestRegWrite(u"Classes\\tg\\shell\\open\\command"_q, QString(), TestOpenCommand(dir.path() + u"/Gone/Telegram.exe"_q));
+	TestRegisterMZGram(mzgramExe);
+	if (TestRegRead(u"Classes\\tg\\shell\\open\\command"_q) != mzgram
+		|| TestRegRead(u"Classes\\ton\\shell\\open\\command"_q) != mzgram) {
+		problems.push_back(u"no handler or a gone one stays"_q);
+	}
+	TestRegClear();
+	Check(
+		problems.isEmpty(),
+		"MZGram registers its links apart from Telegram Desktop",
+		problems.join(u", "_q).toStdString().c_str());
+}
+
+// What MZGram up to 1.0.4 wrote into Telegram Desktop's registration goes
+// back to Telegram Desktop, or away when Telegram Desktop is not there.
+void TestUrlSchemeCleansUpTelegramKeys() {
+	auto dir = QTemporaryDir();
+	const auto telegramExe = dir.path() + u"/Telegram/Telegram.exe"_q;
+	const auto oldExe = dir.path() + u"/Old/MZGram/MZGram.exe"_q;
+	const auto mzgramExe = dir.path() + u"/MZGram/MZGram.exe"_q;
+	TestTouch(telegramExe);
+	TestTouch(oldExe);
+	TestTouch(mzgramExe);
+	const auto telegram = TestOpenCommand(telegramExe);
+	const auto old = TestOpenCommand(oldExe);
+	const auto mzgram = TestOpenCommand(mzgramExe);
+	auto problems = QStringList();
+
+	// Telegram Desktop, then MZGram 1.0.4 over it, then Telegram Desktop's
+	// handler back with its next version.
+	TestRegClear();
+	TestRegisterAsTelegram(telegramExe, u"Telegram Desktop"_q, true);
+	TestRegisterAsTelegram(oldExe, u"MZGram Desktop"_q, false);
+	TestRegisterMZGram(mzgramExe);
+	if (TestRegRead(u"Classes\\tdesktop.tg\\shell\\open\\command"_q) != telegram
+		|| TestRegRead(u"Classes\\tdesktop.ton\\shell\\open\\command"_q) != telegram) {
+		problems.push_back(u"Telegram Desktop's classes still open MZGram"_q);
+	}
+	if (TestRegRead(u"TelegramDesktop\\Capabilities"_q, u"ApplicationName"_q) != u"Telegram Desktop"_q
+		|| TestRegRead(u"TelegramDesktop\\Capabilities"_q, u"ApplicationDescription"_q) != u"Telegram Desktop"_q) {
+		problems.push_back(u"Telegram Desktop's entry still MZGram"_q);
+	}
+	if (TestRegRead(u"RegisteredApplications"_q, u"MZGram Desktop"_q) != kUrlSchemeTestRoot + u"MZGramDesktop\\Capabilities"_q) {
+		problems.push_back(u"MZGram Desktop still on Telegram Desktop's entry"_q);
+	}
+
+	// Telegram Desktop, then MZGram 1.0.4 over all of it: the path of
+	// Telegram Desktop is not known, its classes wait for its next version.
+	TestRegClear();
+	TestRegisterAsTelegram(telegramExe, u"Telegram Desktop"_q, true);
+	TestRegisterAsTelegram(oldExe, u"MZGram Desktop"_q, true);
+	TestRegisterMZGram(mzgramExe);
+	if (TestRegRead(u"Classes\\tdesktop.tg\\shell\\open\\command"_q) != old
+		|| TestRegRead(u"TelegramDesktop\\Capabilities"_q, u"ApplicationName"_q) != u"Telegram Desktop"_q
+		|| TestRegRead(u"Classes\\tg\\shell\\open\\command"_q) != mzgram) {
+		problems.push_back(u"Telegram Desktop's keys over 1.0.4 handled wrong"_q);
+	}
+
+	// MZGram 1.0.4 alone.
+	TestRegClear();
+	TestRegisterAsTelegram(oldExe, u"MZGram Desktop"_q, true);
+	TestRegisterMZGram(mzgramExe);
+	if (TestRegExists(u"Classes\\tdesktop.tg"_q)
+		|| TestRegExists(u"Classes\\tdesktop.tonsite"_q)
+		|| TestRegExists(u"TelegramDesktop"_q)) {
+		problems.push_back(u"the keys of 1.0.4 stay without Telegram Desktop"_q);
+	}
+	if (TestRegRead(u"Classes\\tg\\shell\\open\\command"_q) != mzgram
+		|| TestRegRead(u"Classes\\mzgram.tg\\shell\\open\\command"_q) != mzgram) {
+		problems.push_back(u"tg:// does not open this MZGram"_q);
+	}
+	TestRegClear();
+	Check(
+		problems.isEmpty(),
+		"MZGram gives Telegram Desktop's registration back",
+		problems.join(u", "_q).toStdString().c_str());
+}
+
+#endif // _WIN32
+
+// The app registers its links with these rules on every platform.
+void TestUrlSchemeIsWired() {
+	const auto read = [](const QString &path) {
+		auto file = QFile(QString::fromUtf8(MZGRAM_SOURCE_DIR) + path);
+		return file.open(QIODevice::ReadOnly)
+			? QString::fromUtf8(file.readAll())
+			: QString();
+	};
+	const auto application = read(u"/core/application.cpp"_q);
+	const auto codes = read(u"/settings/settings_codes.cpp"_q);
+	auto missing = QStringList();
+	for (const auto &call : {
+			u"MZGram::RegisterUrlSchemes({"_q,
+			u".shortAppName = MZGram::UrlSchemeClassPrefix(),"_q,
+			u".longAppName = MZGram::UrlSchemeAppKey(),"_q,
+		}) {
+		if (!application.contains(call)) {
+			missing.push_back(call);
+		}
+	}
+	if (application.contains(u".shortAppName = u\"tdesktop\"_q"_q)) {
+		missing.push_back(u"Telegram Desktop's names"_q);
+	}
+	if (!codes.contains(u"Core::Application::RegisterUrlScheme(true);"_q)) {
+		missing.push_back(u"registertg"_q);
+	}
+	Check(
+		missing.isEmpty(),
+		"the app registers its links with MZGram's names",
+		missing.join(u", "_q).toStdString().c_str());
+}
+
 } // namespace
 
 int main() {
@@ -1973,6 +2253,12 @@ int main() {
 		TestIpcLinkStaysOneRecord,
 		TestIpcLocalFilesWithLinkAreDropped,
 		TestIpcRulesAreWired,
+		TestUrlSchemeRules,
+#ifdef _WIN32
+		TestUrlSchemeKeepsTelegramDesktop,
+		TestUrlSchemeCleansUpTelegramKeys,
+#endif // _WIN32
+		TestUrlSchemeIsWired,
 	};
 	for (const auto &test : tests) {
 		test();

@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/application.h"
 
 #include "mzgram/mzgram_update.h"
+#include "mzgram/mzgram_url_scheme.h"
 
 #include "data/data_abstract_structure.h"
 #include "data/data_channel.h"
@@ -2073,43 +2074,37 @@ void Application::startShortcuts() {
 	}, _lifetime);
 }
 
-void Application::RegisterUrlScheme() {
+void Application::RegisterUrlScheme(bool force) {
 	const auto arguments = Launcher::Instance().customWorkingDir()
 		? u"-workdir \"%1\""_q.arg(cWorkingDir())
 		: QString();
 
-	base::Platform::RegisterUrlScheme(base::Platform::UrlSchemeDescriptor{
-		.executable = Platform::ExecutablePathForShortcuts(),
+	// MZGram registers its links under names of its own, apart from
+	// Telegram Desktop's, and leaves Telegram Desktop's handler in place
+	// (mzgram_url_scheme.h).
+#ifdef Q_OS_WIN
+	MZGram::RegisterUrlSchemes({
+		.root = u"Software\\"_q,
+		.executable = QDir::toNativeSeparators(
+			Platform::ExecutablePathForShortcuts()),
 		.arguments = arguments,
-		.protocol = u"tg"_q,
-		.protocolName = u"Telegram Link"_q,
-		.shortAppName = u"tdesktop"_q,
-		.longAppName = QCoreApplication::applicationName(),
-		.displayAppName = AppName.utf16(),
-		.displayAppDescription = AppName.utf16(),
+		.appName = AppName.utf16(),
+		.force = force,
 	});
-
-	base::Platform::RegisterUrlScheme(base::Platform::UrlSchemeDescriptor{
-		.executable = Platform::ExecutablePathForShortcuts(),
-		.arguments = arguments,
-		.protocol = u"tonsite"_q,
-		.protocolName = u"TonSite Link"_q,
-		.shortAppName = u"tdesktop"_q,
-		.longAppName = QCoreApplication::applicationName(),
-		.displayAppName = AppName.utf16(),
-		.displayAppDescription = AppName.utf16(),
-	});
-
-	base::Platform::RegisterUrlScheme(base::Platform::UrlSchemeDescriptor{
-		.executable = Platform::ExecutablePathForShortcuts(),
-		.arguments = arguments,
-		.protocol = u"ton"_q,
-		.protocolName = u"Ton Link"_q,
-		.shortAppName = u"tdesktop"_q,
-		.longAppName = QCoreApplication::applicationName(),
-		.displayAppName = AppName.utf16(),
-		.displayAppDescription = AppName.utf16(),
-	});
+#else // Q_OS_WIN
+	for (const auto &scheme : MZGram::UrlSchemes()) {
+		base::Platform::RegisterUrlScheme(base::Platform::UrlSchemeDescriptor{
+			.executable = Platform::ExecutablePathForShortcuts(),
+			.arguments = arguments,
+			.protocol = scheme.protocol,
+			.protocolName = scheme.protocolName,
+			.shortAppName = MZGram::UrlSchemeClassPrefix(),
+			.longAppName = MZGram::UrlSchemeAppKey(),
+			.displayAppName = AppName.utf16(),
+			.displayAppDescription = AppName.utf16(),
+		});
+	}
+#endif // Q_OS_WIN
 }
 
 bool IsAppLaunched() {

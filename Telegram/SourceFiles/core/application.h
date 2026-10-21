@@ -363,7 +363,7 @@ public:
 	void notifySystemSleep();
 	[[nodiscard]] rpl::producer<> systemSleepEvents() const;
 
-	static void RegisterUrlScheme();
+	static void RegisterUrlScheme(bool force = false);
 
 protected:
 	bool eventFilter(QObject *object, QEvent *event) override;
