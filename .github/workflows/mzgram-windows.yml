@@ -49,12 +49,21 @@ jobs:
         shell: cmd
 
     steps:
+      # The drive with the most free space holds the build, as in the release
+      # workflow. x64 runners leave about 31 GB free on C: and 147 GB on D:;
+      # with C: a cold dependency build left too little to link the Debug
+      # MZGram.exe (LNK1180).
       - name: Prepare directories.
+        shell: pwsh
         run: |
-          mkdir %userprofile%\TBuild\Libraries
-          mklink /d %GITHUB_WORKSPACE%\TBuild %userprofile%\TBuild
-          echo TBUILD=%GITHUB_WORKSPACE%\TBuild>>%GITHUB_ENV%
-          echo LibrariesPath=%GITHUB_WORKSPACE%\TBuild\Libraries${{ matrix.libs_suffix }}>>%GITHUB_ENV%
+          Get-PSDrive -PSProvider FileSystem | Format-Table Name, @{n='FreeGB';e={[math]::Round($_.Free/1GB,1)}}
+          $drive = Get-PSDrive -PSProvider FileSystem | Where-Object { $_.Free -gt 0 } | Sort-Object Free -Descending | Select-Object -First 1
+          $root = if ($drive.Name -eq 'C') { Join-Path $env:USERPROFILE 'TBuild' } else { "$($drive.Name):\TBuild" }
+          New-Item -ItemType Directory -Force (Join-Path $root 'Libraries') | Out-Null
+          New-Item -ItemType SymbolicLink -Path (Join-Path $env:GITHUB_WORKSPACE 'TBuild') -Target $root | Out-Null
+          "TBUILD=$env:GITHUB_WORKSPACE\TBuild" >> $env:GITHUB_ENV
+          "LibrariesPath=$env:GITHUB_WORKSPACE\TBuild\Libraries${{ matrix.libs_suffix }}" >> $env:GITHUB_ENV
+          Write-Output "Build root: $root"
 
       - name: Get repository name.
         shell: bash
@@ -160,9 +169,9 @@ jobs:
             echo "MZGRAM_API=-D TDESKTOP_API_TEST=ON" >> $GITHUB_ENV
           fi
 
-      # The build needs more of drive C: than the image leaves free (24 GB on
-      # x64 runners, and the image keeps growing); none of these tools are
-      # used here. PostgreSQL stays: CMake finds it and links it in.
+      # Toolchains and caches still live on drive C:, and on ARM64 runners the
+      # build does too; none of these tools are used here. PostgreSQL stays:
+      # CMake finds it and links it in.
       - name: Make room on drive C.
         shell: bash
         run: |
