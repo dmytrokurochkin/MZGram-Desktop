@@ -22,6 +22,12 @@ namespace {
 
 #ifdef _WIN32
 
+// What Telegram Desktop registers (lib_base, base_url_scheme_win.cpp).
+// MZGram up to 1.0.4 wrote its own name and path there too.
+const auto kTelegramClassPrefix = u"tdesktop"_q;
+const auto kTelegramAppKey = u"TelegramDesktop"_q;
+const auto kTelegramAppName = u"Telegram Desktop"_q;
+
 [[nodiscard]] QString ReadValue(const QString &key, const QString &name) {
 	const auto wkey = key.toStdWString();
 	const auto wname = name.toStdWString();
@@ -55,12 +61,70 @@ void WriteValue(const QString &key, const QString &name, const QString &value) {
 	RegCloseKey(handle);
 }
 
+void DeleteKey(const QString &key) {
+	const auto wkey = key.toStdWString();
+	RegDeleteTree(HKEY_CURRENT_USER, wkey.c_str());
+	RegDeleteKey(HKEY_CURRENT_USER, wkey.c_str());
+}
+
 [[nodiscard]] QString OpenCommand(const UrlSchemeRegistration &r) {
 	return '"' + r.executable + u"\" "_q + r.arguments + u" -- \"%1\""_q;
 }
 
 [[nodiscard]] QString Icon(const QString &executable) {
 	return '"' + executable + u",1\""_q;
+}
+
+[[nodiscard]] bool Exists(const QString &path) {
+	return QFileInfo::exists(path);
+}
+
+// MZGram up to 1.0.4 registered itself under Telegram Desktop's names, so
+// Default apps showed Telegram Desktop's entry as "MZGram Desktop" and its
+// links opened MZGram. What MZGram wrote there goes back to Telegram Desktop
+// when it is registered (the path of Telegram Desktop is taken from its
+// Software\Classes\<protocol>), or away when it is not.
+void CleanUpTelegramKeys(const UrlSchemeRegistration &r) {
+	const auto telegram = !ReadValue(
+		r.root + u"RegisteredApplications"_q,
+		kTelegramAppName).isEmpty();
+	for (const auto &scheme : UrlSchemes()) {
+		const auto named = r.root
+			+ u"Classes\\"_q
+			+ kTelegramClassPrefix
+			+ '.'
+			+ scheme.protocol;
+		const auto command = ReadValue(
+			named + u"\\shell\\open\\command"_q,
+			QString());
+		if (!IsMZGramExecutable(CommandExecutable(command))) {
+			continue;
+		}
+		const auto handler = ReadValue(
+			r.root + u"Classes\\"_q + scheme.protocol + u"\\shell\\open\\command"_q,
+			QString());
+		const auto executable = CommandExecutable(handler);
+		if (!executable.isEmpty()
+			&& !IsMZGramExecutable(executable)
+			&& Exists(executable)) {
+			WriteValue(named + u"\\shell\\open\\command"_q, QString(), handler);
+			WriteValue(named + u"\\DefaultIcon"_q, QString(), Icon(executable));
+		} else if (!telegram) {
+			DeleteKey(named);
+		}
+	}
+	const auto app = r.root + kTelegramAppKey;
+	const auto capabilities = app + u"\\Capabilities"_q;
+	if (ReadValue(capabilities, u"ApplicationName"_q) != r.appName) {
+		return;
+	} else if (telegram) {
+		WriteValue(capabilities, u"ApplicationName"_q, kTelegramAppName);
+		WriteValue(capabilities, u"ApplicationDescription"_q, kTelegramAppName);
+	} else {
+		DeleteKey(capabilities);
+		const auto wapp = app.toStdWString();
+		RegDeleteKey(HKEY_CURRENT_USER, wapp.c_str());
+	}
 }
 
 #endif // _WIN32
@@ -76,11 +140,11 @@ std::vector<UrlScheme> UrlSchemes() {
 }
 
 QString UrlSchemeClassPrefix() {
-	return u"tdesktop"_q;
+	return u"mzgram"_q;
 }
 
 QString UrlSchemeAppKey() {
-	return u"TelegramDesktop"_q;
+	return u"MZGramDesktop"_q;
 }
 
 QString CommandExecutable(const QString &command) {
@@ -100,12 +164,17 @@ bool IsMZGramExecutable(const QString &path) {
 bool MayTakeUrlScheme(
 		const QString &currentCommand,
 		const std::function<bool(const QString &path)> &exists) {
-	return true;
+	const auto executable = CommandExecutable(currentCommand);
+	return executable.isEmpty()
+		|| IsMZGramExecutable(executable)
+		|| !exists(executable);
 }
 
 #ifdef _WIN32
 
 void RegisterUrlSchemes(const UrlSchemeRegistration &r) {
+	CleanUpTelegramKeys(r);
+
 	const auto capabilities = r.root + UrlSchemeAppKey() + u"\\Capabilities"_q;
 	WriteValue(capabilities, u"ApplicationName"_q, r.appName);
 	WriteValue(capabilities, u"ApplicationDescription"_q, r.appName);
@@ -119,7 +188,15 @@ void RegisterUrlSchemes(const UrlSchemeRegistration &r) {
 		WriteValue(namedBase + u"\\shell\\open\\command"_q, QString(), command);
 		WriteValue(capabilities + u"\\UrlAssociations"_q, scheme.protocol, named);
 
+		// The handler of another app, Telegram Desktop's for one, stays:
+		// MZGram is chosen for these links in Windows Settings > Default apps.
 		const auto legacy = r.root + u"Classes\\"_q + scheme.protocol;
+		const auto current = ReadValue(
+			legacy + u"\\shell\\open\\command"_q,
+			QString());
+		if (!r.force && !MayTakeUrlScheme(current, Exists)) {
+			continue;
+		}
 		WriteValue(legacy, u"URL Protocol"_q, QString());
 		WriteValue(legacy, QString(), u"URL:"_q + scheme.protocolName);
 		WriteValue(legacy + u"\\DefaultIcon"_q, QString(), Icon(r.executable));

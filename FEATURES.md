@@ -2,7 +2,7 @@
 
 What MZGram adds to the regular Telegram apps, and how it differs from them. MZGram is an unofficial client: MZGram for Android is based on Telegram for Android, MZGram Desktop on Telegram Desktop. Everything here is in the code today; nothing planned is listed.
 
-"Since" is the first MZGram release with the feature. "Next release" means it is done and tested but not released yet (Android 1.0.7, Desktop 1.0.5).
+"Since" is the first MZGram release with the feature. "Next release" means it is done and tested but not released yet (Android 1.0.7, Desktop 1.0.6).
 
 Most switches are under **Settings > MZGram**, grouped into topic pages. This file is the same in both repositories; it is updated together with every change to a feature.
 
@@ -213,6 +213,7 @@ Each item has its own switch.
 | Self-update | Update in the bar downloads the archive of that release for this system and architecture (Windows x64 or ARM64 zip, Linux x64 or ARM64 tar.xz) only from the MZGram-Desktop releases on GitHub over HTTPS, checks its SHA-256 against the release's SHA256SUMS and GitHub's digest, unpacks it and restarts; the Updater copies the new files, backs up every file it replaces and puts them back if a copy fails, so the old version keeps working. The data folder is not touched. Progress is shown in the bar; a file that fails the check is deleted and nothing is installed; on an error: Retry or the release page. When the MZGram folder cannot be written, the bar says so and offers the release page. Turned off with the update bar. The version before it is installed by hand once. | 1.0.1 |
 | Check for updates | Settings > MZGram > Interface > Check for updates looks at once, outside the interval and also with the bar switched off, and says what it found: the latest version is installed, a newer one is available (it also gets the bar), or the check failed. | 1.0.2 |
 | Own data folder | MZGram keeps its data apart from Telegram Desktop, so both can be installed. | 1.0.0 |
+| Links beside Telegram Desktop | On Windows MZGram registers tg://, tonsite:// and ton:// links under its own name: Settings > Apps > Default apps lists MZGram Desktop apart from Telegram Desktop, and the app chosen there opens these links. MZGram does not take the links from Telegram Desktop or another app; it opens them by default only when no app has them or the app that had them is gone. Up to 1.0.4 MZGram wrote itself into Telegram Desktop's registration, so Telegram Desktop's entry in Default apps was called MZGram Desktop and its links could open MZGram, also from a folder removed later. MZGram now gives that registration back to Telegram Desktop, or removes it when Telegram Desktop is not installed. | Next release |
 | MZGram name | Window titles, the About box ("MZGram Desktop X.Y.Z, an unofficial client based on Telegram Desktop", GPL, GitHub), menus, tray, notifications, the Windows app id and Start menu shortcut, and the exe properties say MZGram, in every language. The Telegram service keeps its name. | 1.0.1 |
 
 ### Releases
