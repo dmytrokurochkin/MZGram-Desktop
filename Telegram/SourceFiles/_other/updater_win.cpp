@@ -10,10 +10,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/platform/win/base_windows_safe_library.h"
 #include "mzgram/mzgram_update_install.h"
 
+#include <algorithm>
 #include <cstring>
-
 #include <limits>
 #include <memory>
+#include <string>
 
 bool _debug = false;
 
@@ -231,11 +232,19 @@ void fullClearPath(const wstring &dir) {
 	if (res) writeLog(L"Error: failed to clear path! :(");
 }
 
+// MZGram: UpdateInstall::kBackupFolder with Windows separators.
+wstring MZGramBackupFolder() {
+	const auto folder = std::string(MZGram::UpdateInstall::kBackupFolder);
+	auto result = wstring(folder.begin(), folder.end());
+	std::replace(result.begin(), result.end(), L'/', L'\\');
+	return result;
+}
+
 void delFolder() {
 	wstring delPathOld = L"tupdates\\ready", delPath = L"tupdates\\temp", delFolder = L"tupdates";
 	fullClearPath(delPathOld);
 	fullClearPath(delPath);
-	fullClearPath(L"tupdates\\mzgram_backup"); // MZGram: mzgram_update_install.h
+	fullClearPath(MZGramBackupFolder()); // MZGram: mzgram_update_install.h
 	RemoveDirectory(delFolder.c_str());
 }
 
@@ -365,7 +374,7 @@ bool update() {
 	// the app starts as before; the app then says the update was rolled back
 	// (mzgram_update_install.h). There is no retry box.
 	using namespace MZGram::UpdateInstall;
-	const auto backupFolder = wstring(L"tupdates\\mzgram_backup");
+	const auto backupFolder = MZGramBackupFolder();
 	if (!CreateDirectory(backupFolder.c_str(), NULL) && GetLastError() != ERROR_ALREADY_EXISTS) {
 		writeLog(L"Error: failed to create the backup folder");
 		delFolder();
@@ -419,61 +428,6 @@ bool update() {
 	writeLog(L"Update succeed! Clearing folder..");
 	delFolder();
 	return true;
-}
-
-void updateRegistry() {
-	if (versionNum && versionNum != 0x7FFFFFFF && versionNum != 0x7FFFFFFE) {
-		writeLog(L"Updating registry..");
-		versionStr[versionLen / 2] = 0;
-		HKEY rkey;
-		LSTATUS status = RegOpenKeyEx(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{53F49750-6209-4FBF-9CA8-7A333C87D1ED}_is1", 0, KEY_QUERY_VALUE | KEY_SET_VALUE, &rkey);
-		if (status == ERROR_SUCCESS) {
-			writeLog(L"Checking registry install location..");
-			static const int bufSize = 4096;
-			DWORD locationType, locationSize = bufSize * 2;
-			WCHAR locationStr[bufSize], exp[bufSize];
-			if (RegQueryValueEx(rkey, L"InstallLocation", 0, &locationType, (BYTE*)locationStr, &locationSize) == ERROR_SUCCESS) {
-				locationSize /= 2;
-				if (locationStr[locationSize - 1]) {
-					locationStr[locationSize++] = 0;
-				}
-				if (locationType == REG_EXPAND_SZ) {
-					DWORD copy = ExpandEnvironmentStrings(locationStr, exp, bufSize);
-					if (copy <= bufSize) {
-						memcpy(locationStr, exp, copy * sizeof(WCHAR));
-					}
-				}
-				if (locationType == REG_EXPAND_SZ || locationType == REG_SZ) {
-					if (PathCanonicalize(exp, locationStr)) {
-						memcpy(locationStr, exp, bufSize * sizeof(WCHAR));
-						if (GetFullPathName(L".", bufSize, exp, 0) < bufSize) {
-							wstring installpath = locationStr, mypath = exp;
-							if (installpath == mypath + L"\\" || true) { // always update reg info, if we found it
-								WCHAR nameStr[bufSize], dateStr[bufSize], publisherStr[bufSize], icongroupStr[bufSize];
-								SYSTEMTIME stLocalTime;
-								GetLocalTime(&stLocalTime);
-								RegSetValueEx(rkey, L"DisplayVersion", 0, REG_SZ, (const BYTE*)versionStr, ((versionLen / 2) + 1) * sizeof(WCHAR));
-								wsprintf(nameStr, L"Telegram Desktop");
-								RegSetValueEx(rkey, L"DisplayName", 0, REG_SZ, (const BYTE*)nameStr, (wcslen(nameStr) + 1) * sizeof(WCHAR));
-								wsprintf(publisherStr, L"Telegram FZ-LLC");
-								RegSetValueEx(rkey, L"Publisher", 0, REG_SZ, (const BYTE*)publisherStr, (wcslen(publisherStr) + 1) * sizeof(WCHAR));
-								wsprintf(icongroupStr, L"Telegram Desktop");
-								RegSetValueEx(rkey, L"Inno Setup: Icon Group", 0, REG_SZ, (const BYTE*)icongroupStr, (wcslen(icongroupStr) + 1) * sizeof(WCHAR));
-								wsprintf(dateStr, L"%04d%02d%02d", stLocalTime.wYear, stLocalTime.wMonth, stLocalTime.wDay);
-								RegSetValueEx(rkey, L"InstallDate", 0, REG_SZ, (const BYTE*)dateStr, (wcslen(dateStr) + 1) * sizeof(WCHAR));
-
-								const WCHAR *appURL = L"https://desktop.telegram.org";
-								RegSetValueEx(rkey, L"HelpLink", 0, REG_SZ, (const BYTE*)appURL, (wcslen(appURL) + 1) * sizeof(WCHAR));
-								RegSetValueEx(rkey, L"URLInfoAbout", 0, REG_SZ, (const BYTE*)appURL, (wcslen(appURL) + 1) * sizeof(WCHAR));
-								RegSetValueEx(rkey, L"URLUpdateInfo", 0, REG_SZ, (const BYTE*)appURL, (wcslen(appURL) + 1) * sizeof(WCHAR));
-							}
-						}
-					}
-				}
-			}
-			RegCloseKey(rkey);
-		}
-	}
 }
 
 int APIENTRY wWinMain(HINSTANCE instance, HINSTANCE prevInstance, LPWSTR cmdParamarg, int cmdShow) {
@@ -579,8 +533,8 @@ int APIENTRY wWinMain(HINSTANCE instance, HINSTANCE prevInstance, LPWSTR cmdPara
 							error));
 					}
 				}
-				// MZGram: no updateRegistry(), it writes the uninstall entry
-				// of Telegram Desktop's installer; MZGram has no installer.
+				// MZGram: the uninstall entry of Telegram Desktop's installer
+				// is left alone after an update; MZGram has no installer.
 				if (needupdate) {
 					update();
 				}

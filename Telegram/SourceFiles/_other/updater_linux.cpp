@@ -347,6 +347,9 @@ bool update() {
 	};
 	files.copy = [](const string &from, const string &to) {
 		// it is necessary to remove the old file to not to get an error if appimage file is used by fuse
+		// MZGram: a folder where the update has a file is not cleared, as
+		// Telegram's Updater did: it could not be put back, so the update
+		// fails and is rolled back instead.
 		struct stat statbuf;
 		if (!stat(to.c_str(), &statbuf)) {
 			if (S_ISDIR(statbuf.st_mode) || unlink(to.c_str())) {
