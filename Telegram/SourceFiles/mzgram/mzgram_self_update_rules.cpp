@@ -181,7 +181,7 @@ QString EntryPath(const QString &entry) {
 }
 
 bool PlainArchiveEntry(const QString &listing) {
-	return true;
+	return listing.startsWith('-') || listing.startsWith('d');
 }
 
 } // namespace MZGram::Update

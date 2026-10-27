@@ -2,7 +2,7 @@
 
 What MZGram adds to the regular Telegram apps, and how it differs from them. MZGram is an unofficial client: MZGram for Android is based on Telegram for Android, MZGram Desktop on Telegram Desktop. Everything here is in the code today; nothing planned is listed.
 
-"Since" is the first MZGram release with the feature. "Next release" means it is done and tested but not released yet (Android 1.0.7, Desktop 1.0.6).
+"Since" is the first MZGram release with the feature. "Next release" means it is done and tested but not released yet (Android 1.0.8, Desktop 1.0.7).
 
 Most switches are under **Settings > MZGram**, grouped into topic pages. This file is the same in both repositories; it is updated together with every change to a feature.
 
@@ -128,7 +128,7 @@ Each item has its own switch.
 | Feature | What it does | Since |
 |---|---|---|
 | Signed releases | Every release APK is signed with the MZGram key, with a key rotation from the earlier key so it installs over earlier MZGram builds and keeps their data (up to 1.0.3; the next release has its own package and is installed beside them). `SHA256SUMS` and the signing certificate are published with each release. | 1.0.0 |
-| Telegram for Android base | Based on Telegram for Android 13.0.3. It needs Android 6.0 or newer: Telegram 13.0 dropped Android 5. | Next release |
+| Telegram for Android base | Based on Telegram for Android 13.0.3. It needs Android 6.0 or newer: Telegram 13.0 dropped Android 5. | 1.0.7 |
 
 ## Desktop
 
@@ -213,19 +213,20 @@ Each item has its own switch.
 | Self-update | Update in the bar downloads the archive of that release for this system and architecture (Windows x64 or ARM64 zip, Linux x64 or ARM64 tar.xz) only from the MZGram-Desktop releases on GitHub over HTTPS, checks its SHA-256 against the release's SHA256SUMS and GitHub's digest, unpacks it and restarts; the Updater copies the new files, backs up every file it replaces and puts them back if a copy fails, so the old version keeps working. The data folder is not touched. Progress is shown in the bar; a file that fails the check is deleted and nothing is installed; on an error: Retry or the release page. When the MZGram folder cannot be written, the bar says so and offers the release page. Turned off with the update bar. The version before it is installed by hand once. | 1.0.1 |
 | Check for updates | Settings > MZGram > Interface > Check for updates looks at once, outside the interval and also with the bar switched off, and says what it found: the latest version is installed, a newer one is available (it also gets the bar), or the check failed. | 1.0.2 |
 | Own data folder | MZGram keeps its data apart from Telegram Desktop, so both can be installed. | 1.0.0 |
-| Links beside Telegram Desktop | On Windows MZGram registers tg://, tonsite:// and ton:// links under its own name: Settings > Apps > Default apps lists MZGram Desktop apart from Telegram Desktop, and the app chosen there opens these links. MZGram does not take the links from Telegram Desktop or another app; it opens them by default only when no app has them or the app that had them is gone. Up to 1.0.4 MZGram wrote itself into Telegram Desktop's registration, so Telegram Desktop's entry in Default apps was called MZGram Desktop and its links could open MZGram, also from a folder removed later. MZGram now gives that registration back to Telegram Desktop, or removes it when Telegram Desktop is not installed. | Next release |
+| Links beside Telegram Desktop | On Windows MZGram registers tg://, tonsite:// and ton:// links under its own name: Settings > Apps > Default apps lists MZGram Desktop apart from Telegram Desktop, and the app chosen there opens these links. MZGram does not take the links from Telegram Desktop or another app; it opens them by default only when no app has them, the app that had them is gone, or the `registertg` code asks. Up to 1.0.4 MZGram wrote itself into Telegram Desktop's registration, so Telegram Desktop's entry in Default apps was called MZGram Desktop and its links could open MZGram, also from a folder removed later. MZGram gives that registration back to Telegram Desktop, or removes it when Telegram Desktop is not installed; since the next release also the tg:// link 1.0.4 took from it, with Telegram Desktop found through its installer when needed. | 1.0.6 |
+| Links beside Telegram Desktop on Linux | On Linux MZGram becomes the app for tg://, tonsite:// and ton:// links only when no app has them, the app that had them is gone, or the `registertg` code asks; otherwise it is added to the apps these links can be opened with, and Telegram Desktop or the app chosen before stays the default. Up to 1.0.6 MZGram made itself the default after every update. | Next release |
 | MZGram name | Window titles, the About box ("MZGram Desktop X.Y.Z, an unofficial client based on Telegram Desktop", GPL, GitHub), menus, tray, notifications, the Windows app id and Start menu shortcut, and the exe properties say MZGram, in every language. The Telegram service keeps its name. | 1.0.1 |
 
 ### Releases
 
 | Feature | What it does | Since |
 |---|---|---|
-| Windows x64 and ARM64 | A zip for each, with `MZGram.exe`. | 1.0.0 |
-| Windows x64 without extra DLLs | `MZGram.exe` needs nothing but Windows. Up to 1.0.4 the x64 one also needed `libpq.dll` (PostgreSQL's client library, never used) and did not start on a computer without it; ARM64 and Linux were not affected. CI checks every DLL the executables import and starts the new build with Windows only. | Next release |
+| Windows x64 and ARM64 | A zip for each, with `MZGram.exe`. MZGram is built with Qt 6, so it needs Windows 10 version 1809 or newer; Telegram Desktop's own x64 build is made with Qt 5 for Windows 7. | 1.0.0 |
+| Windows x64 without extra DLLs | `MZGram.exe` needs nothing but Windows. Up to 1.0.4 the x64 one also needed `libpq.dll` (PostgreSQL's client library, never used) and did not start on a computer without it; ARM64 and Linux were not affected. CI checks every DLL the executables import and starts the new build with Windows only. | 1.0.6 |
 | Linux x64 | A tar.xz, built against glibc 2.28 so it runs on current distributions. | 1.0.0 |
 | Linux ARM64 | A tar.xz for aarch64 machines such as Snapdragon laptops. | 1.0.1 |
 | Source archive and checksums | Every release has the complete source (`-source.tar.xz`) and `SHA256SUMS`. | 1.0.0 |
-| Telegram Desktop base | Based on Telegram Desktop 7.3.1, with its security fix of 7.2.9: a link that another launch of the app passes on to the running one (a tg:// link opened in a browser, for example) stays one link even with `;` in it, and local files that come together with a link are not opened or sent. Up to 1.0.4 (Telegram Desktop 7.2.8) such a link could make the running app send local files to a chat. | Next release |
+| Telegram Desktop base | Based on Telegram Desktop 7.3.1, with its security fix of 7.2.9: a link that another launch of the app passes on to the running one (a tg:// link opened in a browser, for example) stays one link even with `;` in it, and local files that come together with a link are not opened or sent. Up to 1.0.4 (Telegram Desktop 7.2.8) such a link could make the running app send local files to a chat. | 1.0.6 |
 
 ## Android and Desktop compared
 

@@ -2079,9 +2079,11 @@ void Application::RegisterUrlScheme(bool force) {
 		? u"-workdir \"%1\""_q.arg(cWorkingDir())
 		: QString();
 
-	// MZGram registers its links under names of its own, apart from
-	// Telegram Desktop's, and leaves Telegram Desktop's handler in place
-	// (mzgram_url_scheme.h).
+	// MZGram leaves the handler of another app, Telegram Desktop's for one,
+	// in place unless the "registertg" code asks (mzgram_url_scheme.h), and
+	// can be chosen for these links all the same: on Windows in Default apps,
+	// where it is registered under names of its own, apart from Telegram
+	// Desktop's, on Linux among the apps for the links.
 #ifdef Q_OS_WIN
 	MZGram::RegisterUrlSchemes({
 		.root = u"Software\\"_q,
@@ -2093,13 +2095,22 @@ void Application::RegisterUrlScheme(bool force) {
 	});
 #else // Q_OS_WIN
 	for (const auto &scheme : MZGram::UrlSchemes()) {
+		if (!force && !MZGram::MayTakeUrlScheme(
+				MZGram::DefaultUrlSchemeCommand(scheme.protocol),
+				MZGram::HandlerExecutableExists)) {
+			MZGram::OfferForUrlScheme({
+				.executable = Platform::ExecutablePathForShortcuts(),
+				.arguments = arguments,
+				.protocol = scheme.protocol,
+				.name = AppName.utf16(),
+			});
+			continue;
+		}
 		base::Platform::RegisterUrlScheme(base::Platform::UrlSchemeDescriptor{
 			.executable = Platform::ExecutablePathForShortcuts(),
 			.arguments = arguments,
 			.protocol = scheme.protocol,
 			.protocolName = scheme.protocolName,
-			.shortAppName = MZGram::UrlSchemeClassPrefix(),
-			.longAppName = MZGram::UrlSchemeAppKey(),
 			.displayAppName = AppName.utf16(),
 			.displayAppDescription = AppName.utf16(),
 		});

@@ -161,25 +161,43 @@ constexpr auto kMaxSumsSize = qint64(1024) * 1024;
 
 #else // Q_OS_WIN
 
-// The tar.xz of the release with the system's tar: every entry is checked
-// first (EntryPath), then it is unpacked next to the ready folder and moved.
-[[nodiscard]] bool Unpack(const QString &archive, const QString &ready) {
+// The lines tar lists the archive with, empty when it fails.
+[[nodiscard]] QStringList ListArchive(
+		const QString &archive,
+		const QString &option) {
 	auto list = QProcess();
-	list.start(u"tar"_q, { u"-tJf"_q, archive });
+	list.start(u"tar"_q, { option, archive });
 	if (!list.waitForFinished(120000)
 		|| list.exitStatus() != QProcess::NormalExit
 		|| list.exitCode() != 0) {
 		LOG(("MZGram Update Error: tar could not list the archive."));
-		return false;
+		return {};
 	}
-	const auto entries = QString::fromUtf8(list.readAllStandardOutput())
+	return QString::fromUtf8(list.readAllStandardOutput())
 		.split('\n', Qt::SkipEmptyParts);
+}
+
+// The tar.xz of the release with the system's tar: every entry is checked
+// first (EntryPath, PlainArchiveEntry), then it is unpacked next to the
+// ready folder and moved.
+[[nodiscard]] bool Unpack(const QString &archive, const QString &ready) {
+	const auto entries = ListArchive(archive, u"-tJf"_q);
 	if (entries.isEmpty()) {
 		return false;
 	}
 	for (const auto &entry : entries) {
 		if (EntryPath(entry).isEmpty()) {
 			LOG(("MZGram Update Error: refused archive entry '%1'.").arg(entry));
+			return false;
+		}
+	}
+	const auto listing = ListArchive(archive, u"-tvJf"_q);
+	if (listing.size() != entries.size()) {
+		return false;
+	}
+	for (const auto &line : listing) {
+		if (!PlainArchiveEntry(line)) {
+			LOG(("MZGram Update Error: refused archive entry '%1'.").arg(line));
 			return false;
 		}
 	}
