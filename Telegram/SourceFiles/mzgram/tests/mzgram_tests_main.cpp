@@ -1190,6 +1190,58 @@ void TestSelfUpdateEntries() {
 	Check(problems.isEmpty(), "self-update: archive entries stay in the app folder, never tdata", problems.join(u", "_q).toStdString().c_str());
 }
 
+// Linux archives hold regular files and folders only: a link could lead a
+// later entry out of the app folder, whatever its name.
+void TestSelfUpdateEntryTypes() {
+	using namespace MZGram::Update;
+	auto problems = QStringList();
+	for (const auto &plain : {
+		u"-rwxr-xr-x runner/runner 99233284 2026-10-21 15:52 MZGram/MZGram"_q,
+		u"drwxr-xr-x runner/runner 0 2026-10-21 15:52 MZGram/"_q,
+	}) {
+		if (!PlainArchiveEntry(plain)) {
+			problems.push_back(u"refused: "_q + plain);
+		}
+	}
+	for (const auto &link : {
+		u"lrwxrwxrwx runner/runner 0 2026-10-21 15:52 MZGram/x -> /"_q,
+		u"hrwxr-xr-x runner/runner 0 2026-10-21 15:52 MZGram/y link to MZGram/MZGram"_q,
+		u"crw-r--r-- root/root 1,3 2026-10-21 15:52 MZGram/null"_q,
+		QString(),
+	}) {
+		if (PlainArchiveEntry(link)) {
+			problems.push_back(u"taken: "_q + link);
+		}
+	}
+	auto file = QFile(
+		QString::fromUtf8(MZGRAM_SOURCE_DIR) + u"/mzgram/mzgram_self_update.cpp"_q);
+	const auto text = file.open(QIODevice::ReadOnly)
+		? QString::fromUtf8(file.readAll())
+		: QString();
+	if (!text.contains(u"u\"-tvJf\"_q"_q) || !text.contains(u"PlainArchiveEntry(line)"_q)) {
+		problems.push_back(u"the Linux unpack does not check the entry types"_q);
+	}
+	Check(problems.isEmpty(), "self-update: Linux archives with links are refused", problems.join(u", "_q).toStdString().c_str());
+}
+
+// The Windows Updater keeps the replaced files where the rules say and no
+// longer has Telegram Desktop's installer entry to update.
+void TestUpdaterBackupFolderIsShared() {
+	auto file = QFile(
+		QString::fromUtf8(MZGRAM_SOURCE_DIR) + u"/_other/updater_win.cpp"_q);
+	const auto text = file.open(QIODevice::ReadOnly)
+		? QString::fromUtf8(file.readAll())
+		: QString();
+	auto problems = QStringList();
+	if (text.isEmpty() || text.contains(u"L\"tupdates\\\\mzgram_backup\""_q)) {
+		problems.push_back(u"a backup folder of its own"_q);
+	}
+	if (text.contains(u"updateRegistry"_q)) {
+		problems.push_back(u"updateRegistry"_q);
+	}
+	Check(problems.isEmpty(), "self-update: the Windows Updater uses the shared backup folder", problems.join(u", "_q).toStdString().c_str());
+}
+
 // The MZGram code of a prepared update, in its own tdata (never copied).
 void TestSelfUpdatePreparedCode() {
 	using namespace MZGram::Update;
@@ -1956,6 +2008,36 @@ void TestUrlSchemeRules() {
 		|| !MayTakeUrlScheme(u"\"D:\\old\\MZGram.exe\" -- \"%1\""_q, all)) {
 		problems.push_back(u"leaves no handler or an older MZGram"_q);
 	}
+
+	// Windows reads an unquoted path with spaces up to the first .exe
+	const auto spaces = u"C:\\Program Files\\Other App\\Other.exe -- \"%1\""_q;
+	if (CommandExecutable(spaces) != u"C:\\Program Files\\Other App\\Other.exe"_q) {
+		problems.push_back(u"unquoted with spaces: "_q + CommandExecutable(spaces));
+	}
+	const auto onlyOther = [](const QString &path) {
+		return (path == u"C:\\Program Files\\Other App\\Other.exe"_q);
+	};
+	if (MayTakeUrlScheme(spaces, onlyOther)) {
+		problems.push_back(u"takes an unquoted handler with spaces"_q);
+	}
+
+	// Linux: GLib quotes with ', the binary is MZGram
+	const auto linuxCommand = u"'/opt/My Apps/MZGram/MZGram' -- %u"_q;
+	if (CommandExecutable(linuxCommand) != u"/opt/My Apps/MZGram/MZGram"_q
+		|| !IsMZGramExecutable(CommandExecutable(linuxCommand))
+		|| IsMZGramExecutable(u"/usr/bin/telegram-desktop"_q)
+		|| IsMZGramExecutable(u"/opt/MZGram/MZGram.sh"_q)) {
+		problems.push_back(u"Linux command: "_q + CommandExecutable(linuxCommand));
+	}
+	const auto flatpak = u"/usr/bin/flatpak run --command=Telegram org.telegram.desktop -- @@u %u @@"_q;
+	if (CommandExecutable(flatpak) != u"/usr/bin/flatpak"_q) {
+		problems.push_back(u"flatpak: "_q + CommandExecutable(flatpak));
+	}
+	if (!HandlerExecutableExists(u"telegram-desktop"_q)
+		|| HandlerExecutableExists(u"/mzgram/tests/not/there/Telegram"_q)
+		|| MayTakeUrlScheme(u"telegram-desktop -- %u"_q, HandlerExecutableExists)) {
+		problems.push_back(u"a Linux handler found in PATH is taken"_q);
+	}
 	Check(
 		problems.isEmpty(),
 		"MZGram takes tg:// only from nobody or from MZGram",
@@ -1974,13 +2056,13 @@ QString TestRegRead(const QString &key, const QString &name = QString()) {
 	const auto wname = name.toStdWString();
 	auto buffer = std::wstring(4096, L'\0');
 	auto size = DWORD(buffer.size() * sizeof(WCHAR));
-	if (RegGetValue(HKEY_CURRENT_USER, wkey.c_str(), wname.c_str(), RRF_RT_REG_SZ, nullptr, buffer.data(), &size) != ERROR_SUCCESS) {
+	if (RegGetValue(HKEY_CURRENT_USER, wkey.c_str(), wname.c_str(), RRF_RT_REG_SZ | RRF_RT_REG_EXPAND_SZ, nullptr, buffer.data(), &size) != ERROR_SUCCESS) {
 		return u"(none)"_q;
 	}
 	return QString::fromWCharArray(buffer.c_str());
 }
 
-void TestRegWrite(const QString &key, const QString &name, const QString &value) {
+void TestRegWrite(const QString &key, const QString &name, const QString &value, DWORD type = REG_SZ) {
 	const auto wkey = (kUrlSchemeTestRoot + key).toStdWString();
 	const auto wname = name.toStdWString();
 	const auto wvalue = value.toStdWString();
@@ -1988,7 +2070,7 @@ void TestRegWrite(const QString &key, const QString &name, const QString &value)
 	if (RegCreateKeyEx(HKEY_CURRENT_USER, wkey.c_str(), 0, nullptr, 0, KEY_SET_VALUE, nullptr, &handle, nullptr) != ERROR_SUCCESS) {
 		return;
 	}
-	RegSetValueEx(handle, wname.empty() ? nullptr : wname.c_str(), 0, REG_SZ, reinterpret_cast<const BYTE*>(wvalue.c_str()), DWORD((wvalue.size() + 1) * sizeof(WCHAR)));
+	RegSetValueEx(handle, wname.empty() ? nullptr : wname.c_str(), 0, type, reinterpret_cast<const BYTE*>(wvalue.c_str()), DWORD((wvalue.size() + 1) * sizeof(WCHAR)));
 	RegCloseKey(handle);
 }
 
@@ -2035,14 +2117,23 @@ void TestRegisterAsTelegram(const QString &exe, const QString &name, bool legacy
 	TestRegWrite(u"RegisteredApplications"_q, name, u"SOFTWARE\\TelegramDesktop\\Capabilities"_q);
 }
 
-void TestRegisterMZGram(const QString &exe, bool force = false) {
+void TestRegisterMZGram(const QString &exe, bool force = false, const QString &arguments = QString()) {
 	MZGram::RegisterUrlSchemes({
 		.root = kUrlSchemeTestRoot,
 		.executable = QDir::toNativeSeparators(exe),
-		.arguments = QString(),
+		.arguments = arguments,
 		.appName = u"MZGram Desktop"_q,
 		.force = force,
 	});
+}
+
+// Telegram Desktop's installer (Telegram/build/setup.iss) leaves its folder
+// in its uninstall entry.
+void TestRegisterTelegramInstaller(const QString &exe) {
+	TestRegWrite(
+		u"Microsoft\\Windows\\CurrentVersion\\Uninstall\\{53F49750-6209-4FBF-9CA8-7A333C87D1ED}_is1"_q,
+		u"InstallLocation"_q,
+		QDir::toNativeSeparators(QFileInfo(exe).path()) + '\\');
 }
 
 // MZGram registers its own entry for Windows Settings > Default apps and
@@ -2093,6 +2184,31 @@ void TestUrlSchemeKeepsTelegramDesktop() {
 	if (TestRegRead(u"Classes\\tg\\shell\\open\\command"_q) != mzgram
 		|| TestRegRead(u"Classes\\ton\\shell\\open\\command"_q) != mzgram) {
 		problems.push_back(u"no handler or a gone one stays"_q);
+	}
+	// Handlers written as REG_EXPAND_SZ or unquoted with spaces
+	const auto otherExe = dir.path() + u"/Other App/Other.exe"_q;
+	TestTouch(otherExe);
+	qputenv("MZGRAM_TEST_URL_SCHEME", QDir::toNativeSeparators(dir.path()).toUtf8());
+	const auto expanded = u"\"%MZGRAM_TEST_URL_SCHEME%\\Other App\\Other.exe\" -- \"%1\""_q;
+	const auto unquoted = QDir::toNativeSeparators(otherExe) + u" -- \"%1\""_q;
+	TestRegClear();
+	TestRegWrite(u"Classes\\tg\\shell\\open\\command"_q, QString(), expanded, REG_EXPAND_SZ);
+	TestRegWrite(u"Classes\\ton\\shell\\open\\command"_q, QString(), unquoted);
+	TestRegisterMZGram(mzgramExe);
+	if (TestRegRead(u"Classes\\tg\\shell\\open\\command"_q) == mzgram) {
+		problems.push_back(u"a REG_EXPAND_SZ handler taken"_q);
+	}
+	if (TestRegRead(u"Classes\\ton\\shell\\open\\command"_q) != unquoted) {
+		problems.push_back(u"an unquoted handler with spaces taken"_q);
+	}
+
+	// The working folder of a -workdir launch
+	TestRegClear();
+	TestRegisterMZGram(mzgramExe, false, u"-workdir \"C:/data/\""_q);
+	const auto workdir = '"' + QDir::toNativeSeparators(mzgramExe) + u"\" -workdir \"C:/data/\" -- \"%1\""_q;
+	if (TestRegRead(u"Classes\\mzgram.tg\\shell\\open\\command"_q) != workdir
+		|| TestRegRead(u"Classes\\tg\\shell\\open\\command"_q) != workdir) {
+		problems.push_back(u"-workdir lost"_q);
 	}
 	TestRegClear();
 	Check(
@@ -2159,6 +2275,63 @@ void TestUrlSchemeCleansUpTelegramKeys() {
 		|| TestRegRead(u"Classes\\mzgram.tg\\shell\\open\\command"_q) != mzgram) {
 		problems.push_back(u"tg:// does not open this MZGram"_q);
 	}
+
+	// MZGram 1.0.4 without Telegram Desktop, another app took tg:// since:
+	// Telegram Desktop's class goes, it never opens the other app.
+	const auto otherExe = dir.path() + u"/Other/Other.exe"_q;
+	TestTouch(otherExe);
+	const auto other = TestOpenCommand(otherExe);
+	TestRegClear();
+	TestRegisterAsTelegram(oldExe, u"MZGram Desktop"_q, true);
+	TestRegWrite(u"Classes\\tg\\shell\\open\\command"_q, QString(), other);
+	TestRegisterMZGram(mzgramExe);
+	if (TestRegExists(u"Classes\\tdesktop.tg"_q)
+		|| TestRegRead(u"Classes\\tg\\shell\\open\\command"_q) != other) {
+		problems.push_back(u"Telegram Desktop's class opens another app"_q);
+	}
+
+	// Telegram Desktop from its installer, MZGram 1.0.4 over all of it:
+	// Telegram.exe is found in the installer's folder.
+	TestRegClear();
+	TestRegisterAsTelegram(telegramExe, u"Telegram Desktop"_q, true);
+	TestRegisterTelegramInstaller(telegramExe);
+	TestRegisterAsTelegram(oldExe, u"MZGram Desktop"_q, true);
+	TestRegisterMZGram(mzgramExe);
+	if (TestRegRead(u"Classes\\tdesktop.tg\\shell\\open\\command"_q) != telegram
+		|| TestRegRead(u"Classes\\tdesktop.ton\\shell\\open\\command"_q) != telegram
+		|| TestRegRead(u"Classes\\tg\\shell\\open\\command"_q) != telegram
+		|| TestRegRead(u"Classes\\tonsite\\shell\\open\\command"_q) != telegram) {
+		problems.push_back(u"Telegram Desktop from its installer not given back"_q);
+	}
+
+	// Telegram Desktop with its own class, tg:// taken by MZGram 1.0.0
+	// from a zip in Temp: tg:// goes back to Telegram Desktop.
+	TestRegClear();
+	TestRegisterAsTelegram(telegramExe, u"Telegram Desktop"_q, false);
+	TestRegWrite(u"Classes\\tg\\shell\\open\\command"_q, QString(), old);
+	TestRegisterMZGram(mzgramExe);
+	if (TestRegRead(u"Classes\\tg\\shell\\open\\command"_q) != telegram) {
+		problems.push_back(u"tg:// of an old MZGram not given back"_q);
+	}
+
+	// registertg is kept: the next version does not give tg:// back.
+	TestRegisterMZGram(mzgramExe, true);
+	TestRegisterMZGram(mzgramExe);
+	if (TestRegRead(u"Classes\\tg\\shell\\open\\command"_q) != mzgram) {
+		problems.push_back(u"registertg undone by the next version"_q);
+	}
+
+	// Telegram Desktop not found at first, then its next version writes its
+	// class again: tg:// goes back to it then.
+	TestRegClear();
+	TestRegisterAsTelegram(telegramExe, u"Telegram Desktop"_q, true);
+	TestRegisterAsTelegram(oldExe, u"MZGram Desktop"_q, true);
+	TestRegisterMZGram(mzgramExe);
+	TestRegisterAsTelegram(telegramExe, u"Telegram Desktop"_q, false);
+	TestRegisterMZGram(mzgramExe);
+	if (TestRegRead(u"Classes\\tg\\shell\\open\\command"_q) != telegram) {
+		problems.push_back(u"tg:// not given back once Telegram Desktop is found"_q);
+	}
 	TestRegClear();
 	Check(
 		problems.isEmpty(),
@@ -2181,8 +2354,10 @@ void TestUrlSchemeIsWired() {
 	auto missing = QStringList();
 	for (const auto &call : {
 			u"MZGram::RegisterUrlSchemes({"_q,
-			u".shortAppName = MZGram::UrlSchemeClassPrefix(),"_q,
-			u".longAppName = MZGram::UrlSchemeAppKey(),"_q,
+			u"if (!force && !MZGram::MayTakeUrlScheme("_q,
+			u"MZGram::DefaultUrlSchemeCommand(scheme.protocol),"_q,
+			u"MZGram::HandlerExecutableExists)) {"_q,
+			u"MZGram::OfferForUrlScheme({"_q,
 		}) {
 		if (!application.contains(call)) {
 			missing.push_back(call);
@@ -2231,6 +2406,8 @@ int main() {
 		TestSelfUpdateOnlyThisRepository,
 		TestSelfUpdateChecksum,
 		TestSelfUpdateEntries,
+		TestSelfUpdateEntryTypes,
+		TestUpdaterBackupFolderIsShared,
 		TestSelfUpdatePreparedCode,
 		TestUpdateInstallRollsBack,
 		TestReleasesCarryTheUpdater,

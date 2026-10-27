@@ -170,6 +170,10 @@ bool MayTakeUrlScheme(
 		|| !exists(executable);
 }
 
+bool HandlerExecutableExists(const QString &path) {
+	return QFileInfo::exists(path);
+}
+
 #ifdef _WIN32
 
 void RegisterUrlSchemes(const UrlSchemeRegistration &r) {

@@ -1,5 +1,6 @@
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -150,6 +151,15 @@ class NotesTest(unittest.TestCase):
         self.assertEqual(notes(["[mzgram] CI: x", "[mzgram] Test: y", "upstream commit"]), [NO_CHANGES])
         self.assertEqual(notes([]), [NO_CHANGES])
 
+    # A commit can read as a change users see when it is not one (a fix of
+    # something no release had): the release then gives its own list.
+    def test_a_release_can_give_its_own_list(self):
+        subjects = ["[mzgram] Telegram 13.0: MZGram's strings found again"]
+        own = ["- Based on Telegram 13.0.3", "", "Original quality on media3", "  "]
+        self.assertEqual(notes(subjects, own), ["- Based on Telegram 13.0.3", "- Original quality on media3"])
+        self.assertEqual(notes(subjects, []), ["- Telegram 13.0: MZGram's strings found again"])
+        self.assertEqual(notes(subjects, ["", " "]), ["- Telegram 13.0: MZGram's strings found again"])
+
 
 class CliTest(unittest.TestCase):
     def run_cli(self, *args, stdin=""):
@@ -163,6 +173,16 @@ class CliTest(unittest.TestCase):
     def test_notes_from_stdin(self):
         result = self.run_cli("notes", stdin="[mzgram] CI: x\n[mzgram] Feature: y\n")
         self.assertEqual(result.stdout.strip(), "- Feature: y")
+
+    def test_notes_own_list_from_a_file(self):
+        with tempfile.TemporaryDirectory() as folder:
+            own = Path(folder) / "1.0.7.changes.md"
+            missing = Path(folder) / "1.0.8.changes.md"
+            own.write_text("- Links stay with Telegram Desktop\n", encoding="utf-8")
+            result = self.run_cli("notes", "--own", str(own), stdin="[mzgram] Feature: y\n")
+            self.assertEqual(result.stdout.strip(), "- Links stay with Telegram Desktop")
+            result = self.run_cli("notes", "--own", str(missing), stdin="[mzgram] Feature: y\n")
+            self.assertEqual(result.stdout.strip(), "- Feature: y")
 
     def test_bad_tag_fails(self):
         result = self.run_cli("release", "v1.2", "--upstream", "12.10.1", "--floor", "7038")

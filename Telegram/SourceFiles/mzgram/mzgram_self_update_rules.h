@@ -103,4 +103,8 @@ struct Asset {
 // "/": the MZGram/ folder itself.
 [[nodiscard]] QString EntryPath(const QString &entry);
 
+// A line of "tar -tv" for a regular file or a folder. Links and devices are
+// refused: a link could lead a later entry out of the app folder.
+[[nodiscard]] bool PlainArchiveEntry(const QString &listing);
+
 } // namespace MZGram::Update

@@ -180,4 +180,8 @@ QString EntryPath(const QString &entry) {
 	return path;
 }
 
+bool PlainArchiveEntry(const QString &listing) {
+	return true;
+}
+
 } // namespace MZGram::Update
