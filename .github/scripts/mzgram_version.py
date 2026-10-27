@@ -26,6 +26,7 @@ Subcommands (tags of the repo on stdin, one per line):
 import argparse
 import re
 import sys
+from pathlib import Path
 
 TAG = re.compile(r"^v(0|[1-9]\d*)\.(0|[1-9]\d?)\.(0|[1-9]\d?)(?:-beta\.([1-9]\d?))?$")
 MAX_BASE = (2100000000 - 9) // 10  # Android's versionCode limit after * 10 + 9
@@ -115,8 +116,16 @@ def previous(tag: str, tags: list[str]) -> str:
     return max(older, key=code) if older else ""
 
 
-def notes(subjects: list[str]) -> list[str]:
-    """The release notes list: one line per [mzgram] commit a user would notice."""
+def notes(subjects: list[str], own: list[str] | None = None) -> list[str]:
+    """The release notes list: one line per [mzgram] commit a user would notice.
+
+    own: the release's own list (.github/release_notes/X.Y.Z.changes.md), used
+    instead when it has a line, for commits that only read like changes users
+    see (a fix of something no release had, a move of code with its tests).
+    """
+    own_lines = [line.strip() for line in own or [] if line.strip()]
+    if own_lines:
+        return [line if line.startswith("- ") else f"- {line}" for line in own_lines]
     lines = []
     for subject in subjects:
         subject = subject.strip()
@@ -143,11 +152,14 @@ def main() -> int:
     dv.add_argument("--floor", type=int, required=True)
     prev = sub.add_parser("previous")
     prev.add_argument("tag")
-    sub.add_parser("notes")
+    nt = sub.add_parser("notes")
+    nt.add_argument("--own", help="the release's own list of changes, used when the file is there")
     args = parser.parse_args()
 
     if args.command == "notes":
-        print("\n".join(notes(sys.stdin.read().splitlines())))
+        own_path = Path(args.own) if args.own else None
+        own = own_path.read_text(encoding="utf-8").splitlines() if own_path and own_path.is_file() else None
+        print("\n".join(notes(sys.stdin.read().splitlines(), own)))
         return 0
     tags = [line.strip() for line in sys.stdin if line.strip()]
     # git ls-remote prints "<sha>\trefs/tags/v1.0.0" and "...^{}" for annotated tags

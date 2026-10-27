@@ -84,7 +84,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # The 14.44 toolset is what keeps Windows 7 support alive on x64.
+          # The 14.44 toolset, as upstream builds x64 with (for its Windows 7
+          # build on Qt 5; MZGram is built with Qt 6 and needs Windows 10).
           - arch: x64
             toolset: '14.44'
             configure_arch: 'x64'
@@ -511,7 +512,7 @@ jobs:
           (cd dist && sha256sum -- * > SHA256SUMS && cat SHA256SUMS)
           RANGE=${PREVIOUS:+$PREVIOUS..}$GITHUB_SHA
           # The [mzgram] commits users notice; build, CI, test, docs and spec work is left out (mzgram_version.py)
-          CHANGES=$(git log --no-merges --format=%s "$RANGE" | python3 .github/scripts/mzgram_version.py notes)
+          CHANGES=$(git log --no-merges --format=%s "$RANGE" | python3 .github/scripts/mzgram_version.py notes --own ".github/release_notes/$VERSION.changes.md")
           {
             echo "MZGram Desktop $VERSION, based on Telegram Desktop $UPSTREAM."
             echo
@@ -526,7 +527,7 @@ jobs:
               cat ".github/release_notes/$VERSION.md"
               echo
             fi
-            echo "- Windows: unpack \`MZGram-Desktop-$VERSION-windows-x64.zip\` (or \`-arm64\` on ARM) and run \`MZGram.exe\`."
+            echo "- Windows 10 version 1809 or newer: unpack \`MZGram-Desktop-$VERSION-windows-x64.zip\` (or \`-arm64\` on ARM) and run \`MZGram.exe\`."
             echo "- Linux: unpack \`MZGram-Desktop-$VERSION-linux-x64.tar.xz\` and run \`MZGram\` (glibc 2.28 or newer)."
             echo "- Linux ARM64 (aarch64, e.g. Snapdragon laptops): unpack \`MZGram-Desktop-$VERSION-linux-arm64.tar.xz\` and run \`MZGram\` (glibc 2.28 or newer)."
             echo
