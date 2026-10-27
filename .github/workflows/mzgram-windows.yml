@@ -33,8 +33,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # The 14.44 toolset is what keeps Windows 7 support alive on x64.
-          # ARM64 has no Windows 7 to support, so it builds with the default.
+          # The 14.44 toolset, as upstream builds x64 with (for its Windows 7
+          # build on Qt 5; MZGram is built with Qt 6 and needs Windows 10).
+          # ARM64 builds with the default toolset, as upstream does.
           - arch: x64
             toolset: '14.44'
             configure_arch: 'x64'

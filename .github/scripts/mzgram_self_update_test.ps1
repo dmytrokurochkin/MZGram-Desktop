@@ -12,12 +12,9 @@
 # First the new build starts alone, as from its zip on a computer with
 # nothing but Windows: no PostgreSQL in PATH (mzgram_check_imports.py).
 #
-# MZGram x64 up to 1.0.4 imports libpq.dll, and MZGram.exe takes the DLLs
-# it imports from System32 only (DependentLoadFlags 0x800), so that release
-# starts nowhere and cannot update itself: its users install the next one by
-# hand. For such a release the test updates this build over a copy of
-# itself instead (the new files marked so the copy can be told apart): what
-# the next release installs over this one goes through the same path.
+# The release must start with Windows only as well: MZGram x64 up to 1.0.4
+# imported libpq.dll and started nowhere, so it could not update itself (its
+# users installed 1.0.6 by hand). Such a release fails the test.
 param(
 	[Parameter(Mandatory = $true)][string]$Build,
 	[Parameter(Mandatory = $true)][string]$Arch,
@@ -72,7 +69,9 @@ if (-not $from) {
 }
 if ($from -notmatch '^v(\d+)\.(\d+)\.(\d+)$') { throw "latest release $from is not vX.Y.Z" }
 $to = "v$($Matches[1]).$($Matches[2]).$([int]$Matches[3] + 1)"
-$toCode = [int]$Matches[1] * 1000000 + [int]$Matches[2] * 10000 + ([int]$Matches[3] + 1) * 100 + 99
+# The code of the next release, as the release workflow gives it
+$toCode = ('' | python (Join-Path $PSScriptRoot 'mzgram_version.py') release $to --upstream test --floor 0 | Where-Object { $_ -like 'code=*' }) -replace '^code=', ''
+if ($LASTEXITCODE -or -not $toCode) { throw "no code for $to" }
 Write-Host "self-update: $from -> $to (code $toCode), windows-$Arch"
 
 $zip = "MZGram-Desktop-$($from.Substring(1))-windows-$Arch.zip"
@@ -85,16 +84,10 @@ if (-not $expected -or $expected -ne $actual) { throw "$zip does not match SHA25
 Expand-Archive (Join-Path $work $zip) -DestinationPath (Join-Path $work 'install')
 $app = Join-Path $work 'install\MZGram'
 
-# A release that does not start with Windows only is replaced by this build
 $oldImports = python (Join-Path $PSScriptRoot 'mzgram_check_imports.py') (Join-Path $app 'MZGram.exe')
-$fromName = $from
 if ($LASTEXITCODE) {
-	Write-Host "$from windows-${Arch}: $oldImports"
-	Write-Host "$from windows-$Arch starts nowhere and cannot update itself; its users install $to by hand. Updating this build over a copy of itself."
-	foreach ($name in 'MZGram.exe', 'Updater.exe') {
-		Copy-Item (Join-Path $Build $name) $app -Force
-	}
-	$fromName = 'this build'
+	Write-Host "FAIL: $from windows-$Arch does not start with Windows only: $oldImports"
+	exit 1
 }
 
 # The working folder with data the update must keep
@@ -108,13 +101,6 @@ $ready = Join-Path $data 'tupdates\temp'
 New-Item -ItemType Directory (Join-Path $ready 'tdata') | Out-Null
 foreach ($name in 'MZGram.exe', 'Updater.exe') {
 	Copy-Item (Join-Path $Build $name) $ready
-	if ($fromName -ne $from) {
-		# Bytes after the end of a PE file change nothing in how it runs
-		$file = [IO.File]::Open((Join-Path $ready $name), 'Append')
-		$bytes = [Text.Encoding]::ASCII.GetBytes('MZGram self-update test')
-		$file.Write($bytes, 0, $bytes.Length)
-		$file.Close()
-	}
 }
 [IO.File]::WriteAllText((Join-Path $ready 'tdata\mzgram_version'), "$toCode")
 [IO.File]::WriteAllText((Join-Path $ready 'ready'), '1')
@@ -131,7 +117,9 @@ $deadline = (Get-Date).AddSeconds(180)
 while ((Get-Date) -lt $deadline) {
 	Start-Sleep -Seconds 3
 	$running = Get-Process MZGram -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe }
-	if ($running -and (Get-FileHash $exe).Hash -eq $newHash) {
+	# The Updater may be writing the file right now: then the next round
+	try { $hash = (Get-FileHash $exe -ErrorAction Stop).Hash } catch { $hash = $null }
+	if ($running -and $hash -eq $newHash) {
 		$installed = $true
 		break
 	}
@@ -154,7 +142,7 @@ if ($problems.Count) {
 	foreach ($problem in $problems) { Write-Host "FAIL: $problem" }
 	exit 1
 }
-Write-Host "PASS: $fromName installed $to over itself, the data stayed"
-# GitHub's pwsh step ends with "exit $LASTEXITCODE", still the code of the
-# failed import check of a release that starts nowhere
+Write-Host "PASS: $from installed $to over itself, the data stayed"
+# GitHub's pwsh step ends with "exit $LASTEXITCODE", the code of the last
+# native command
 exit 0

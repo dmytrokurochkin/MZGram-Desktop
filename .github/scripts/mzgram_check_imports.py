@@ -14,8 +14,10 @@ import re
 import struct
 import sys
 
-# DLLs that come with Windows 7 and later (the API sets with Windows 10 and
-# later, resolved by the loader). Nothing else may be imported.
+# DLLs that come with Windows 10 version 1809, the oldest Windows MZGram
+# runs on (Qt 6 needs it; Telegram's own x64 build is made with Qt 5 for
+# Windows 7). icuuc.dll is Windows' ICU since 1703, which Qt 6 links to; the
+# API sets are resolved by the loader. Nothing else may be imported.
 SYSTEM = {
     "advapi32.dll", "authz.dll", "avrt.dll", "bcrypt.dll",
     "bcryptprimitives.dll", "comctl32.dll", "comdlg32.dll", "crypt32.dll",
