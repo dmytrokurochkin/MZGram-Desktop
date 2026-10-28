@@ -2,7 +2,7 @@
 
 What MZGram adds to the regular Telegram apps, and how it differs from them. MZGram is an unofficial client: MZGram for Android is based on Telegram for Android, MZGram Desktop on Telegram Desktop. Everything here is in the code today; nothing planned is listed.
 
-"Since" is the first MZGram release with the feature. "Next release" means it is done and tested but not released yet (Android 1.0.8, Desktop 1.0.7).
+"Since" is the first MZGram release with the feature. "Next release" means it is done and tested but not released yet (Android 1.0.9, Desktop 1.0.8).
 
 Most switches are under **Settings > MZGram**, grouped into topic pages. This file is the same in both repositories; it is updated together with every change to a feature.
 
@@ -62,7 +62,7 @@ Each item has its own switch.
 | Pin in MZGram only | When the server allows no more pinned chats, more chats can be pinned on this device only, up to 10 in all: the server's pins first, then MZGram's, marked with their own pin. Nothing is sent to the server, and Premium is not needed or changed. Telegram stops at the server's limit. | 1.0.1 |
 | Open archive on pull | Pulling the chat list down past the archive row opens the archive. | 1.0.0 |
 | Media preview | A long press on a chat's avatar shows its last photo or video instead of the chat preview. | 1.0.0 |
-| Delete for everyone by default | A switch: the Delete box of messages comes with deleting them for the other side too already ticked, and it can be unticked before deleting. Telegram leaves it unticked. | Next release |
+| Delete for everyone by default | A switch: the Delete box of messages comes with deleting them for the other side too already ticked, and it can be unticked before deleting. Telegram leaves it unticked. | 1.0.8 |
 
 ### Media and calls
 
@@ -215,7 +215,7 @@ Each item has its own switch.
 | Check for updates | Settings > MZGram > Interface > Check for updates looks at once, outside the interval and also with the bar switched off, and says what it found: the latest version is installed, a newer one is available (it also gets the bar), or the check failed. | 1.0.2 |
 | Own data folder | MZGram keeps its data apart from Telegram Desktop, so both can be installed. | 1.0.0 |
 | Links beside Telegram Desktop | On Windows MZGram registers tg://, tonsite:// and ton:// links under its own name: Settings > Apps > Default apps lists MZGram Desktop apart from Telegram Desktop, and the app chosen there opens these links. MZGram does not take the links from Telegram Desktop or another app; it opens them by default only when no app has them, the app that had them is gone, or the `registertg` code asks. Up to 1.0.4 MZGram wrote itself into Telegram Desktop's registration, so Telegram Desktop's entry in Default apps was called MZGram Desktop and its links could open MZGram, also from a folder removed later. MZGram gives that registration back to Telegram Desktop, or removes it when Telegram Desktop is not installed; since the next release also the tg:// link 1.0.4 took from it, with Telegram Desktop found through its installer when needed. | 1.0.6 |
-| Links beside Telegram Desktop on Linux | On Linux MZGram becomes the app for tg://, tonsite:// and ton:// links only when no app has them, the app that had them is gone, or the `registertg` code asks; otherwise it is added to the apps these links can be opened with, and Telegram Desktop or the app chosen before stays the default. Up to 1.0.6 MZGram made itself the default after every update. | Next release |
+| Links beside Telegram Desktop on Linux | On Linux MZGram becomes the app for tg://, tonsite:// and ton:// links only when no app has them, the app that had them is gone, or the `registertg` code asks; otherwise it is added to the apps these links can be opened with, and Telegram Desktop or the app chosen before stays the default. Up to 1.0.6 MZGram made itself the default after every update. | 1.0.7 |
 | MZGram name | Window titles, the About box ("MZGram Desktop X.Y.Z, an unofficial client based on Telegram Desktop", GPL, GitHub), menus, tray, notifications, the Windows app id and Start menu shortcut, and the exe properties say MZGram, in every language. The Telegram service keeps its name. | 1.0.1 |
 
 ### Releases
