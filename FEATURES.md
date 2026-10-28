@@ -62,6 +62,7 @@ Each item has its own switch.
 | Pin in MZGram only | When the server allows no more pinned chats, more chats can be pinned on this device only, up to 10 in all: the server's pins first, then MZGram's, marked with their own pin. Nothing is sent to the server, and Premium is not needed or changed. Telegram stops at the server's limit. | 1.0.1 |
 | Open archive on pull | Pulling the chat list down past the archive row opens the archive. | 1.0.0 |
 | Media preview | A long press on a chat's avatar shows its last photo or video instead of the chat preview. | 1.0.0 |
+| Delete for everyone by default | A switch: the Delete box of messages comes with deleting them for the other side too already ticked, and it can be unticked before deleting. Telegram leaves it unticked. | Next release |
 
 ### Media and calls
 
@@ -245,6 +246,7 @@ Yes: present. No: absent. Partly: present in a narrower form.
 | Message menu: Save, Reminder, Repeat, Open in, Details, QR | Yes | Yes |
 | Message menu: Copy Photo, Delete Downloaded File, Forward without sender | Yes | No |
 | Pin in MZGram only | Yes | Yes |
+| Delete for everyone ticked by default | Yes (a switch) | Yes (Telegram Desktop ticks it unless told to remember otherwise) |
 | Confirm voice and round video messages | Yes (one switch) | Yes (two switches) |
 | Ask before calling | Yes | No |
 | Instant camera and camera tile switches | Yes | No |
