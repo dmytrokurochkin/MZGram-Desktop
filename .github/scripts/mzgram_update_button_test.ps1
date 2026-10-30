@@ -3,7 +3,8 @@
 # This build is rebuilt with the code just below the latest MZGram release
 # and the test hook (MZGRAM_TEST_HOOKS, mzgram_update.cpp): with
 # MZGRAM_TEST_PRESS_UPDATE set it installs the first release the bar offers
-# as if Update was pressed. Only mzgram_update.cpp is compiled again.
+# as if Update was pressed. Only mzgram_update.cpp is compiled again, in
+# the folder CMake made.
 #
 # Then it runs like a user's copy: it asks GitHub for the latest release,
 # downloads SHA256SUMS and the archive of its architecture through GitHub's
@@ -43,11 +44,22 @@ if ($LASTEXITCODE -or -not $code) { throw "no code for $tag" }
 $below = [long]$code - 1
 Write-Host "Update button: this build as code $below, the release $tag (code $code), windows-$Arch"
 
+# The folder as CMake created it: TBUILD is a link to the build drive, and
+# the same build reached through another path is generated anew and compiled
+# from scratch
+$cacheDir = Get-Content (Join-Path $Out 'CMakeCache.txt') | Where-Object { $_ -like 'CMAKE_CACHEFILE_DIR:INTERNAL=*' } | Select-Object -First 1
+if (-not $cacheDir) { throw "no CMAKE_CACHEFILE_DIR in $Out" }
+$Out = ($cacheDir -split '=', 2)[1]
+Write-Host "Update button: the build folder $Out"
+
+$started = Get-Date
 cmake -D "MZGRAM_VERSION_CODE=$below" -D MZGRAM_TEST_HOOKS=ON $Out
 if ($LASTEXITCODE) { throw 'cmake could not configure the test build' }
 cmake --build $Out --config Debug --target Telegram Updater
 if ($LASTEXITCODE) { throw 'the test build failed' }
 $build = Join-Path $Out 'Debug'
+$rebuilt = (Get-Item (Join-Path $build 'MZGram.exe')).LastWriteTime
+if ($rebuilt -lt $started) { throw 'MZGram.exe was not linked again' }
 
 # What the update must bring: the files of the release zip
 $zip = "MZGram-Desktop-$($tag.Substring(1))-windows-$Arch.zip"
