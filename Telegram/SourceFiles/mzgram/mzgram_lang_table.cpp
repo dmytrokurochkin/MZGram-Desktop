@@ -336,6 +336,27 @@ const std::vector<Phrase> kPhrases = {
 		"again.",
 		"Не вдалося завантажити MZGram %1. Перевірте з’єднання і спробуйте "
 		"ще раз." },
+	{ "update_failed_server",
+		"GitHub did not give MZGram %1 right now, often because of its "
+		"hourly limit. Try again later or use the release page.",
+		"GitHub зараз не віддав MZGram %1, часто через погодинне "
+		"обмеження. Спробуйте пізніше або скористайтеся сторінкою "
+		"релізу." },
+	{ "update_failed_address",
+		"MZGram %1 was not downloaded: GitHub sent it from an address "
+		"MZGram does not trust. Nothing was installed.",
+		"MZGram %1 не завантажено: GitHub віддав його з адреси, якій "
+		"MZGram не довіряє. Нічого не встановлено." },
+	{ "update_failed_release",
+		"The MZGram %1 release on GitHub is not the one that was found. "
+		"Check for updates again.",
+		"Реліз MZGram %1 на GitHub не той, що був знайдений. Перевірте "
+		"оновлення ще раз." },
+	{ "update_failed_disk",
+		"MZGram %1 could not be saved: the disk may be full or the "
+		"update folder cannot be written. Nothing was installed.",
+		"Не вдалося зберегти MZGram %1: можливо, диск заповнений або в "
+		"папку оновлень не можна записувати. Нічого не встановлено." },
 	{ "update_failed_checksum",
 		"The MZGram %1 archive did not pass the SHA-256 check and was "
 		"deleted. Nothing was installed.",

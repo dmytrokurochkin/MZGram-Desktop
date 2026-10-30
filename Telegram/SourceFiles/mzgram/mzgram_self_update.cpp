@@ -375,7 +375,7 @@ private:
 		const auto path = DownloadFolder() + _archive.name;
 		const auto file = std::make_shared<QFile>(path);
 		if (!file->open(QIODevice::WriteOnly)) {
-			fail("update_failed_network", u"could not open %1: %2"_q.arg(
+			fail(kFailedDisk, u"could not open %1: %2"_q.arg(
 				path,
 				file->errorString()));
 			return;
@@ -394,13 +394,13 @@ private:
 			*written += chunk.size();
 			if (*written > kMaxArchiveSize) {
 				*stopped = Failure{
-					"update_failed_network",
+					kFailedServer,
 					u"an archive larger than %1 bytes"_q.arg(kMaxArchiveSize),
 				};
 				reply->abort();
 			} else if (file->write(chunk) != chunk.size()) {
 				*stopped = Failure{
-					"update_failed_network",
+					kFailedDisk,
 					u"could not write %1: %2"_q.arg(path, file->errorString()),
 				};
 				reply->abort();
@@ -441,7 +441,7 @@ private:
 			const auto error = file->errorString();
 			file->close();
 			if (!saved) {
-				fail("update_failed_network", u"could not write %1: %2"_q.arg(
+				fail(kFailedDisk, u"could not write %1: %2"_q.arg(
 					path,
 					error));
 				return;
@@ -480,10 +480,10 @@ private:
 			QFile::remove(path);
 			crl::on_main([=] {
 				if (!matches) {
-					fail("update_failed_checksum", u"SHA-256 %1, SHA256SUMS %2, "
+					fail(kFailedChecksum, u"SHA-256 %1, SHA256SUMS %2, "
 						"GitHub %3"_q.arg(actual, expected, digest));
 				} else if (!unpackFailure.isEmpty()) {
-					fail("update_failed_unpack", unpackFailure);
+					fail(kFailedUnpack, unpackFailure);
 				} else {
 					restart();
 				}
@@ -497,7 +497,7 @@ private:
 		_status = Status{ .step = Status::Step::Installing };
 		if (!Core::checkReadyUpdate()) {
 			fail(
-				"update_failed_unpack",
+				kFailedUnpack,
 				u"the prepared update was refused (Update Error above)"_q);
 			return;
 		}

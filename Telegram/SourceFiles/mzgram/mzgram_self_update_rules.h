@@ -60,8 +60,17 @@ struct Asset {
 	qint64 size = -1;
 };
 
+// The texts of the bar when an update stops (mzgram_lang_table.cpp).
+inline constexpr auto kFailedNetwork = "update_failed_network"; // no answer
+inline constexpr auto kFailedServer = "update_failed_server"; // HTTP, size
+inline constexpr auto kFailedAddress = "update_failed_address"; // host
+inline constexpr auto kFailedRelease = "update_failed_release"; // changed
+inline constexpr auto kFailedDisk = "update_failed_disk"; // a file
+inline constexpr auto kFailedChecksum = "update_failed_checksum";
+inline constexpr auto kFailedUnpack = "update_failed_unpack";
+
 // Why the download of an update stopped: the key of the text the bar shows
-// (mzgram_lang_table.cpp) and the reason log.txt gets.
+// and the reason log.txt gets.
 struct Failure {
 	const char *key = nullptr;
 	QString reason;
@@ -77,7 +86,9 @@ struct Failure {
 	int redirects);
 
 // The address a redirect leads to: its Location against the address that
-// answered.
+// answered, kept as the bytes GitHub sent. As text (QUrl::toString) the
+// %20 of a release download's query is a space, and the address is no
+// longer valid: MZGram up to 1.0.7 refused every download that way.
 [[nodiscard]] QUrl RedirectTarget(const QUrl &from, const QByteArray &location);
 
 // A finished answer, as QNetworkReply gives it.

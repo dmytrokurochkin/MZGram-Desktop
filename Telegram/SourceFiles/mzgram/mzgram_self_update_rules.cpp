@@ -46,20 +46,22 @@ bool AllowedUrl(const QString &url) {
 	return false;
 }
 
+// Strict, on the encoded form: the address as it goes to the network.
 bool AllowedUrl(const QUrl &url) {
-	return AllowedUrl(url.toString());
+	return url.isValid()
+		&& AllowedUrl(QString::fromLatin1(url.toEncoded()));
 }
 
 std::optional<Failure> RequestFailure(const QUrl &url, int redirects) {
 	if (redirects > kMaxRedirects) {
 		return Failure{
-			"update_failed_network",
+			kFailedAddress,
 			u"more than %1 redirects"_q.arg(kMaxRedirects),
 		};
 	}
 	if (!AllowedUrl(url)) {
 		return Failure{
-			"update_failed_network",
+			kFailedAddress,
 			u"not an allowed address: %1"_q.arg(LogAddress(url)),
 		};
 	}
@@ -67,7 +69,7 @@ std::optional<Failure> RequestFailure(const QUrl &url, int redirects) {
 }
 
 QUrl RedirectTarget(const QUrl &from, const QByteArray &location) {
-	return from.resolved(QUrl(QString::fromUtf8(location)));
+	return from.resolved(QUrl::fromEncoded(location, QUrl::StrictMode));
 }
 
 namespace {
@@ -87,12 +89,18 @@ namespace {
 } // namespace
 
 Outcome AnswerOutcome(const QUrl &url, const Answer &answer) {
-	if (answer.status >= 300 && answer.status < 400) {
+	const auto redirect = (answer.status == 301)
+		|| (answer.status == 302)
+		|| (answer.status == 303)
+		|| (answer.status == 307)
+		|| (answer.status == 308);
+	if (redirect && !answer.location.isEmpty()) {
 		return { .redirect = RedirectTarget(url, answer.location) };
+	} else if (answer.status != 0 && answer.status != 200) {
+		// 304 and a redirect without Location included: never followed
+		return { .failure = Failure{ kFailedServer, AnswerReason(answer) } };
 	} else if (answer.error != 0 || answer.status != 200) {
-		return {
-			.failure = Failure{ "update_failed_network", AnswerReason(answer) },
-		};
+		return { .failure = Failure{ kFailedNetwork, AnswerReason(answer) } };
 	}
 	return {};
 }
@@ -100,7 +108,7 @@ Outcome AnswerOutcome(const QUrl &url, const Answer &answer) {
 std::optional<Failure> BodyFailure(qint64 size) {
 	if (size > kMaxBodySize) {
 		return Failure{
-			"update_failed_network",
+			kFailedServer,
 			u"an answer larger than %1 bytes"_q.arg(kMaxBodySize),
 		};
 	}
@@ -114,17 +122,17 @@ std::optional<Failure> ReleaseFailure(
 	const auto again = ParseLatest(body);
 	if (!again) {
 		return Failure{
-			"update_failed_network",
+			kFailedRelease,
 			u"the answer of GitHub is not a stable release"_q,
 		};
 	} else if (again->tag != tag) {
 		return Failure{
-			"update_failed_network",
+			kFailedRelease,
 			u"GitHub answered with %1, not %2"_q.arg(again->tag, tag),
 		};
 	} else if (again->code <= installedCode) {
 		return Failure{
-			"update_failed_network",
+			kFailedRelease,
 			u"%1 (code %2) is not newer than this build (code %3)"_q
 				.arg(again->tag)
 				.arg(again->code)
