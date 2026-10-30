@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "mzgram/mzgram_self_update_rules.h"
 
+#include "mzgram/mzgram_update_rules.h"
 #include "base/basic_types.h"
 
 #include <QtCore/QFile>
@@ -43,6 +44,100 @@ bool AllowedUrl(const QString &url) {
 		}
 	}
 	return false;
+}
+
+bool AllowedUrl(const QUrl &url) {
+	return AllowedUrl(url.toString());
+}
+
+std::optional<Failure> RequestFailure(const QUrl &url, int redirects) {
+	if (redirects > kMaxRedirects) {
+		return Failure{
+			"update_failed_network",
+			u"more than %1 redirects"_q.arg(kMaxRedirects),
+		};
+	}
+	if (!AllowedUrl(url)) {
+		return Failure{
+			"update_failed_network",
+			u"not an allowed address: %1"_q.arg(LogAddress(url)),
+		};
+	}
+	return std::nullopt;
+}
+
+QUrl RedirectTarget(const QUrl &from, const QByteArray &location) {
+	return from.resolved(QUrl(QString::fromUtf8(location)));
+}
+
+namespace {
+
+[[nodiscard]] QString AnswerReason(const Answer &answer) {
+	if (answer.status != 0 && answer.status != 200) {
+		return u"HTTP %1"_q.arg(answer.status);
+	} else if (answer.error != 0) {
+		// Qt puts the address into the text: never its query
+		auto text = answer.errorText;
+		text.replace(QRegularExpression(u"\\?\\S*"_q), u"?..."_q);
+		return u"network error %1: %2"_q.arg(answer.error).arg(text);
+	}
+	return u"no answer"_q;
+}
+
+} // namespace
+
+Outcome AnswerOutcome(const QUrl &url, const Answer &answer) {
+	if (answer.status >= 300 && answer.status < 400) {
+		return { .redirect = RedirectTarget(url, answer.location) };
+	} else if (answer.error != 0 || answer.status != 200) {
+		return {
+			.failure = Failure{ "update_failed_network", AnswerReason(answer) },
+		};
+	}
+	return {};
+}
+
+std::optional<Failure> BodyFailure(qint64 size) {
+	if (size > kMaxBodySize) {
+		return Failure{
+			"update_failed_network",
+			u"an answer larger than %1 bytes"_q.arg(kMaxBodySize),
+		};
+	}
+	return std::nullopt;
+}
+
+std::optional<Failure> ReleaseFailure(
+		const QByteArray &body,
+		const QString &tag,
+		qint64 installedCode) {
+	const auto again = ParseLatest(body);
+	if (!again) {
+		return Failure{
+			"update_failed_network",
+			u"the answer of GitHub is not a stable release"_q,
+		};
+	} else if (again->tag != tag) {
+		return Failure{
+			"update_failed_network",
+			u"GitHub answered with %1, not %2"_q.arg(again->tag, tag),
+		};
+	} else if (again->code <= installedCode) {
+		return Failure{
+			"update_failed_network",
+			u"%1 (code %2) is not newer than this build (code %3)"_q
+				.arg(again->tag)
+				.arg(again->code)
+				.arg(installedCode),
+		};
+	}
+	return std::nullopt;
+}
+
+QString LogAddress(const QUrl &url) {
+	return url.adjusted(QUrl::RemoveQuery
+		| QUrl::RemoveFragment
+		| QUrl::RemoveUserInfo).toString(QUrl::FullyEncoded);
 }
 
 bool ReleaseFile(const QString &url, const QString &tag) {

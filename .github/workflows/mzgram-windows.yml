@@ -201,6 +201,7 @@ jobs:
       # An empty debug information format keeps PDBs from eating the disk the
       # dependency tree already left thin, as upstream does.
       - name: Build.
+        id: build
         run: |
           cd %TBUILD%\%REPO_NAME%\Telegram
 
@@ -252,3 +253,16 @@ jobs:
         with:
           name: MZGram-Windows-${{ matrix.arch }}-Debug
           path: artifact\
+
+      # The Update button the way a user presses it: this build, rebuilt with
+      # the code just below the latest release and the test hook, downloads
+      # that release from GitHub, checks it and installs it
+      # (.github/scripts/mzgram_update_button_test.ps1). It runs when the unit
+      # tests failed too, so a red run shows both.
+      - name: Update button test.
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          & "$env:TBUILD\$env:REPO_NAME\.github\scripts\mzgram_update_button_test.ps1" -Out "$env:TBUILD\$env:REPO_NAME\out" -Arch ${{ matrix.arch }}

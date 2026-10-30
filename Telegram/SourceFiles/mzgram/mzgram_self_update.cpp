@@ -32,9 +32,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 namespace MZGram::Update {
 namespace {
 
-constexpr auto kMaxRedirects = 5;
-constexpr auto kMaxSumsSize = qint64(1024) * 1024;
-
 [[nodiscard]] System CurrentSystem() {
 #if defined Q_OS_WIN
 	return System::Windows;
@@ -256,18 +253,35 @@ public:
 		_release = release;
 		_status = Status{ .step = Status::Step::Downloading };
 		base::Platform::DeleteDirectory(DownloadFolder());
-		get(QString::fromLatin1(kReleaseByTagUrl) + release.tag, 0, [=](
-				QByteArray body) {
+		const auto url = QUrl(
+			QString::fromLatin1(kReleaseByTagUrl) + release.tag,
+			QUrl::StrictMode);
+		get(url, 0, [=](QByteArray body) {
 			gotRelease(body);
 		});
 	}
 
 private:
-	void fail(const char *failure) {
-		LOG(("MZGram Update Error: %1.").arg(failure));
+	void fail(const char *failure, const QString &reason) {
+		LOG(("MZGram Update Error: %1 (%2)."
+			).arg(QString::fromLatin1(failure), reason));
 		_running = false;
 		base::Platform::DeleteDirectory(DownloadFolder());
 		_status = Status{ .step = Status::Step::Failed, .failure = failure };
+	}
+
+	void fail(const Failure &failure) {
+		fail(failure.key, failure.reason);
+	}
+
+	[[nodiscard]] static Answer ReadAnswer(not_null<QNetworkReply*> reply) {
+		return {
+			.status = reply->attribute(
+				QNetworkRequest::HttpStatusCodeAttribute).toInt(),
+			.error = int(reply->error()),
+			.errorText = reply->errorString(),
+			.location = reply->rawHeader("Location"),
+		};
 	}
 
 	// The release has no archive that can be checked: its page instead
@@ -279,27 +293,25 @@ private:
 
 	// GET with every redirect checked against the allowed hosts; the body
 	// is kept in memory (the release answer, SHA256SUMS).
-	void get(QString url, int redirects, Fn<void(QByteArray)> done) {
-		if (!AllowedUrl(url) || redirects > kMaxRedirects) {
-			fail("update_failed_network");
+	// The address stays a QUrl from the Location header to the request
+	// (mzgram_self_update_rules.cpp, RedirectTarget).
+	void get(QUrl url, int redirects, Fn<void(QByteArray)> done) {
+		if (const auto failure = RequestFailure(url, redirects)) {
+			fail(*failure);
 			return;
 		}
 		const auto reply = _network.get(request(url));
 		QObject::connect(reply, &QNetworkReply::finished, [=] {
 			reply->deleteLater();
-			const auto status = reply->attribute(
-				QNetworkRequest::HttpStatusCodeAttribute).toInt();
-			if (status >= 300 && status < 400) {
-				const auto location = reply->url().resolved(QUrl(
-					QString::fromUtf8(reply->rawHeader("Location"))));
-				get(location.toString(), redirects + 1, done);
-			} else if (reply->error() != QNetworkReply::NoError
-				|| status != 200) {
-				fail("update_failed_network");
+			const auto outcome = AnswerOutcome(url, ReadAnswer(reply));
+			if (outcome.redirect) {
+				get(*outcome.redirect, redirects + 1, done);
+			} else if (outcome.failure) {
+				fail(*outcome.failure);
 			} else {
-				const auto body = reply->read(kMaxSumsSize + 1);
-				if (body.size() > kMaxSumsSize) {
-					fail("update_failed_network");
+				const auto body = reply->read(kMaxBodySize + 1);
+				if (const auto failure = BodyFailure(body.size())) {
+					fail(*failure);
 				} else {
 					done(body);
 				}
@@ -307,8 +319,8 @@ private:
 		});
 	}
 
-	[[nodiscard]] QNetworkRequest request(const QString &url) const {
-		auto result = QNetworkRequest(QUrl(url));
+	[[nodiscard]] QNetworkRequest request(const QUrl &url) const {
+		auto result = QNetworkRequest(url);
 		result.setAttribute(
 			QNetworkRequest::RedirectPolicyAttribute,
 			QNetworkRequest::ManualRedirectPolicy);
@@ -318,11 +330,11 @@ private:
 	}
 
 	void gotRelease(const QByteArray &body) {
-		const auto again = ParseLatest(body);
-		if (!again
-			|| again->tag != _release.tag
-			|| again->code <= InstalledCode()) {
-			fail("update_failed_network");
+		if (const auto failure = ReleaseFailure(
+				body,
+				_release.tag,
+				InstalledCode())) {
+			fail(*failure);
 			return;
 		}
 		const auto assets = ParseAssets(body);
@@ -341,7 +353,7 @@ private:
 			return;
 		}
 		_archive = *archive;
-		get(sums->url, 0, [=](QByteArray text) {
+		get(QUrl(sums->url, QUrl::StrictMode), 0, [=](QByteArray text) {
 			const auto all = ParseSums(text);
 			const auto i = all.find(_archive.name);
 			if (i == end(all)) {
@@ -349,35 +361,48 @@ private:
 				return;
 			}
 			_expected = i->second;
-			download(_archive.url, 0);
+			download(QUrl(_archive.url, QUrl::StrictMode), 0);
 		});
 	}
 
 	// The archive, into a file, with the progress in the bar.
-	void download(QString url, int redirects) {
-		if (!AllowedUrl(url) || redirects > kMaxRedirects) {
-			fail("update_failed_network");
+	void download(QUrl url, int redirects) {
+		if (const auto failure = RequestFailure(url, redirects)) {
+			fail(*failure);
 			return;
 		}
 		QDir().mkpath(DownloadFolder());
 		const auto path = DownloadFolder() + _archive.name;
 		const auto file = std::make_shared<QFile>(path);
 		if (!file->open(QIODevice::WriteOnly)) {
-			fail("update_failed_network");
+			fail("update_failed_network", u"could not open %1: %2"_q.arg(
+				path,
+				file->errorString()));
 			return;
 		}
 		const auto reply = _network.get(request(url));
 		const auto written = std::make_shared<qint64>(0);
+		// Why the download was stopped while it was going.
+		const auto stopped = std::make_shared<std::optional<Failure>>();
 		QObject::connect(reply, &QNetworkReply::readyRead, [=] {
 			const auto status = reply->attribute(
 				QNetworkRequest::HttpStatusCodeAttribute).toInt();
-			if (status != 200) {
+			if (status != 200 || *stopped) {
 				return;
 			}
 			const auto chunk = reply->readAll();
 			*written += chunk.size();
-			if (*written > kMaxArchiveSize
-				|| file->write(chunk) != chunk.size()) {
+			if (*written > kMaxArchiveSize) {
+				*stopped = Failure{
+					"update_failed_network",
+					u"an archive larger than %1 bytes"_q.arg(kMaxArchiveSize),
+				};
+				reply->abort();
+			} else if (file->write(chunk) != chunk.size()) {
+				*stopped = Failure{
+					"update_failed_network",
+					u"could not write %1: %2"_q.arg(path, file->errorString()),
+				};
 				reply->abort();
 			}
 		});
@@ -396,20 +421,29 @@ private:
 		});
 		QObject::connect(reply, &QNetworkReply::finished, [=] {
 			reply->deleteLater();
-			const auto status = reply->attribute(
-				QNetworkRequest::HttpStatusCodeAttribute).toInt();
-			if (status >= 300 && status < 400) {
+			const auto outcome = AnswerOutcome(url, ReadAnswer(reply));
+			if (*stopped) {
+				file->close();
+				fail(**stopped);
+				return;
+			} else if (outcome.redirect) {
 				file->close();
 				file->remove();
-				const auto location = reply->url().resolved(QUrl(
-					QString::fromUtf8(reply->rawHeader("Location"))));
-				download(location.toString(), redirects + 1);
+				download(*outcome.redirect, redirects + 1);
+				return;
+			} else if (outcome.failure) {
+				file->close();
+				fail(*outcome.failure);
 				return;
 			}
-			file->write(reply->readAll());
+			const auto rest = reply->readAll();
+			const auto saved = (file->write(rest) == rest.size());
+			const auto error = file->errorString();
 			file->close();
-			if (reply->error() != QNetworkReply::NoError || status != 200) {
-				fail("update_failed_network");
+			if (!saved) {
+				fail("update_failed_network", u"could not write %1: %2"_q.arg(
+					path,
+					error));
 				return;
 			}
 			verifyAndUnpack(path);
@@ -423,27 +457,33 @@ private:
 		const auto digest = _archive.digest;
 		const auto code = _release.code;
 		crl::async([=] {
-			const auto matches = HashMatches(FileSha256(path), expected, digest);
-			auto prepared = false;
+			const auto actual = FileSha256(path);
+			const auto matches = HashMatches(actual, expected, digest);
+			auto unpackFailure = QString();
 			if (matches) {
 				const auto ready = ReadyFolder();
 				base::Platform::DeleteDirectory(ready);
-				prepared = Unpack(path, ready)
-					&& HasRequiredFiles(ready)
-					&& WriteFile(
+				if (!Unpack(path, ready)) {
+					unpackFailure = u"could not unpack %1"_q.arg(path);
+				} else if (!HasRequiredFiles(ready)) {
+					unpackFailure = u"the archive misses a file"_q;
+				} else if (!WriteFile(
 						ready + '/' + QString::fromLatin1(kPreparedCodeFile),
 						QByteArray::number(code))
-					&& WriteFile(ready + u"/ready"_q, "1");
-				if (!prepared) {
+					|| !WriteFile(ready + u"/ready"_q, "1")) {
+					unpackFailure = u"could not write into %1"_q.arg(ready);
+				}
+				if (!unpackFailure.isEmpty()) {
 					base::Platform::DeleteDirectory(ready);
 				}
 			}
 			QFile::remove(path);
 			crl::on_main([=] {
 				if (!matches) {
-					fail("update_failed_checksum");
-				} else if (!prepared) {
-					fail("update_failed_unpack");
+					fail("update_failed_checksum", u"SHA-256 %1, SHA256SUMS %2, "
+						"GitHub %3"_q.arg(actual, expected, digest));
+				} else if (!unpackFailure.isEmpty()) {
+					fail("update_failed_unpack", unpackFailure);
 				} else {
 					restart();
 				}
@@ -456,7 +496,9 @@ private:
 	void restart() {
 		_status = Status{ .step = Status::Step::Installing };
 		if (!Core::checkReadyUpdate()) {
-			fail("update_failed_unpack");
+			fail(
+				"update_failed_unpack",
+				u"the prepared update was refused (Update Error above)"_q);
 			return;
 		}
 		cSetRestartingUpdate(true);

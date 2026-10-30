@@ -70,6 +70,23 @@ public:
 	void start() {
 		_timer.callEach(kTimerPeriod);
 		base::call_delayed(kFirstCheckDelay, &_guard, [=] { check(false); });
+#ifdef MZGRAM_TEST_HOOKS
+		// The Update button test in CI (mzgram_update_button_test.ps1): the
+		// first release the bar offers is installed as if Update was
+		// pressed. Only a build configured with MZGRAM_TEST_HOOKS has it.
+		if (!qEnvironmentVariableIsEmpty("MZGRAM_TEST_PRESS_UPDATE")) {
+			_available.value(
+			) | rpl::filter([](const std::optional<Release> &release) {
+				return release.has_value();
+			}) | rpl::take(1) | rpl::on_next([](
+					const std::optional<Release> &release) {
+				const auto offered = *release;
+				LOG(("MZGram Update: the test presses Update for %1."
+					).arg(offered.tag));
+				crl::on_main([=] { Install(offered); });
+			}, _lifetime);
+		}
+#endif // MZGRAM_TEST_HOOKS
 		refresh(false);
 	}
 

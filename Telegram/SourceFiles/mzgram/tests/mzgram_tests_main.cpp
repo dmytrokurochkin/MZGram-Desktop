@@ -1133,6 +1133,230 @@ void TestSelfUpdateOnlyThisRepository() {
 	Check(problems.isEmpty(), "self-update: only this repository on GitHub, over https", problems.join(u", "_q).toStdString().c_str());
 }
 
+// The redirect of a release download as GitHub sends it (v1.0.7 on
+// 2026-10-30): to release-assets, with a signed query that keeps an encoded
+// space, "attachment%3B%20filename%3D<name>". The signature is made up.
+QByteArray GitHubLocation(const QString &name) {
+	const auto file = name.toUtf8();
+	return "https://release-assets.githubusercontent.com/"
+		"github-production-release-asset/1367255579/"
+		"2f409d5f-9b90-41ae-b934-6eb7b9737677"
+		"?sp=r&sv=2018-11-09&sr=b&spr=https&se=2026-10-30T11%3A33%3A17Z"
+		"&rscd=attachment%3B+filename%3D" + file
+		+ "&rsct=application%2Foctet-stream&skv=2018-11-09"
+		"&sig=Ab12%2BCd%2FEf%3D&jwt=eyJhbGciOiJIUzI1NiJ9.e30.c2ln"
+		"&response-content-disposition=attachment%3B%20filename%3D" + file
+		+ "&response-content-type=application%2Foctet-stream";
+}
+
+// The whole way of SHA256SUMS and of each archive (Windows and Linux): the
+// address of the release file, GitHub's 302 to release-assets, the request
+// there and its 200. MZGram up to 1.0.7 turned the next address into text,
+// which decoded %20 into a space, and refused it (update_failed_network).
+void TestSelfUpdateFollowsGitHubRedirect() {
+	using namespace MZGram::Update;
+	auto problems = QStringList();
+	const auto prefix = QString::fromLatin1(kDownloadPrefix) + u"v1.2.0/"_q;
+	for (const auto &name : {
+		QString::fromLatin1(kSumsName),
+		ArchiveName(u"1.2.0"_q, System::Windows, Arch::X64),
+		ArchiveName(u"1.2.0"_q, System::Windows, Arch::Arm64),
+		ArchiveName(u"1.2.0"_q, System::Linux, Arch::X64),
+		ArchiveName(u"1.2.0"_q, System::Linux, Arch::Arm64),
+	}) {
+		const auto location = GitHubLocation(name);
+		if (!AllowedUrl(QString::fromUtf8(location))
+			|| !AllowedUrl(QUrl::fromEncoded(location, QUrl::StrictMode))) {
+			problems.push_back(u"the address of "_q + name + u" refused"_q);
+		}
+		const auto start = QUrl(prefix + name, QUrl::StrictMode);
+		if (const auto failure = RequestFailure(start, 0)) {
+			problems.push_back(name + u": "_q + failure->reason);
+			continue;
+		}
+		const auto outcome = AnswerOutcome(start, Answer{
+			.status = 302,
+			.location = location,
+		});
+		if (!outcome.redirect || outcome.failure) {
+			problems.push_back(name + u": the 302 is not followed"_q);
+			continue;
+		}
+		const auto next = *outcome.redirect;
+		if (const auto failure = RequestFailure(next, 1)) {
+			problems.push_back(name + u": the redirect refused, "_q + failure->reason);
+		}
+		if (next.toEncoded() != location) {
+			problems.push_back(name + u": the redirect address changed"_q);
+		}
+		const auto done = AnswerOutcome(next, Answer{ .status = 200 });
+		if (done.redirect || done.failure) {
+			problems.push_back(name + u": its 200 is not the end"_q);
+		}
+	}
+	// A Location relative to the address that answered
+	const auto relative = AnswerOutcome(
+		QUrl(prefix + u"SHA256SUMS"_q, QUrl::StrictMode),
+		Answer{ .status = 302, .location = "/a/b?name=x%20y" });
+	if (!relative.redirect
+		|| relative.redirect->toEncoded() != "https://github.com/a/b?name=x%20y"
+		|| RequestFailure(*relative.redirect, 1)) {
+		problems.push_back(u"a relative redirect"_q);
+	}
+	Check(problems.isEmpty(), "self-update: GitHub's redirect of SHA256SUMS and of each archive is followed", problems.join(u", "_q).toStdString().c_str());
+}
+
+// Each way a download stops has its own text in the bar and its reason in
+// log.txt, without the signed query of the address.
+void TestSelfUpdateFailureReasons() {
+	using namespace MZGram::Update;
+	auto problems = QStringList();
+	const auto expect = [&](
+			const std::optional<Failure> &failure,
+			const char *key,
+			const QString &reason,
+			const char *what) {
+		if (!failure) {
+			problems.push_back(QString::fromLatin1(what) + u": no failure"_q);
+		} else if (qstrcmp(failure->key, key)) {
+			problems.push_back(QString::fromLatin1(what)
+				+ u": "_q
+				+ QString::fromLatin1(failure->key));
+		} else if (!failure->reason.contains(reason)
+			|| failure->reason.contains(u"secret"_q)
+			|| failure->reason.contains(u"sig="_q)) {
+			problems.push_back(QString::fromLatin1(what)
+				+ u": the reason "_q
+				+ failure->reason);
+		}
+	};
+	const auto good = QUrl(
+		QString::fromLatin1(kDownloadPrefix) + u"v1.2.0/SHA256SUMS"_q,
+		QUrl::StrictMode);
+	const auto evil = QUrl::fromEncoded(
+		"https://example.com/a.zip?sig=secret",
+		QUrl::StrictMode);
+	expect(RequestFailure(evil, 0), "update_failed_address", u"example.com"_q, "another host");
+	expect(
+		RequestFailure(QUrl(u"http://github.com/a.zip"_q), 0),
+		"update_failed_address",
+		u"http://github.com"_q,
+		"no https");
+	expect(RequestFailure(good, kMaxRedirects + 1), "update_failed_address", u"redirects"_q, "too many redirects");
+	if (RequestFailure(good, kMaxRedirects)) {
+		problems.push_back(u"the last allowed redirect refused"_q);
+	}
+	const auto away = AnswerOutcome(good, Answer{
+		.status = 302,
+		.location = "https://example.com/a.zip?sig=secret",
+	});
+	if (!away.redirect) {
+		problems.push_back(u"a redirect to another host not read"_q);
+	} else {
+		expect(RequestFailure(*away.redirect, 1), "update_failed_address", u"example.com"_q, "a redirect to another host");
+	}
+	expect(AnswerOutcome(good, Answer{ .status = 403, .error = 201 }).failure, "update_failed_server", u"HTTP 403"_q, "403");
+	expect(AnswerOutcome(good, Answer{ .status = 404, .error = 203 }).failure, "update_failed_server", u"HTTP 404"_q, "404");
+	expect(AnswerOutcome(good, Answer{ .status = 503 }).failure, "update_failed_server", u"HTTP 503"_q, "503");
+	const auto notModified = AnswerOutcome(good, Answer{ .status = 304 });
+	if (notModified.redirect) {
+		problems.push_back(u"304 taken for a redirect"_q);
+	}
+	expect(notModified.failure, "update_failed_server", u"HTTP 304"_q, "304");
+	const auto nowhere = AnswerOutcome(good, Answer{ .status = 302 });
+	if (nowhere.redirect) {
+		problems.push_back(u"302 without Location taken for a redirect"_q);
+	}
+	expect(nowhere.failure, "update_failed_server", u"HTTP 302"_q, "302 without Location");
+	expect(
+		AnswerOutcome(good, Answer{
+			.error = 4,
+			.errorText = u"Socket operation timed out on https://x/a?sig=secret"_q,
+		}).failure,
+		"update_failed_network",
+		u"network error 4: Socket operation timed out"_q,
+		"a timeout");
+	expect(AnswerOutcome(good, Answer{ .status = 200, .error = 2 }).failure, "update_failed_network", u"network error 2"_q, "a closed connection");
+	expect(AnswerOutcome(good, Answer{}).failure, "update_failed_network", u"no answer"_q, "no answer");
+	expect(BodyFailure(kMaxBodySize + 1), "update_failed_server", u"larger"_q, "a too large answer");
+	if (BodyFailure(kMaxBodySize)) {
+		problems.push_back(u"an answer of the largest size refused"_q);
+	}
+	const auto release = ReleaseJson("v1.2.0");
+	if (ReleaseFailure(release, u"v1.2.0"_q, StableCode(u"v1.1.0"_q))) {
+		problems.push_back(u"the offered release refused"_q);
+	}
+	expect(ReleaseFailure(release, u"v1.3.0"_q, StableCode(u"v1.1.0"_q)), "update_failed_release", u"v1.2.0, not v1.3.0"_q, "another release");
+	expect(ReleaseFailure(release, u"v1.2.0"_q, StableCode(u"v1.2.0"_q)), "update_failed_release", u"not newer"_q, "not newer");
+	expect(ReleaseFailure("not json", u"v1.2.0"_q, 0), "update_failed_release", u"not a stable release"_q, "a broken answer");
+	if (LogAddress(QUrl::fromEncoded(GitHubLocation(u"a.zip"_q))).contains('?')) {
+		problems.push_back(u"the signed query in log.txt"_q);
+	}
+	Check(problems.isEmpty(), "self-update: each failure has its own text and its reason", problems.join(u", "_q).toStdString().c_str());
+}
+
+// Every text a failure shows is in the string table (TrNow of a variable
+// is not found by TestEveryUsedKeyIsInTheTable), and the installer writes
+// its own one when a file cannot be written.
+void TestSelfUpdateFailureTexts() {
+	auto keys = QSet<QString>();
+	for (const auto &phrase : MZGram::Phrases()) {
+		keys.insert(QString::fromUtf8(phrase.key));
+	}
+	auto problems = QStringList();
+	for (const auto key : {
+		"update_failed_network",
+		"update_failed_server",
+		"update_failed_address",
+		"update_failed_release",
+		"update_failed_disk",
+		"update_failed_checksum",
+		"update_failed_unpack",
+	}) {
+		if (!keys.contains(QString::fromLatin1(key))) {
+			problems.push_back(QString::fromLatin1(key));
+		}
+	}
+	auto file = QFile(QString::fromUtf8(MZGRAM_SOURCE_DIR)
+		+ u"/mzgram/mzgram_self_update.cpp"_q);
+	const auto installer = file.open(QIODevice::ReadOnly)
+		? QString::fromUtf8(file.readAll())
+		: QString();
+	if (installer.count(u"kFailedDisk"_q) < 3) {
+		problems.push_back(u"a file that cannot be written is not update_failed_disk"_q);
+	}
+	if (installer.contains(u"toString()"_q)
+		|| QRegularExpression(u"\\bfail\\(\"[a-z_]+\"\\)"_q).match(installer).hasMatch()) {
+		problems.push_back(u"an address as text or a failure without a reason"_q);
+	}
+	Check(problems.isEmpty(), "self-update: every failure text is in the table", problems.join(u", "_q).toStdString().c_str());
+}
+
+// The hook of the Update button test in CI is only in a build that asks for
+// it (MZGRAM_TEST_HOOKS), never in a release.
+void TestUpdateButtonHookStaysInTests() {
+	const auto read = [](const QString &path) {
+		auto file = QFile(QString::fromUtf8(MZGRAM_SOURCE_DIR) + '/' + path);
+		return file.open(QIODevice::ReadOnly)
+			? QString::fromUtf8(file.readAll()).replace(u"\r\n"_q, u"\n"_q)
+			: QString();
+	};
+	auto problems = QStringList();
+	const auto update = read(u"mzgram/mzgram_update.cpp"_q);
+	const auto guard = update.indexOf(u"#ifdef MZGRAM_TEST_HOOKS"_q);
+	const auto hook = update.indexOf(u"MZGRAM_TEST_PRESS_UPDATE"_q);
+	if (guard < 0 || hook < guard || update.indexOf(u"#endif"_q, guard) < hook) {
+		problems.push_back(u"the hook is not behind MZGRAM_TEST_HOOKS"_q);
+	}
+	if (read(u"../../.github/workflows/mzgram-desktop-release.yml"_q).contains(u"MZGRAM_TEST_HOOKS"_q)) {
+		problems.push_back(u"a release build has the hook"_q);
+	}
+	if (!read(u"../../.github/workflows/mzgram-windows.yml"_q).contains(u"mzgram_update_button_test.ps1"_q)) {
+		problems.push_back(u"the Windows CI does not press Update"_q);
+	}
+	Check(problems.isEmpty(), "self-update: the Update button test hook is never in a release", problems.join(u", "_q).toStdString().c_str());
+}
+
 // The archive must match SHA256SUMS and the GitHub digest.
 void TestSelfUpdateChecksum() {
 	using namespace MZGram::Update;
@@ -2404,6 +2628,10 @@ int main() {
 		TestUpdateIsWired,
 		TestSelfUpdateArchiveChoice,
 		TestSelfUpdateOnlyThisRepository,
+		TestSelfUpdateFollowsGitHubRedirect,
+		TestSelfUpdateFailureReasons,
+		TestSelfUpdateFailureTexts,
+		TestUpdateButtonHookStaysInTests,
 		TestSelfUpdateChecksum,
 		TestSelfUpdateEntries,
 		TestSelfUpdateEntryTypes,

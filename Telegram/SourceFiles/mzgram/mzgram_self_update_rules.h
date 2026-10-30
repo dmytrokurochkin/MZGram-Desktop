@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <QtCore/QByteArray>
 #include <QtCore/QString>
+#include <QtCore/QUrl>
 
 #include <map>
 #include <optional>
@@ -31,6 +32,9 @@ inline constexpr auto kDownloadPrefix
 	= "https://github.com/dmytrokurochkin/MZGram-Desktop/releases/download/";
 inline constexpr auto kSumsName = "SHA256SUMS";
 inline constexpr auto kMaxArchiveSize = qint64(512) * 1024 * 1024;
+// The release answer and SHA256SUMS are kept in memory.
+inline constexpr auto kMaxBodySize = qint64(1024) * 1024;
+inline constexpr auto kMaxRedirects = 5;
 
 // In tupdates/temp/tdata of a prepared update (the Updater never copies
 // tdata): the MZGram code of the release. core/update_checker.cpp checks it
@@ -56,8 +60,55 @@ struct Asset {
 	qint64 size = -1;
 };
 
+// Why the download of an update stopped: the key of the text the bar shows
+// (mzgram_lang_table.cpp) and the reason log.txt gets.
+struct Failure {
+	const char *key = nullptr;
+	QString reason;
+};
+
 // https on github.com or its download hosts, nothing else.
 [[nodiscard]] bool AllowedUrl(const QString &url);
+[[nodiscard]] bool AllowedUrl(const QUrl &url);
+
+// A request may go to this address after so many redirects.
+[[nodiscard]] std::optional<Failure> RequestFailure(
+	const QUrl &url,
+	int redirects);
+
+// The address a redirect leads to: its Location against the address that
+// answered.
+[[nodiscard]] QUrl RedirectTarget(const QUrl &from, const QByteArray &location);
+
+// A finished answer, as QNetworkReply gives it.
+struct Answer {
+	int status = 0; // HTTP, 0 without an answer
+	int error = 0; // QNetworkReply::NetworkError
+	QString errorText;
+	QByteArray location;
+};
+
+// What a finished answer leads to: the next address of a redirect, a
+// failure, or neither (200: the body can be read).
+struct Outcome {
+	std::optional<QUrl> redirect;
+	std::optional<Failure> failure;
+};
+[[nodiscard]] Outcome AnswerOutcome(const QUrl &url, const Answer &answer);
+
+// A body (the release answer, SHA256SUMS) of this size.
+[[nodiscard]] std::optional<Failure> BodyFailure(qint64 size);
+
+// The answer of /releases/tags/<tag> is the release the bar offered, still
+// newer than this build.
+[[nodiscard]] std::optional<Failure> ReleaseFailure(
+	const QByteArray &body,
+	const QString &tag,
+	qint64 installedCode);
+
+// An address for log.txt: without the query, which for a download holds
+// GitHub's signature.
+[[nodiscard]] QString LogAddress(const QUrl &url);
 
 // A file of the release with this tag of this repository.
 [[nodiscard]] bool ReleaseFile(const QString &url, const QString &tag);

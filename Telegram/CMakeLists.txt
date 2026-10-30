@@ -56,6 +56,14 @@ if (DEFINED MZGRAM_VERSION_CODE)
         PROPERTIES COMPILE_DEFINITIONS "MZGRAM_VERSION_CODE=${MZGRAM_VERSION_CODE}")
 endif()
 
+# MZGram: the Update button test of the Windows CI only (it rebuilds this
+# file with -D MZGRAM_TEST_HOOKS=ON, mzgram_update_button_test.ps1); a
+# release never sets it.
+if (MZGRAM_TEST_HOOKS)
+    set_property(SOURCE ${src_loc}/mzgram/mzgram_update.cpp
+        APPEND PROPERTY COMPILE_DEFINITIONS MZGRAM_TEST_HOOKS)
+endif()
+
 # MZGram: the update check (mzgram_update.cpp) makes HTTP requests with
 # QNetworkAccessManager, and the static Qt Network resolves names with the
 # Windows DNS API. Upstream links it only through its updater, which is off.
