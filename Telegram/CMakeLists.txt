@@ -56,11 +56,14 @@ if (DEFINED MZGRAM_VERSION_CODE)
         PROPERTIES COMPILE_DEFINITIONS "MZGRAM_VERSION_CODE=${MZGRAM_VERSION_CODE}")
 endif()
 
-# MZGram: the Update button test of the Windows CI only (it rebuilds this
-# file with -D MZGRAM_TEST_HOOKS=ON, mzgram_update_button_test.ps1); a
-# release never sets it.
+# MZGram: the Update button and AI window tests of the Windows CI only (they
+# rebuild these files with -D MZGRAM_TEST_HOOKS=ON,
+# mzgram_update_button_test.ps1 and mzgram_ai_window_test.ps1); a release
+# never sets it.
 if (MZGRAM_TEST_HOOKS)
     set_property(SOURCE ${src_loc}/mzgram/mzgram_update.cpp
+        APPEND PROPERTY COMPILE_DEFINITIONS MZGRAM_TEST_HOOKS)
+    set_property(SOURCE ${src_loc}/mzgram/mzgram_ai.cpp
         APPEND PROPERTY COMPILE_DEFINITIONS MZGRAM_TEST_HOOKS)
 endif()
 
@@ -1583,6 +1586,8 @@ PRIVATE
     main/session/send_as_peers.h
     main/session/session_show.cpp
     main/session/session_show.h
+    mzgram/mzgram_ai.cpp
+    mzgram/mzgram_ai.h
     mzgram/mzgram_ai_rules.cpp
     mzgram/mzgram_ai_rules.h
     mzgram/mzgram_anti_recall.cpp

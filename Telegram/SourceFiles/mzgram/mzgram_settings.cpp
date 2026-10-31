@@ -14,6 +14,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_session.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
+#include "mzgram/mzgram_ai.h"
 #include "mzgram/mzgram_archive.h"
 #include "mzgram/mzgram_archive_rules.h"
 #include "mzgram/mzgram_lang.h"
@@ -626,6 +627,87 @@ void BuildInterface(SectionBuilder &builder) {
 	builder.addDividerText(Text("check_updates_info"));
 }
 
+// The default site of "Ask AI": a choice applies at once.
+void AiProviderBox(not_null<Ui::GenericBox*> box) {
+	using namespace MZGram::Ai;
+	box->setTitle(Text("ai_default_provider"));
+	const auto group = std::make_shared<Ui::RadiobuttonGroup>(
+		int(DefaultProvider()));
+	for (const auto &info : Providers()) {
+		box->addRow(object_ptr<Ui::Radiobutton>(
+			box,
+			group,
+			int(info.id),
+			QString::fromLatin1(info.name),
+			st::defaultBoxCheckbox));
+	}
+	group->setChangedCallback([=](int value) {
+		SetDefaultProvider(Provider(value));
+		box->closeBox();
+	});
+	box->addButton(Text("button_cancel"), [=] {
+		box->closeBox();
+	});
+}
+
+// The default site, by its name.
+[[nodiscard]] rpl::producer<QString> AiProviderValue() {
+	using namespace MZGram::Ai;
+	const auto option = &base::options::lookup<QString>(kOptionAiProvider);
+	return rpl::single(
+		rpl::empty
+	) | rpl::then(
+		option->changes()
+	) | rpl::map([] {
+		return QString::fromLatin1(
+			MZGram::Ai::Info(MZGram::Ai::DefaultProvider()).name);
+	});
+}
+
+void BuildAi(SectionBuilder &builder) {
+	using namespace MZGram::Ai;
+
+	builder.addSkip();
+	const auto controller = builder.controller();
+	AddOptionToggle(
+		builder,
+		u"mzgram/ai-action"_q,
+		"ai_show_action",
+		kOptionAiAction,
+		{ u"ai"_q, u"gemini"_q, u"claude"_q, u"chatgpt"_q, u"deepseek"_q, u"grok"_q });
+	builder.addButton({
+		.id = u"mzgram/ai-provider"_q,
+		.title = Text("ai_default_provider"),
+		.st = &st::settingsButtonNoIcon,
+		.label = AiProviderValue(),
+		.onClick = [=] {
+			controller->show(Box(AiProviderBox));
+		},
+		.keywords = { u"ai"_q, u"default"_q },
+	});
+	builder.addButton({
+		.id = u"mzgram/ai-sign-out"_q,
+		.title = Text("ai_sign_out"),
+		.st = &st::settingsButtonNoIcon,
+		.onClick = [=] {
+			controller->show(Ui::MakeConfirmBox({
+				.text = MZGram::TrNow("ai_sign_out_confirm"),
+				.confirmed = [](Fn<void()> close) {
+					ClearSignIns();
+					close();
+					Ui::Toast::Show(MZGram::TrNow("ai_signed_out"));
+				},
+				.confirmText = Text("ai_sign_out"),
+				.cancelText = Text("button_cancel"),
+				.confirmStyle = &st::attentionBoxButton,
+			}));
+		},
+		.keywords = { u"ai"_q, u"sign out"_q, u"log out"_q },
+	});
+	builder.addSkip();
+	builder.addDividerText(Text("ai_info"));
+}
+
 void BuildAdsFilters(SectionBuilder &builder) {
 	using namespace MZGram;
 
@@ -657,14 +739,15 @@ struct Topic {
 };
 
 // The topics, in the order the MZGram page lists them.
-[[nodiscard]] const std::array<Topic, 6> &Topics() {
-	static const auto result = std::array<Topic, 6>{ {
+[[nodiscard]] const std::array<Topic, 7> &Topics() {
+	static const auto result = std::array<Topic, 7>{ {
 		{ "section_archive", &st::menuIconArchive, BuildArchive },
 		{ "section_ghost_mode", &st::menuIconStealth, BuildGhostMode },
 		{ "section_message_menu", &st::menuIconChatBubble, BuildMessageMenu },
 		{ "section_media_calls", &st::menuIconPhone, BuildMediaCalls },
 		{ "section_interface", &st::menuIconPalette, BuildInterface },
 		{ "section_ads_filters", &st::menuIconBlock, BuildAdsFilters },
+		{ "section_ai", &st::menuIconBot, BuildAi },
 	} };
 	return result;
 }
@@ -774,6 +857,7 @@ Type TopicId(int index) {
 	case 3: return MZGramTopicSection<3>::Id();
 	case 4: return MZGramTopicSection<4>::Id();
 	case 5: return MZGramTopicSection<5>::Id();
+	case 6: return MZGramTopicSection<6>::Id();
 	}
 	Unexpected("Index in MZGram TopicId.");
 }

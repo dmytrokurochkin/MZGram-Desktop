@@ -172,6 +172,12 @@ Each item has its own switch.
 | Message details | Ids, dates, views, file and media of a message. | 1.0.0 |
 | Scan QR code | When a downloaded photo holds a QR code, shows its link or text. Scanned on the computer. | 1.0.0 |
 
+### Ask AI
+
+| Feature | What it does, and how it differs from Telegram | Since |
+|---|---|---|
+| Ask AI | Ask AI in the menu of a message with text opens a box with the message, a prompt of your own and the site: Gemini, Claude, ChatGPT, DeepSeek or Grok (the default one is set in Settings > MZGram > AI). Open shows that site in an MZGram window of its own, in the same built-in browser as Mini Apps (WebView2 on Windows, WebKitGTK on Linux), with a sign-in profile apart from Telegram's. No paid API: you sign in to the site with your own account. A script puts the prompt and the message into the site's input field; nothing is sent until you press Send on the site. No site has an address parameter that only fills the field (ChatGPT's and Grok's send at once), so none is used. The model is chosen on the site: MZGram cannot pick it reliably there, and the box says so. The first time, a warning says the text leaves Telegram. Not in chats that restrict copying, unless Forward and save protected content is on. When a site changes its page, the window says no field was found, and Copy text still works. Sign out of AI sites starts a new profile. | Next release |
+
 ### Chats and pinning
 
 | Feature | What it does, and how it differs from Telegram | Since |
@@ -245,6 +251,7 @@ Yes: present. No: absent. Partly: present in a narrower form.
 | Protected content | Yes | Yes |
 | Message menu: Save, Reminder, Repeat, Open in, Details, QR | Yes | Yes |
 | Message menu: Copy Photo, Delete Downloaded File, Forward without sender | Yes | No |
+| Ask AI: a message in an AI site's chat in MZGram's own window | No | Yes |
 | Pin in MZGram only | Yes | Yes |
 | Delete for everyone ticked by default | Yes (a switch) | Yes (Telegram Desktop ticks it unless told to remember otherwise) |
 | Confirm voice and round video messages | Yes (one switch) | Yes (two switches) |

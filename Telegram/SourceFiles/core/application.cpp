@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "core/application.h"
 
+#include "mzgram/mzgram_ai.h"
 #include "mzgram/mzgram_update.h"
 #include "mzgram/mzgram_url_scheme.h"
 
@@ -442,6 +443,8 @@ void Application::run() {
 	startTray();
 	// MZGram: the bar about a newer MZGram release, in place of the updater
 	MZGram::Update::Start();
+	// MZGram: the AI window test of the Windows CI, in test builds only
+	MZGram::Ai::StartTestHook();
 
 	_lastActivePrimaryWindow->firstShow();
 

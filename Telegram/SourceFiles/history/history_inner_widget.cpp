@@ -40,6 +40,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_top_peers_selector.h"
 #include "history/history_inner_widget_accessibility.h"
 #include "history/history_item_components.h"
+#include "mzgram/mzgram_ai.h"
 #include "mzgram/mzgram_message_dim.h"
 #include "history/history_item_text.h"
 #include "payments/payments_reaction_process.h"
@@ -3661,6 +3662,12 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 							[=] { copyContextText(itemId); },
 							&st::menuIconCopy);
 					}
+					// MZGram: "Ask AI", only where copying is allowed
+					MZGram::Ai::AddAskAiAction(
+						_menu.get(),
+						item,
+						_controller,
+						hasCopyRestriction(item));
 					if ((!item->translation() || !_history->translatedTo())
 						&& (view->hasVisibleText() || mediaHasTextForCopy)) {
 						const auto peer = item->history()->peer;

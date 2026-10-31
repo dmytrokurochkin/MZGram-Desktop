@@ -2878,7 +2878,7 @@ void TestAiIsWired() {
 		"kStorageFolder",
 		"kOptionAiStorageToken",
 		"GenerateStorageToken",
-		"ClearStorageDataByToken",
+		"removeRecursively",
 		"InsertScript(",
 		"ParseStatus(",
 		"NewWindowTarget(",

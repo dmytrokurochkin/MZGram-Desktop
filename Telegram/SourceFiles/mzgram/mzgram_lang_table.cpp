@@ -420,6 +420,32 @@ const std::vector<Phrase> kPhrases = {
 	// Branding (mzgram_branding.cpp, about_box.cpp)
 	{ "brand_about_text", "Unofficial messaging client based on Telegram Desktop {version}.", "Неофіційний клієнт для обміну повідомленнями на базі Telegram Desktop {version}." },
 	{ "brand_intro_about", "Welcome to MZGram Desktop,\nan unofficial client for Telegram.", "Ласкаво просимо до MZGram Desktop,\nнеофіційного клієнта Telegram." },
+	// Ask AI (mzgram_ai.cpp, Settings > MZGram > AI)
+	{ "section_ai", "AI", "ШІ" },
+	{ "ai_show_action", "Show \"Ask AI\" in the message menu", "Показувати «Запитати ШІ» в меню повідомлення" },
+	{ "ai_default_provider", "Default AI", "ШІ за замовчуванням" },
+	{ "ai_sign_out", "Sign out of AI sites", "Вийти з сайтів ШІ" },
+	{ "ai_sign_out_confirm", "Sign out of every AI site in MZGram? Your Telegram accounts stay signed in.", "Вийти з усіх сайтів ШІ в MZGram? Ваші акаунти Telegram лишаться в системі." },
+	{ "ai_signed_out", "Signed out of the AI sites.", "Ви вийшли з сайтів ШІ." },
+	{ "ai_info", "Ask AI opens the chosen AI site in an MZGram window, with a sign-in of its own apart from Telegram's. No paid API is used: you sign in to the site with your own account. The message and your prompt are put into the site's input field, and nothing is sent until you press Send there yourself. Messages in chats that restrict copying have no Ask AI.", "«Запитати ШІ» відкриває вибраний сайт ШІ у вікні MZGram з окремим входом, не пов'язаним із Telegram. Платний API не використовується: ви входите на сайт зі своїм акаунтом. Повідомлення і ваш промпт підставляються в поле вводу сайту, і нічого не надсилається, поки ви самі не натиснете там «Надіслати». У чатах, що забороняють копіювання, «Запитати ШІ» немає." },
+	{ "ai_ask", "Ask AI", "Запитати ШІ" },
+	{ "ai_message", "Message", "Повідомлення" },
+	{ "ai_prompt", "Your prompt (optional)", "Ваш промпт (необов'язково)" },
+	{ "ai_provider", "AI site", "Сайт ШІ" },
+	{ "ai_model", "Model", "Модель" },
+	{ "ai_model_on_site", "Chosen on the %1 site: MZGram cannot choose a model there reliably.", "Обирається на сайті %1: MZGram не може надійно вибрати там модель." },
+	{ "ai_open", "Open", "Відкрити" },
+	{ "ai_privacy_title", "The text leaves Telegram", "Текст залишає Telegram" },
+	{ "ai_privacy_text", "The message and your prompt will be put into the chat of %1, a service outside Telegram and MZGram, under the account you sign in with there. It is sent only when you press Send on the site. Continue?", "Повідомлення і ваш промпт буде підставлено в чат %1, сервісу поза Telegram і MZGram, під акаунтом, з яким ви там увійдете. Його буде надіслано, лише коли ви натиснете «Надіслати» на сайті. Продовжити?" },
+	{ "ai_privacy_note", "Nothing is sent until you press Send on the site yourself.", "Нічого не надсилається, поки ви самі не натиснете «Надіслати» на сайті." },
+	{ "ai_continue", "Continue", "Продовжити" },
+	{ "ai_status_opening", "Opening %1…", "Відкриваю %1…" },
+	{ "ai_status_inserted", "The text is in the input field. Check it and press Send yourself.", "Текст у полі вводу. Перевірте його і натисніть «Надіслати» самі." },
+	{ "ai_status_no_field", "No input field found. Sign in if the site asks, then press Insert text, or copy the text and paste it.", "Поле вводу не знайдено. Увійдіть, якщо сайт просить, і натисніть «Вставити текст» або скопіюйте текст і вставте його." },
+	{ "ai_insert", "Insert text", "Вставити текст" },
+	{ "ai_copy", "Copy text", "Копіювати текст" },
+	{ "ai_copied", "Text copied.", "Текст скопійовано." },
+	{ "ai_no_webview", "The built-in browser cannot start here. On Windows install Microsoft Edge WebView2 Runtime, on Linux WebKitGTK, then try again.", "Вбудований браузер тут не запускається. На Windows встановіть Microsoft Edge WebView2 Runtime, на Linux WebKitGTK, і спробуйте ще раз." },
 };
 
 const std::map<std::string, const Phrase*> &Index() {

@@ -28,6 +28,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history_item.h"
 #include "history/history_item_components.h"
 #include "mzgram/mzgram_anti_recall.h"
+#include "mzgram/mzgram_ai.h"
 #include "mzgram/mzgram_context_actions.h"
 #include "mzgram/mzgram_qr_scan.h"
 #include "history/history_item_helpers.h"
@@ -1920,6 +1921,12 @@ void FillContextMenuItems(
 					}
 				}, &st::menuIconCopy);
 			}
+			// MZGram: "Ask AI", only where copying is allowed
+			MZGram::Ai::AddAskAiAction(
+				result.get(),
+				view->data(),
+				list->controller(),
+				list->hasCopyRestriction(view->data()));
 
 			const auto translate = mediaHasTextForCopy
 				? (HistoryView::TransribedText(item)
