@@ -1583,6 +1583,8 @@ PRIVATE
     main/session/send_as_peers.h
     main/session/session_show.cpp
     main/session/session_show.h
+    mzgram/mzgram_ai_rules.cpp
+    mzgram/mzgram_ai_rules.h
     mzgram/mzgram_anti_recall.cpp
     mzgram/mzgram_anti_recall.h
     mzgram/mzgram_archive.cpp

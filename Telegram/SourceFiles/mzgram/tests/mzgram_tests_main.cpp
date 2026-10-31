@@ -6,6 +6,7 @@ For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "base/basic_types.h"
+#include "mzgram/mzgram_ai_rules.h"
 #include "mzgram/mzgram_archive_rules.h"
 #include "mzgram/mzgram_branding_rules.h"
 #include "mzgram/mzgram_ipc_rules.h"
@@ -23,10 +24,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QDirIterator>
 #include <QtCore/QFile>
 #include <QtCore/QFileInfo>
+#include <QtCore/QJsonArray>
+#include <QtCore/QJsonDocument>
 #include <QtCore/QTemporaryDir>
 #include <QtCore/QRegularExpression>
 #include <QtCore/QSet>
 #include <QtCore/QString>
+#include <QtCore/QUrl>
 
 #include "base/options.h"
 
@@ -706,6 +710,7 @@ void TestSettingsAreTopicPages() {
 		u"MediaCalls"_q,
 		u"Interface"_q,
 		u"AdsFilters"_q,
+		u"Ai"_q,
 	};
 	auto toggles = 0;
 	for (const auto &topic : topics) {
@@ -739,7 +744,7 @@ void TestSettingsAreTopicPages() {
 	}
 	std::printf("settings topic pages: %d switches and buttons\n", toggles);
 	Check(
-		problems.isEmpty() && toggles == 41,
+		problems.isEmpty() && toggles == 44,
 		"settings are a list of topic pages, every switch on one",
 		problems.join(u", "_q).toStdString().c_str());
 }
@@ -2599,6 +2604,328 @@ void TestUrlSchemeIsWired() {
 		missing.join(u", "_q).toStdString().c_str());
 }
 
+// "Ask AI" (mzgram_ai_rules.h): the five sites, what goes into their chat
+// and where the window may go.
+void TestAiProviders() {
+	using namespace MZGram::Ai;
+	auto problems = QStringList();
+	const auto &providers = Providers();
+	const auto expected = std::vector<std::tuple<Provider, const char*, const char*, const char*>>{
+		{ Provider::Gemini, "gemini", "Gemini", "https://gemini.google.com/app" },
+		{ Provider::Claude, "claude", "Claude", "https://claude.ai/new" },
+		{ Provider::ChatGpt, "chatgpt", "ChatGPT", "https://chatgpt.com/" },
+		{ Provider::DeepSeek, "deepseek", "DeepSeek", "https://chat.deepseek.com/" },
+		{ Provider::Grok, "grok", "Grok", "https://grok.com/" },
+	};
+	if (providers.size() != expected.size()) {
+		problems.push_back(u"not the five sites"_q);
+	} else {
+		for (auto i = 0; i != int(expected.size()); ++i) {
+			const auto &[id, key, name, url] = expected[i];
+			const auto &info = providers[i];
+			const auto label = QString::fromLatin1(key);
+			if (info.id != id
+				|| QString::fromLatin1(info.key) != label
+				|| QString::fromLatin1(info.name) != QString::fromLatin1(name)) {
+				problems.push_back(label + u": id, key or name"_q);
+			}
+			if (QString::fromLatin1(info.startUrl) != QString::fromLatin1(url)) {
+				problems.push_back(label + u": start address"_q);
+			}
+			if (&Info(id) != &info) {
+				problems.push_back(label + u": Info"_q);
+			}
+			if (ProviderByKey(label) != id) {
+				problems.push_back(label + u": by key"_q);
+			}
+			// No text in the address: no site only fills the field from it
+			const auto start = QUrl(QString::fromLatin1(info.startUrl));
+			if (start.hasQuery() || start.scheme() != u"https"_q) {
+				problems.push_back(label + u": a query or not https"_q);
+			}
+			if (NewWindowTarget(id, QString::fromLatin1(info.startUrl)) != NewWindow::Here) {
+				problems.push_back(label + u": its own site leaves the window"_q);
+			}
+			if (info.inputSelectors.empty()) {
+				problems.push_back(label + u": no input field"_q);
+			}
+			if (info.prefill != Prefill::Script || info.model != ModelChoice::OnSite) {
+				problems.push_back(label + u": a prefill or model nobody checked"_q);
+			}
+		}
+	}
+	if (ProviderByKey(u"bard"_q) || ProviderByKey(QString())) {
+		problems.push_back(u"an unknown key is a site"_q);
+	}
+	Check(problems.isEmpty(), "ai: Gemini, Claude, ChatGPT, DeepSeek and Grok, each with its site and input field", problems.join(u", "_q).toStdString().c_str());
+}
+
+// Settings > MZGram > AI: the default site is kept.
+void TestAiDefaultProvider() {
+	using namespace MZGram::Ai;
+	auto problems = QStringList();
+	for (const auto provider : { Provider::Claude, Provider::Grok, Provider::ChatGpt, Provider::DeepSeek, Provider::Gemini }) {
+		SetDefaultProvider(provider);
+		if (DefaultProvider() != provider) {
+			problems.push_back(QString::number(int(provider)));
+		}
+	}
+	Check(problems.isEmpty(), "ai: the default site is kept", problems.join(u", "_q).toStdString().c_str());
+}
+
+// The prompt, an empty line, the message.
+void TestAiComposeText() {
+	using namespace MZGram::Ai;
+	auto problems = QStringList();
+	const auto expect = [&](const QString &prompt, const QString &message, const QString &result) {
+		const auto composed = ComposeText(prompt, message);
+		if (composed != result) {
+			problems.push_back(u"\""_q + prompt + u"\" + \""_q + message + u"\" = \""_q + composed + '"');
+		}
+	};
+	expect(QString(), u"Hello"_q, u"Hello"_q);
+	expect(u"Translate to English"_q, QString::fromUtf8("Привіт"), QString::fromUtf8("Translate to English\n\nПривіт"));
+	expect(u"  Summarize \r\n"_q, u" line1\r\nline2 "_q, u"Summarize\n\nline1\nline2"_q);
+	expect(u"Explain"_q, u"  "_q, u"Explain"_q);
+	expect(QString(), QString(), QString());
+	Check(problems.isEmpty(), "ai: the prompt and the message", problems.join(u", "_q).toStdString().c_str());
+}
+
+// Any text stays one string literal of the script.
+void TestAiScriptString() {
+	using namespace MZGram::Ai;
+	auto problems = QStringList();
+	const auto samples = {
+		u"He said \"hi\" \\ 'yes'"_q,
+		u"</script><script>alert(1)</script>"_q,
+		u"line1\nline2\r\n\tend"_q,
+		QString(QString::fromUtf8("Привіт 👋 ") + QChar(0x2028) + QChar(0x2029) + QChar(0)),
+		u"${x}`'&<>"_q,
+		QString(),
+	};
+	for (const auto &sample : samples) {
+		const auto literal = ScriptString(sample);
+		auto ascii = !literal.isEmpty();
+		for (const auto byte : literal) {
+			if (uchar(byte) >= 0x80 || uchar(byte) < 0x20) {
+				ascii = false;
+			}
+		}
+		if (!ascii || !literal.startsWith('"') || !literal.endsWith('"')) {
+			problems.push_back(sample + u": not one ASCII literal"_q);
+			continue;
+		}
+		const auto inner = literal.mid(1, literal.size() - 2);
+		for (const auto bad : { '"', '\'', '<', '>', '&', '\n', '\r' }) {
+			if (inner.contains(bad)) {
+				problems.push_back(sample + u": a raw "_q + QChar(bad));
+			}
+		}
+		const auto parsed = QJsonDocument::fromJson("[" + literal + "]");
+		if (!parsed.isArray() || parsed.array().at(0).toString() != sample) {
+			problems.push_back(sample + u": another text"_q);
+		}
+	}
+	Check(problems.isEmpty(), "ai: any text is one escaped string of the script", problems.join(u", "_q).toStdString().c_str());
+}
+
+// The script fills the field and never sends.
+void TestAiInsertScript() {
+	using namespace MZGram::Ai;
+	auto problems = QStringList();
+	const auto text = u"Line \"one\"\n</script>"_q;
+	auto scripts = QSet<QByteArray>();
+	for (const auto &info : Providers()) {
+		const auto label = QString::fromLatin1(info.key);
+		const auto script = InsertScript(info.id, text);
+		scripts.insert(script);
+		if (!script.contains(ScriptString(text))) {
+			problems.push_back(label + u": not the escaped text"_q);
+		}
+		if (script.contains("</script>") || script.contains("Line \"one\"")) {
+			problems.push_back(label + u": the raw text"_q);
+		}
+		for (const auto selector : info.inputSelectors) {
+			if (!script.contains(ScriptString(QString::fromLatin1(selector)))) {
+				problems.push_back(label + u": no selector "_q + QString::fromLatin1(selector));
+			}
+		}
+		if (!script.contains("window.external.invoke")
+			|| !script.contains("inserted")
+			|| !script.contains("no_field")) {
+			problems.push_back(label + u": does not say what happened"_q);
+		}
+		for (const auto sends : { "click(", "submit(", "requestSubmit", "KeyboardEvent", "keydown", "keypress", "keyup", "Enter" }) {
+			if (script.contains(sends)) {
+				problems.push_back(label + u": "_q + QString::fromLatin1(sends));
+			}
+		}
+	}
+	if (scripts.size() != 5) {
+		problems.push_back(u"not a script per site"_q);
+	}
+	Check(problems.isEmpty(), "ai: the script fills the input field and never sends", problems.join(u", "_q).toStdString().c_str());
+}
+
+void TestAiStatus() {
+	using namespace MZGram::Ai;
+	Check(ParseStatus("{\"mzgram_ai\":\"inserted\"}") == Status::Inserted
+		&& ParseStatus("{\"mzgram_ai\":\"no_field\"}") == Status::NoField
+		&& ParseStatus("{\"mzgram_ai\":\"sent\"}") == Status::None
+		&& ParseStatus("{}") == Status::None
+		&& ParseStatus("inserted") == Status::None
+		&& ParseStatus(QByteArray()) == Status::None,
+		"ai: what the script says",
+		"");
+}
+
+// Only https in the window; the site and the sign-in pages stay in it.
+void TestAiNavigation() {
+	using namespace MZGram::Ai;
+	auto problems = QStringList();
+	for (const auto &[url, allowed] : std::vector<std::pair<QString, bool>>{
+		{ u"https://claude.ai/login"_q, true },
+		{ u"https://accounts.google.com/v3/signin"_q, true },
+		{ u"about:blank"_q, true },
+		{ u"http://claude.ai/"_q, false },
+		{ u"javascript:alert(1)"_q, false },
+		{ u"file:///C:/Users"_q, false },
+		{ u"data:text/html,x"_q, false },
+		{ QString(), false },
+	}) {
+		if (AllowedNavigation(url) != allowed) {
+			problems.push_back(url);
+		}
+	}
+	using Target = NewWindow;
+	for (const auto &[provider, url, target] : std::vector<std::tuple<Provider, QString, Target>>{
+		{ Provider::Gemini, u"https://accounts.google.com/signin"_q, Target::Here },
+		{ Provider::Claude, u"https://claude.ai/chat/1"_q, Target::Here },
+		{ Provider::ChatGpt, u"https://auth.openai.com/log-in"_q, Target::Here },
+		{ Provider::ChatGpt, u"https://login.microsoftonline.com/common"_q, Target::Here },
+		{ Provider::Grok, u"https://accounts.x.ai/sign-in"_q, Target::Here },
+		{ Provider::DeepSeek, u"https://chat.deepseek.com/sign_in"_q, Target::Here },
+		{ Provider::Claude, u"https://appleid.apple.com/auth"_q, Target::Here },
+		{ Provider::Claude, u"https://en.wikipedia.org/wiki/Kyiv"_q, Target::Browser },
+		{ Provider::Gemini, u"https://claude.ai/"_q, Target::Browser },
+		{ Provider::ChatGpt, u"https://chatgpt.com.example.org/"_q, Target::Browser },
+		{ Provider::ChatGpt, u"https://evilchatgpt.com/"_q, Target::Browser },
+		{ Provider::Claude, u"https://claude.ai@example.org/"_q, Target::Browser },
+		{ Provider::Claude, u"http://claude.ai/"_q, Target::Refuse },
+		{ Provider::Claude, u"javascript:alert(1)"_q, Target::Refuse },
+		{ Provider::Grok, u"data:text/html,x"_q, Target::Refuse },
+		{ Provider::Grok, u"file:///etc/passwd"_q, Target::Refuse },
+	}) {
+		if (NewWindowTarget(provider, url) != target) {
+			problems.push_back(u"new window "_q + url);
+		}
+	}
+	Check(problems.isEmpty(), "ai: the window goes only to https, the site and its sign-in stay in it", problems.join(u", "_q).toStdString().c_str());
+}
+
+// Every text of "Ask AI" is in the table (and so, by
+// TestEveryPhraseInEveryLanguage, in the twelve languages).
+void TestAiTexts() {
+	auto keys = QSet<QString>();
+	for (const auto &phrase : MZGram::Phrases()) {
+		keys.insert(QString::fromUtf8(phrase.key));
+	}
+	auto missing = QStringList();
+	for (const auto key : {
+		"section_ai",
+		"ai_show_action",
+		"ai_default_provider",
+		"ai_sign_out",
+		"ai_sign_out_confirm",
+		"ai_signed_out",
+		"ai_info",
+		"ai_ask",
+		"ai_message",
+		"ai_prompt",
+		"ai_provider",
+		"ai_model",
+		"ai_model_on_site",
+		"ai_open",
+		"ai_privacy_title",
+		"ai_privacy_text",
+		"ai_privacy_note",
+		"ai_continue",
+		"ai_status_opening",
+		"ai_status_inserted",
+		"ai_status_no_field",
+		"ai_insert",
+		"ai_copy",
+		"ai_copied",
+		"ai_no_webview",
+	}) {
+		if (!keys.contains(QString::fromLatin1(key))) {
+			missing.push_back(QString::fromLatin1(key));
+		}
+	}
+	Check(missing.isEmpty(), "ai: every text is in the string table", missing.join(u", "_q).toStdString().c_str());
+}
+
+// The menu item, the window with its own profile, the warning, the test
+// hook only in test builds and its run in the Windows CI.
+void TestAiIsWired() {
+	auto problems = QStringList();
+	const auto ai = ReadSource("mzgram/mzgram_ai.cpp");
+	if (ai.isEmpty()) {
+		problems.push_back(u"no mzgram_ai.cpp"_q);
+	}
+	for (const auto needed : {
+		"Webview::Window",
+		"kStorageFolder",
+		"kOptionAiStorageToken",
+		"GenerateStorageToken",
+		"ClearStorageDataByToken",
+		"InsertScript(",
+		"ParseStatus(",
+		"NewWindowTarget(",
+		"AllowedNavigation(",
+		"kOptionAiWarned",
+		"\"ai_privacy_text\"",
+		"\"ai_model_on_site\"",
+	}) {
+		if (!ai.contains(QString::fromLatin1(needed))) {
+			problems.push_back(u"mzgram_ai.cpp: no "_q + QString::fromLatin1(needed));
+		}
+	}
+	// Never one of Telegram's own web profiles
+	for (const auto telegram : { "resolveStorageId", "TonSiteStorageId", "wvproxy" }) {
+		if (ai.contains(QString::fromLatin1(telegram))) {
+			problems.push_back(u"mzgram_ai.cpp: "_q + QString::fromLatin1(telegram));
+		}
+	}
+	const auto guard = ai.indexOf(u"#ifdef MZGRAM_TEST_HOOKS"_q);
+	const auto hook = ai.indexOf(u"MZGRAM_TEST_AI"_q);
+	if (guard < 0 || hook < guard || ai.indexOf(u"#endif // MZGRAM_TEST_HOOKS"_q, guard) < ai.lastIndexOf(u"MZGRAM_TEST_AI"_q)) {
+		problems.push_back(u"the test hook is not behind MZGRAM_TEST_HOOKS"_q);
+	}
+	// The menu item is where Copy text is, with its restriction
+	for (const auto path : { "history/history_inner_widget.cpp", "history/view/history_view_context_menu.cpp" }) {
+		const auto text = ReadSource(path);
+		const auto at = text.indexOf(u"MZGram::Ai::AddAskAiAction("_q);
+		if (at < 0) {
+			problems.push_back(QString::fromLatin1(path) + u": no Ask AI"_q);
+		} else if (!text.mid(at, 300).contains(u"hasCopyRestriction("_q)) {
+			problems.push_back(QString::fromLatin1(path) + u": Ask AI without the copy restriction"_q);
+		}
+	}
+	if (!ReadSource("core/application.cpp").contains(u"MZGram::Ai::StartTestHook()"_q)) {
+		problems.push_back(u"the test hook is never started"_q);
+	}
+	const auto cmake = ReadSource("../CMakeLists.txt");
+	const auto hooks = cmake.indexOf(u"if (MZGRAM_TEST_HOOKS)"_q);
+	if (hooks < 0 || !cmake.mid(hooks, 400).contains(u"mzgram/mzgram_ai.cpp"_q)) {
+		problems.push_back(u"CMake: mzgram_ai.cpp without MZGRAM_TEST_HOOKS"_q);
+	}
+	if (!ReadSource("../../.github/workflows/mzgram-windows.yml").contains(u"mzgram_ai_window_test.ps1"_q)) {
+		problems.push_back(u"the Windows CI does not open the AI window"_q);
+	}
+	Check(problems.isEmpty(), "ai: menu item, own profile, warning and the window test are wired", problems.join(u", "_q).toStdString().c_str());
+}
+
 } // namespace
 
 int main() {
@@ -2664,6 +2991,15 @@ int main() {
 		TestUrlSchemeCleansUpTelegramKeys,
 #endif // _WIN32
 		TestUrlSchemeIsWired,
+		TestAiProviders,
+		TestAiDefaultProvider,
+		TestAiComposeText,
+		TestAiScriptString,
+		TestAiInsertScript,
+		TestAiStatus,
+		TestAiNavigation,
+		TestAiTexts,
+		TestAiIsWired,
 	};
 	for (const auto &test : tests) {
 		test();

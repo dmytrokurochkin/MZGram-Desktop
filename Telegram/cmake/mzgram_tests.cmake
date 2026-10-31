@@ -21,6 +21,8 @@ target_include_directories(mzgram_tests PRIVATE ${src_loc})
 
 nice_target_sources(mzgram_tests ${src_loc}
 PRIVATE
+    mzgram/mzgram_ai_rules.cpp
+    mzgram/mzgram_ai_rules.h
     mzgram/mzgram_archive_rules.cpp
     mzgram/mzgram_archive_rules.h
     mzgram/mzgram_branding_rules.cpp
