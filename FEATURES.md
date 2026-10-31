@@ -55,6 +55,12 @@ Each item has its own switch.
 | QR Code | When a photo holds a QR code, shows its link or text. The photo is scanned on the device. | 1.0.0 |
 | Forward without sender | Opens the forward screen with the sender's name already hidden. | 1.0.0 |
 
+### Ask AI
+
+| Feature | What it does, and how it differs from Telegram | Since |
+|---|---|---|
+| Ask AI | Ask AI in the menu of a message with text opens a box with the message, a prompt of your own and the site: Gemini, Claude, ChatGPT, DeepSeek or Grok (the default one is set in Settings > MZGram > AI). Open shows that site on an MZGram screen of its own, in Android System WebView with a profile of its own, so its sign-in and data stay apart from Mini Apps and the rest of Telegram; a WebView too old for profiles does not open the site and says so. No paid API: you sign in to the site with your own account. A script puts the prompt and the message into the site's input field; nothing is sent until you press Send on the site, and the site gets no access to the app. No site has an address parameter that only fills the field (ChatGPT's and Grok's send at once), so none is used. The model is chosen on the site: MZGram cannot pick it reliably there, and the box says so. The first time, a warning says the text leaves Telegram. Not in chats that restrict copying, unless Forward and save protected content is on. A link to another site opens in the browser. When a site changes its page, the screen says no field was found, and Copy text still works. Sign out of AI sites clears the profile. | Next release |
+
 ### Chats and pinning
 
 | Feature | What it does, and how it differs from Telegram | Since |
@@ -251,7 +257,7 @@ Yes: present. No: absent. Partly: present in a narrower form.
 | Protected content | Yes | Yes |
 | Message menu: Save, Reminder, Repeat, Open in, Details, QR | Yes | Yes |
 | Message menu: Copy Photo, Delete Downloaded File, Forward without sender | Yes | No |
-| Ask AI: a message in an AI site's chat in MZGram's own window | No | Yes |
+| Ask AI: a message in an AI site's chat in MZGram's own window | Yes | Yes |
 | Pin in MZGram only | Yes | Yes |
 | Delete for everyone ticked by default | Yes (a switch) | Yes (Telegram Desktop ticks it unless told to remember otherwise) |
 | Confirm voice and round video messages | Yes (one switch) | Yes (two switches) |
