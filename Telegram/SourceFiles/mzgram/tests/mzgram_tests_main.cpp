@@ -1908,6 +1908,11 @@ void TestLanguagePickerIsWired() {
 			missing.push_back(QString::fromUtf8(path) + u": "_q + text);
 		}
 	}
+	// The note under the picker tells both choices apart
+	if (!MZGram::Translate("mzgram_language_info", false).contains(u"Same as Telegram: "_q)
+		|| !MZGram::Translate("mzgram_language_info", true).contains(QString::fromUtf8("Як у Telegram: "))) {
+		missing.push_back(u"mzgram_language_info: no Same as Telegram"_q);
+	}
 	Check(
 		missing.isEmpty(),
 		"the MZGram language picker is in Settings and the texts follow it",

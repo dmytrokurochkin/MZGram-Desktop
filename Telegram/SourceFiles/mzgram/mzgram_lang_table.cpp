@@ -268,12 +268,7 @@ const std::vector<Phrase> kPhrases = {
 	// Interface.
 	{ "mzgram_language", "MZGram language", "Мова MZGram" },
 	{ "mzgram_language_system", "System", "Як у системі" },
-	{ "mzgram_language_info",
-		"The language of MZGram's own settings and features, apart from "
-		"Telegram's language. System: the system's language when MZGram has "
-		"it, otherwise English.",
-		"Мова власних налаштувань і функцій MZGram, окремо від мови Telegram. "
-		"Як у системі: мова системи, якщо MZGram її має, інакше англійська." },
+	{ "mzgram_language_info", "The language of MZGram's own settings and features. Same as Telegram: Telegram's language when MZGram has it, otherwise English. System: the system's language when MZGram has it, otherwise English.", "Мова власних налаштувань і функцій MZGram. Як у Telegram: мова Telegram, якщо MZGram її має, інакше англійська. Як у системі: мова системи, якщо MZGram її має, інакше англійська." },
 	{ "message_seconds", "Show seconds in message time", "Показувати секунди в часі повідомлень" },
 	{ "hide_stories", "Hide Stories", "Приховати історії" },
 	{ "disable_greeting_sticker", "Disable greeting sticker", "Вимкнути вітальний стікер" },
