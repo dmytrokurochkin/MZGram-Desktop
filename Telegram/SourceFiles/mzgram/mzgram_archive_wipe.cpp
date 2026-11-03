@@ -142,7 +142,7 @@ ArchiveSizes MeasureArchive(
 			QDir::AllEntries | QDir::Hidden | QDir::System | QDir::NoDotAndDotDot);
 		for (const auto &entry : list) {
 			const auto path = CleanPath(entry.absoluteFilePath());
-			if (entry.fileName().contains(u".mzgram-deleting-"_q)
+			if (entry.fileName().contains(kAside)
 				|| path == CleanPath(database)
 				|| path == attachmentsPath) {
 				continue;
