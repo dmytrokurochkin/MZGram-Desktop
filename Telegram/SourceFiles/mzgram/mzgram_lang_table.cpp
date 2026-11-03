@@ -141,6 +141,12 @@ const std::vector<Phrase> kPhrases = {
 	{ "archive_cleared", "Archive cleared.", "Архів очищено." },
 	{ "archive_files_deleted", "Archive files deleted, %1 freed.", "Файли архіву видалено, звільнено %1." },
 	{ "archive_files_left", "Some archive files could not be deleted. MZGram will try again at the next start.", "Деякі файли архіву не вдалося видалити. MZGram спробує ще раз під час наступного запуску." },
+	{ "archive_size", "Archive size", "Розмір архіву" },
+	{ "archive_size_counting", "Counting…", "Рахую…" },
+	{ "archive_size_database", "Messages", "Повідомлення" },
+	{ "archive_size_media", "Media", "Медіа" },
+	{ "archive_size_attachments", "Saved Attachments", "Збережені вкладення" },
+	{ "archive_size_other", "Other", "Інше" },
 
 	// Ghost Mode.
 	{ "ghost_mode", "Ghost mode", "Режим привида" },

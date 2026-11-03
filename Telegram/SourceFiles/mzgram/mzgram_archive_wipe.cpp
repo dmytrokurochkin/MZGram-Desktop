@@ -23,4 +23,12 @@ QStringList LeftFromWipe(const QStringList &folders) {
 	return {};
 }
 
+ArchiveSizes MeasureArchive(
+		const QString &database,
+		const QString &folder,
+		const QString &media,
+		const QString &attachments) {
+	return {}; // Red: not counted yet
+}
+
 } // namespace MZGram

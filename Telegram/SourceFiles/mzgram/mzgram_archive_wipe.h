@@ -36,4 +36,25 @@ struct WipedFiles {
 // The folders an earlier wipe set aside and did not delete.
 [[nodiscard]] QStringList LeftFromWipe(const QStringList &folders);
 
+// Settings > MZGram > Archive: how much the archive takes, by kind. The
+// messages database (with its journal), the copies of media in the
+// archive's folder, Saved Attachments and anything else in that folder;
+// what a wipe set aside is being deleted and is not counted. Slow on
+// gigabytes: not on the main thread.
+struct ArchiveSizes {
+	qint64 database = 0;
+	qint64 media = 0;
+	qint64 attachments = 0;
+	qint64 other = 0;
+
+	[[nodiscard]] qint64 total() const {
+		return database + media + attachments + other;
+	}
+};
+[[nodiscard]] ArchiveSizes MeasureArchive(
+	const QString &database,
+	const QString &folder,
+	const QString &media,
+	const QString &attachments);
+
 } // namespace MZGram
