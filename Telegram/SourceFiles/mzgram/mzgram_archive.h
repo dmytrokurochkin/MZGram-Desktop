@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #pragma once
 
 #include "data/data_types.h"
+#include "mzgram/mzgram_archive_rules.h"
 
 class History;
 class HistoryItem;
@@ -22,6 +23,11 @@ namespace MZGram {
 // Every private chat, group, channel and secret chat is saved while
 // "Save deleted and edited messages" is on (mzgram_archive_rules.h).
 [[nodiscard]] bool SavesChat(not_null<PeerData*> peer);
+
+// The switch of "Keep messages" that decides for a chat and for a message
+// (mzgram_archive_rules.h).
+[[nodiscard]] ChatKind ChatKindOf(not_null<PeerData*> peer);
+[[nodiscard]] ArchiveSource SourceOfItem(not_null<const HistoryItem*> item);
 
 // Called for every message the server sends, from History::createItem and
 // Data::Session::updateEditedMessage. Stores other people's messages and

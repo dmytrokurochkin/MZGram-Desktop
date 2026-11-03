@@ -38,6 +38,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/options.h"
 
 #include <algorithm>
+#include <array>
 #include <cstdio>
 #include <functional>
 #include <map>
@@ -382,6 +383,9 @@ void TestArchiveRules() {
 			kOptionSaveFormatting,
 			kOptionSaveReactions,
 			kOptionSaveForBots,
+			kOptionSaveFromUsers,
+			kOptionSaveInGroups,
+			kOptionSaveInChannels,
 			kOptionSemiTransparentDeleted,
 		}) {
 		if (!base::options::lookup<bool>(id).value()) {
@@ -395,33 +399,35 @@ void TestArchiveRules() {
 	if (kDeletedOpacity != 0.75) {
 		problems.push_back(u"deleted opacity is not 75%"_q);
 	}
-	if (!KeepsDeleted(false, false, false) || !KeepsEdit(false, false, false)) {
+	const auto user = ArchiveSource::User;
+	const auto bot = ArchiveSource::Bot;
+	if (!KeepsDeleted(false, false, user) || !KeepsEdit(false, false, user)) {
 		problems.push_back(u"other people's message not kept"_q);
 	}
-	if (KeepsDeleted(false, true, false) || KeepsEdit(false, true, false)) {
+	if (KeepsDeleted(false, true, user) || KeepsEdit(false, true, user)) {
 		problems.push_back(u"own message kept"_q);
 	}
-	if (KeepsDeleted(true, false, false) || KeepsEdit(true, false, false)) {
+	if (KeepsDeleted(true, false, user) || KeepsEdit(true, false, user)) {
 		problems.push_back(u"service message kept"_q);
 	}
-	if (!KeepsDeleted(false, false, true)) {
-		problems.push_back(u"bot chat not kept by default"_q);
+	if (!KeepsDeleted(false, false, bot)) {
+		problems.push_back(u"bot not kept by default"_q);
 	}
 	bots.set(false);
-	if (KeepsDeleted(false, false, true) || KeepsEdit(false, false, true)) {
-		problems.push_back(u"bot chat kept with its switch off"_q);
+	if (KeepsDeleted(false, false, bot) || KeepsEdit(false, false, bot)) {
+		problems.push_back(u"bot kept with its switch off"_q);
 	}
-	if (!KeepsDeleted(false, false, false)) {
-		problems.push_back(u"bot switch affects other chats"_q);
+	if (!KeepsDeleted(false, false, user)) {
+		problems.push_back(u"bot switch affects other messages"_q);
 	}
 	bots.set(true);
 	edits.set(false);
-	if (KeepsEdit(false, false, false) || !KeepsDeleted(false, false, false)) {
+	if (KeepsEdit(false, false, user) || !KeepsDeleted(false, false, user)) {
 		problems.push_back(u"edit history switch not on its own"_q);
 	}
 	edits.set(true);
 	deleted.set(false);
-	if (KeepsDeleted(false, false, false) || !KeepsEdit(false, false, false)) {
+	if (KeepsDeleted(false, false, user) || !KeepsEdit(false, false, user)) {
 		problems.push_back(u"deleted switch not on its own"_q);
 	}
 	deleted.set(true);
@@ -429,6 +435,110 @@ void TestArchiveRules() {
 		problems.isEmpty(),
 		"archive keeps other people's messages, a switch for each part",
 		problems.join(u", "_q).toStdString().c_str());
+}
+
+// Keep messages: from users, from bots, in groups, in channels, all on by
+// default. A bot's message goes by "From bots" in any chat; other messages
+// by the chat; a group may have bots' messages to keep while "In groups" is
+// off. Turning one off keeps what was saved.
+[[nodiscard]] QString ReadSource(const char *path);
+
+void TestKeepFrom() {
+	using namespace MZGram;
+	auto problems = QStringList();
+	struct Case {
+		bool bot;
+		ChatKind chat;
+		ArchiveSource source;
+	};
+	for (const auto &c : {
+			Case{ false, ChatKind::Private, ArchiveSource::User },
+			Case{ true, ChatKind::Private, ArchiveSource::Bot },
+			Case{ true, ChatKind::Group, ArchiveSource::Bot },
+			Case{ true, ChatKind::Channel, ArchiveSource::Bot },
+			Case{ false, ChatKind::Group, ArchiveSource::Group },
+			Case{ false, ChatKind::Channel, ArchiveSource::Channel } }) {
+		if (SourceOf(c.bot, c.chat) != c.source) {
+			problems.push_back(u"source of bot %1 in chat %2"_q.arg(c.bot).arg(int(c.chat)));
+		}
+	}
+	const auto options = std::array<const char*, 4>{
+		kOptionSaveFromUsers,
+		kOptionSaveForBots,
+		kOptionSaveInGroups,
+		kOptionSaveInChannels,
+	};
+	const auto sources = std::array<ArchiveSource, 4>{
+		ArchiveSource::User,
+		ArchiveSource::Bot,
+		ArchiveSource::Group,
+		ArchiveSource::Channel,
+	};
+	for (auto i = 0; i != 4; ++i) {
+		auto &option = base::options::lookup<bool>(options[i]);
+		if (!option.value() || !SavesFrom(sources[i])) {
+			problems.push_back(QString::fromLatin1(options[i]) + u" off by default"_q);
+		}
+		option.set(false);
+		for (auto j = 0; j != 4; ++j) {
+			if (SavesFrom(sources[j]) != (i != j)) {
+				problems.push_back(QString::fromLatin1(options[i]) + u" decides for another"_q);
+			}
+		}
+		if (KeepsDeleted(false, false, sources[i]) || KeepsEdit(false, false, sources[i])) {
+			problems.push_back(QString::fromLatin1(options[i]) + u": kept while off"_q);
+		}
+		option.set(true);
+	}
+	auto &groups = base::options::lookup<bool>(kOptionSaveInGroups);
+	auto &bots = base::options::lookup<bool>(kOptionSaveForBots);
+	groups.set(false);
+	if (!MaySaveChat(false, ChatKind::Group)) {
+		problems.push_back(u"a group's bots are not kept with In groups off"_q);
+	}
+	bots.set(false);
+	if (MaySaveChat(false, ChatKind::Group)) {
+		problems.push_back(u"a group kept with both off"_q);
+	}
+	groups.set(true);
+	if (MaySaveChat(true, ChatKind::Private) || !MaySaveChat(false, ChatKind::Private)) {
+		problems.push_back(u"a private chat with a bot"_q);
+	}
+	bots.set(true);
+	// The author decides; the chats of a channel post, a channel writing in
+	// a group and an anonymous admin are what is asked
+	const auto archive = ReadSource("mzgram/mzgram_archive.cpp");
+	for (const auto needed : {
+			"const auto user = item->from()->asUser();",
+			"SourceOf(user && user->isBot(), ChatKindOf(item->history()->peer))",
+			"MaySaveChat(user && user->isBot(), ChatKindOf(peer))",
+			"peer->isBroadcast()",
+			"(peer->isChat() || peer->isMegagroup())",
+			"SourceOfItem(item))) {" }) {
+		if (!archive.contains(QString::fromLatin1(needed))) {
+			problems.push_back(u"archive: no "_q + QString::fromLatin1(needed));
+		}
+	}
+	// Turning a switch off deletes nothing: the switches are plain toggles
+	const auto settings = ReadSource("mzgram/mzgram_settings.cpp");
+	const auto from = settings.indexOf(u"Text(\"keep_from_title\")"_q);
+	const auto till = settings.indexOf(u"Text(\"keep_from_info\")"_q);
+	if (from < 0 || till < from) {
+		problems.push_back(u"no Keep messages in the Archive topic"_q);
+	} else {
+		const auto part = settings.mid(from, till - from);
+		for (const auto needed : { "kOptionSaveFromUsers", "kOptionSaveForBots", "kOptionSaveInGroups", "kOptionSaveInChannels", "\"keep_from_users\"", "\"keep_from_bots\"", "\"keep_from_groups\"", "\"keep_from_channels\"" }) {
+			if (!part.contains(QString::fromLatin1(needed))) {
+				problems.push_back(u"Keep messages: no "_q + QString::fromLatin1(needed));
+			}
+		}
+		for (const auto never : { "wipe", "remove", "delete", "forget" }) {
+			if (part.contains(QString::fromLatin1(never), Qt::CaseInsensitive)) {
+				problems.push_back(u"Keep messages: "_q + QString::fromLatin1(never));
+			}
+		}
+	}
+	Check(problems.isEmpty(), "keep messages from users, bots, groups, channels: the author, then the chat", problems.join(u", "_q).toStdString().c_str());
 }
 
 // No list of chats any more: nothing in the sources picks chats, and the
@@ -468,9 +578,9 @@ void TestArchiveIsForEveryChat() {
 	}
 	const auto antiRecall = read("mzgram/mzgram_anti_recall.cpp");
 	if (!antiRecall.contains(
-			u"KeepsDeleted(item->isService(), item->out(), IsBotChat(item))"_q)
+			u"KeepsDeleted(item->isService(), item->out(), SourceOfItem(item))"_q)
 		|| !antiRecall.contains(
-			u"KeepsEdit(item->isService(), item->out(), IsBotChat(item))"_q)) {
+			u"KeepsEdit(item->isService(), item->out(), SourceOfItem(item))"_q)) {
 		problems.push_back(u"anti-recall does not ask the rules"_q);
 	}
 	const auto archive = read("mzgram/mzgram_archive.cpp");
@@ -488,6 +598,9 @@ void TestArchiveIsForEveryChat() {
 			u"kOptionSaveFormatting"_q,
 			u"kOptionSaveReactions"_q,
 			u"kOptionSaveForBots"_q,
+			u"kOptionSaveFromUsers"_q,
+			u"kOptionSaveInGroups"_q,
+			u"kOptionSaveInChannels"_q,
 			u"kOptionSemiTransparentDeleted"_q,
 			u"kOptionDeletedMark"_q,
 			u"kOptionEditedMark"_q,
@@ -772,7 +885,7 @@ void TestSettingsAreTopicPages() {
 	}
 	std::printf("settings topic pages: %d switches and buttons\n", toggles);
 	Check(
-		problems.isEmpty() && toggles == 50,
+		problems.isEmpty() && toggles == 53,
 		"settings are a list of topic pages, every switch on one",
 		problems.join(u", "_q).toStdString().c_str());
 }
@@ -3773,6 +3886,7 @@ int main() {
 		TestProtectedCopyPlan,
 		TestProtectedContentIsWired,
 		TestArchiveRules,
+		TestKeepFrom,
 		TestArchiveIsForEveryChat,
 		TestArchiveMediaHasNoLimit,
 		TestEraseLocalDatabase,

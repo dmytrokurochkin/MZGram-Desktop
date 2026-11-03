@@ -419,14 +419,38 @@ void BuildArchive(SectionBuilder &builder) {
 		"save_reactions",
 		kOptionSaveReactions,
 		{ u"reactions"_q });
+	builder.addSkip();
+	builder.addDividerText(Text("saved_media_note"));
+
+	// Whose messages are kept; turning one off keeps what was saved
+	builder.addSkip();
+	builder.addSubsectionTitle(Text("keep_from_title"));
+	AddOptionToggle(
+		builder,
+		u"mzgram/save-from-users"_q,
+		"keep_from_users",
+		kOptionSaveFromUsers,
+		{ u"users"_q, u"people"_q, u"private"_q });
 	AddOptionToggle(
 		builder,
 		u"mzgram/save-for-bots"_q,
-		"save_for_bots",
+		"keep_from_bots",
 		kOptionSaveForBots,
 		{ u"bots"_q });
+	AddOptionToggle(
+		builder,
+		u"mzgram/save-in-groups"_q,
+		"keep_from_groups",
+		kOptionSaveInGroups,
+		{ u"groups"_q });
+	AddOptionToggle(
+		builder,
+		u"mzgram/save-in-channels"_q,
+		"keep_from_channels",
+		kOptionSaveInChannels,
+		{ u"channels"_q });
 	builder.addSkip();
-	builder.addDividerText(Text("saved_media_note"));
+	builder.addDividerText(Text("keep_from_info"));
 
 	builder.addSkip();
 	const auto controller = builder.controller();

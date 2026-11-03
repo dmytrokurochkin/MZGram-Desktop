@@ -310,7 +310,22 @@ void QueueMediaSave(not_null<HistoryItem*> item, const MessageKey &key) {
 bool SavesChat(not_null<PeerData*> peer) {
 	const auto user = peer->asUser();
 	return SaveDeletedMessages()
-		&& (SaveForBots() || !user || !user->isBot());
+		&& MaySaveChat(user && user->isBot(), ChatKindOf(peer));
+}
+
+ChatKind ChatKindOf(not_null<PeerData*> peer) {
+	return peer->isBroadcast()
+		? ChatKind::Channel
+		: (peer->isChat() || peer->isMegagroup())
+		? ChatKind::Group
+		: ChatKind::Private;
+}
+
+// The author decides for a bot's message; a channel's post, a channel
+// writing in a group and an anonymous admin have a chat as the author.
+ArchiveSource SourceOfItem(not_null<const HistoryItem*> item) {
+	const auto user = item->from()->asUser();
+	return SourceOf(user && user->isBot(), ChatKindOf(item->history()->peer));
 }
 
 void CaptureMessage(not_null<HistoryItem*> item, const MTPMessage &message) {
@@ -321,11 +336,10 @@ void CaptureMessage(not_null<HistoryItem*> item, const MTPMessage &message) {
 	}
 	const auto history = item->history();
 	// The owner's own messages are never kept.
-	const auto user = history->peer->asUser();
 	if (!KeepsDeleted(
 			false,
 			message.c_message().is_out(),
-			user && user->isBot())) {
+			SourceOfItem(item))) {
 		return;
 	}
 	const auto key = KeyFor(item);
