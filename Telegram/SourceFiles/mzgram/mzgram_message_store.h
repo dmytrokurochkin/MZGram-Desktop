@@ -93,11 +93,15 @@ public:
 	[[nodiscard]] QString mediaFolder(uint64 account, uint64 peer) const;
 	// Downloads/MZGram/Saved Attachments, empty when there is no Downloads.
 	[[nodiscard]] QString attachmentsFolder() const;
+	// The media folder and Saved Attachments, what Clear archive deletes.
+	[[nodiscard]] QStringList archiveFolders() const;
 
 	// Full wipe for the settings screen's "clear archive" action: every
 	// archived row (messages, edits, deletions) plus every copied media
-	// file on disk, for every account and every peer.
-	void wipeAll();
+	// file on disk, for every account and every peer. The rows go at once;
+	// the media folders are moved aside (MZGram::SetAsideForWipe) and
+	// returned, for the caller to delete on a background thread.
+	[[nodiscard]] QStringList wipeAll();
 
 	// Export/import for the settings screen. The export is the raw SQLite
 	// file itself, not a separate format. Callers must call

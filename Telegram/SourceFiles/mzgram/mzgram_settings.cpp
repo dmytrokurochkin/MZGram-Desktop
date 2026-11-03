@@ -17,6 +17,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "mzgram/mzgram_ai.h"
 #include "mzgram/mzgram_archive.h"
 #include "mzgram/mzgram_archive_rules.h"
+#include "mzgram/mzgram_archive_wipe.h"
 #include "mzgram/mzgram_lang.h"
 #include "mzgram/mzgram_message_store.h"
 #include "mzgram/mzgram_options.h"
@@ -29,6 +30,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "settings.h"
 #include "ui/boxes/confirm_box.h"
 #include "ui/layers/generic_box.h"
+#include "ui/text/format_values.h"
 #include "ui/toast/toast.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/checkbox.h"
@@ -336,9 +338,8 @@ void BuildArchive(SectionBuilder &builder) {
 		.title = Text("import_archive"),
 		.st = &st::settingsButtonNoIcon,
 		.onClick = [=] {
-			controller->show(Ui::MakeConfirmBox({
-				.text = MZGram::TrNow("import_archive_confirm"),
-				.confirmed = crl::guard(controller, [=] {
+			// The box closes first, then the file dialog opens
+			const auto importArchive = crl::guard(controller, [=] {
 					FileDialog::GetOpenPath(
 						Core::App().getFileDialogParent(),
 						MZGram::TrNow("import_archive_title"),
@@ -360,7 +361,13 @@ void BuildArchive(SectionBuilder &builder) {
 									MZGram::TrNow("archive_import_failed"));
 							}
 						});
-				}),
+			});
+			controller->show(Ui::MakeConfirmBox({
+				.text = MZGram::TrNow("import_archive_confirm"),
+				.confirmed = [=](Fn<void()> close) {
+					close();
+					importArchive();
+				},
 				.confirmText = MZGram::TrNow("import"),
 				.cancelText = Text("button_cancel"),
 				.confirmStyle = &st::attentionBoxButton,
@@ -379,8 +386,24 @@ void BuildArchive(SectionBuilder &builder) {
 		.onClick = [=] {
 			controller->show(Ui::MakeConfirmBox({
 				.text = MZGram::TrNow("clear_archive_confirm"),
-				.confirmed = [=] {
-					MessageStore::Instance().wipeAll();
+				.confirmed = [=](Fn<void()> close) {
+					close();
+					// The rows go at once, the files on a background
+					// thread: gigabytes take minutes to delete
+					const auto aside = MessageStore::Instance().wipeAll();
+					Ui::Toast::Show(MZGram::TrNow("archive_cleared"));
+					if (aside.isEmpty()) {
+						return;
+					}
+					crl::async([=] {
+						const auto removed = MZGram::RemoveWiped(aside);
+						crl::on_main([=] {
+							Ui::Toast::Show(removed.complete
+								? MZGram::TrNow("archive_files_deleted").arg(
+									Ui::FormatSizeText(removed.bytes))
+								: MZGram::TrNow("archive_files_left"));
+						});
+					});
 				},
 				.confirmText = Text("button_delete"),
 				.cancelText = Text("button_cancel"),
@@ -407,7 +430,8 @@ void BuildArchive(SectionBuilder &builder) {
 			const auto session = &controller->session();
 			controller->show(Ui::MakeConfirmBox({
 				.text = MZGram::TrNow("erase_local_database_confirm"),
-				.confirmed = [=] {
+				.confirmed = [=](Fn<void()> close) {
+					close();
 					session->data().cache().clear();
 					session->data().cacheBigFile().clear();
 					Core::Restart();

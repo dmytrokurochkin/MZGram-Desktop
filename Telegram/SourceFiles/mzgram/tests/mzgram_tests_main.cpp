@@ -3524,8 +3524,18 @@ void TestConfirmBoxesClose() {
 		const auto text = QString::fromUtf8(file.readAll()).replace(u"\r\n"_q, u"\n"_q);
 		for (auto at = text.indexOf(u".confirmed = "_q); at >= 0; at = text.indexOf(u".confirmed = "_q, at + 1)) {
 			++count;
-			const auto line = text.mid(at, text.indexOf('\n', at) - at);
-			const auto body = text.mid(at, 300);
+			auto line = text.mid(at, text.indexOf('\n', at) - at);
+			auto body = text.mid(at, 300);
+			// A callback made above: ".confirmed = remove," and
+			// "const auto remove = [=](Fn<void()> close) {"
+			const auto named = QRegularExpression(u"^\\.confirmed = (\\w+),$"_q).match(line.trimmed());
+			if (named.hasMatch()) {
+				const auto made = text.lastIndexOf(u"const auto "_q + named.captured(1) + u" = "_q, at);
+				if (made >= 0) {
+					line = text.mid(made, text.indexOf('\n', made) - made);
+					body = text.mid(made, 300);
+				}
+			}
 			if (!line.contains(u"(Fn<void()> close)"_q) || !body.contains(u"close();"_q)) {
 				problems.push_back(i.fileName() + u": "_q + line.trimmed());
 			}
@@ -3540,8 +3550,8 @@ void TestConfirmBoxesClose() {
 		problems.push_back(u"import archive"_q);
 	}
 	const auto actions = ReadSource("mzgram/mzgram_context_actions.cpp");
-	const auto remove = actions.indexOf(u"delete_downloaded_confirm"_q);
-	if (remove < 0 || !actions.mid(remove, 400).contains(u"(Fn<void()> close)"_q)) {
+	if (!actions.contains(u"const auto remove = [=](Fn<void()> close) {\n\t\t\tclose();"_q)
+		|| !actions.contains(u".confirmed = remove,"_q)) {
 		problems.push_back(u"delete downloaded file"_q);
 	}
 	Check(problems.isEmpty(), "every MZGram confirm box closes after its button", problems.join(u"; "_q).toStdString().c_str());

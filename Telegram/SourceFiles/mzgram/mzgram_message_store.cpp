@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "mzgram/mzgram_message_store.h"
 
+#include "mzgram/mzgram_archive_wipe.h"
+
 #include "mzgram/mzgram_presence_rules.h"
 
 #include "base/unixtime.h"
@@ -140,7 +142,22 @@ bool MessageStore::ensureOpen() {
 	}
 	_opened = true;
 	loadCaches();
+	// What a wipe set aside and did not delete (MZGram was closed first)
+	if (const auto left = MZGram::LeftFromWipe(archiveFolders())
+		; !left.isEmpty()) {
+		crl::async([=] {
+			[[maybe_unused]] const auto removed = MZGram::RemoveWiped(left);
+		});
+	}
 	return true;
+}
+
+QStringList MessageStore::archiveFolders() const {
+	auto result = QStringList{ cWorkingDir() + u"tdata/mzgram/media"_q };
+	if (const auto attachments = attachmentsFolder(); !attachments.isEmpty()) {
+		result.push_back(attachments);
+	}
+	return result;
 }
 
 void MessageStore::loadCaches() {
@@ -515,9 +532,9 @@ void MessageStore::reopenAfterFileReplace() {
 	}
 }
 
-void MessageStore::wipeAll() {
+QStringList MessageStore::wipeAll() {
 	if (!ensureOpen()) {
-		return;
+		return {};
 	}
 	auto query = QSqlQuery(_db);
 	for (const auto table : {
@@ -535,10 +552,9 @@ void MessageStore::wipeAll() {
 			LogFailure("wipeAll", query);
 		}
 	}
-	QDir(cWorkingDir() + u"tdata/mzgram/media/"_q).removeRecursively();
-	if (const auto attachments = attachmentsFolder(); !attachments.isEmpty()) {
-		QDir(attachments).removeRecursively();
-	}
+	// The files can take gigabytes: moved aside now, deleted by the caller
+	// on a background thread
+	return MZGram::SetAsideForWipe(archiveFolders());
 }
 
 void MessageStore::recordLastSeen(uint64 user, TimeId when) {
