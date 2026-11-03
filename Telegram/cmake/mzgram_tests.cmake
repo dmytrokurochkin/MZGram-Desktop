@@ -25,6 +25,8 @@ PRIVATE
     mzgram/mzgram_ai_rules.h
     mzgram/mzgram_archive_rules.cpp
     mzgram/mzgram_archive_rules.h
+    mzgram/mzgram_archive_wipe.cpp
+    mzgram/mzgram_archive_wipe.h
     mzgram/mzgram_branding_rules.cpp
     mzgram/mzgram_branding_rules.h
     mzgram/mzgram_ipc_rules.cpp

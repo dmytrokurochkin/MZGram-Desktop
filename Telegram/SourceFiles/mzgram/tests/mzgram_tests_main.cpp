@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/basic_types.h"
 #include "mzgram/mzgram_ai_rules.h"
 #include "mzgram/mzgram_archive_rules.h"
+#include "mzgram/mzgram_archive_wipe.h"
 #include "mzgram/mzgram_branding_rules.h"
 #include "mzgram/mzgram_ipc_rules.h"
 #include "mzgram/mzgram_lang.h"
@@ -3413,6 +3414,139 @@ void TestMessageMenuItems() {
 	Check(problems.isEmpty(), "message menu: Copy Photo, Delete Downloaded File, Forward without sender, the same items in every chat", problems.join(u", "_q).toStdString().c_str());
 }
 
+// Settings > MZGram > Archive > Clear archive: the folders go aside at once
+// and are deleted on a background thread, with how much was freed; what an
+// earlier wipe left is found again.
+void TestArchiveWipe() {
+	auto problems = QStringList();
+	auto folder = QTemporaryDir();
+	const auto media = folder.filePath(u"tdata/mzgram/media"_q);
+	const auto attachments = folder.filePath(u"Downloads/MZGram/Saved Attachments/"_q);
+	const auto write = [&](const QString &path, const QByteArray &bytes) {
+		QDir().mkpath(QFileInfo(path).absolutePath());
+		auto file = QFile(path);
+		if (!file.open(QIODevice::WriteOnly) || file.write(bytes) != bytes.size()) {
+			problems.push_back(u"the test could not write "_q + path);
+		}
+	};
+	write(media + u"/1/2/2_10.jpg"_q, QByteArray(1000, 'a'));
+	write(media + u"/1/3/3_11.pdf"_q, QByteArray(2000, 'b'));
+	write(attachments + u"5_12.mp4"_q, QByteArray(3000, 'c'));
+	const auto missing = folder.filePath(u"not here"_q);
+	const auto aside = MZGram::SetAsideForWipe({ media, attachments, missing });
+	if (aside.size() != 2) {
+		problems.push_back(u"set aside: %1"_q.arg(aside.join(u", "_q)));
+	}
+	if (QFileInfo::exists(media) || QFileInfo::exists(attachments)) {
+		problems.push_back(u"the folders are still where the archive looks"_q);
+	}
+	for (const auto &path : aside) {
+		if (!QFileInfo(path).isDir() || !path.contains(u".mzgram-deleting-"_q)) {
+			problems.push_back(u"not aside: "_q + path);
+		}
+	}
+	if (MZGram::LeftFromWipe({ media, attachments }).size() != 2) {
+		problems.push_back(u"an unfinished wipe is not found"_q);
+	}
+	const auto removed = MZGram::RemoveWiped(aside);
+	if (removed.files != 3 || removed.bytes != 6000 || !removed.complete) {
+		problems.push_back(u"removed %1 files, %2 bytes, complete %3"_q
+			.arg(removed.files).arg(removed.bytes).arg(removed.complete));
+	}
+	for (const auto &path : aside) {
+		if (QFileInfo::exists(path)) {
+			problems.push_back(u"still on disk: "_q + path);
+		}
+	}
+	if (!MZGram::LeftFromWipe({ media, attachments }).isEmpty()) {
+		problems.push_back(u"left after the wipe"_q);
+	}
+	// A second wipe while the first is still deleting
+	write(media + u"/1/2/2_13.jpg"_q, QByteArray(10, 'd'));
+	const auto first = MZGram::SetAsideForWipe({ media });
+	write(media + u"/1/2/2_14.jpg"_q, QByteArray(10, 'e'));
+	const auto second = MZGram::SetAsideForWipe({ media });
+	if (first.size() != 1 || second.size() != 1 || first == second) {
+		problems.push_back(u"two wipes share a folder"_q);
+	}
+	const auto both = MZGram::RemoveWiped(first + second);
+	if (both.files != 2 || !both.complete) {
+		problems.push_back(u"two wipes: %1 files"_q.arg(both.files));
+	}
+	if (MZGram::RemoveWiped({}).files != 0 || !MZGram::RemoveWiped({}).complete) {
+		problems.push_back(u"nothing to delete"_q);
+	}
+
+	// The button: the box closes, the files go in the background, and the
+	// result is shown; the store sets the folders aside and finishes an
+	// earlier wipe at the start
+	const auto settings = ReadSource("mzgram/mzgram_settings.cpp");
+	const auto start = settings.indexOf(u"u\"mzgram/wipe-archive\"_q"_q);
+	const auto button = (start < 0) ? QString() : settings.mid(start, 1600);
+	for (const auto &needed : {
+			u"(Fn<void()> close)"_q,
+			u"close();"_q,
+			u"MessageStore::Instance().wipeAll()"_q,
+			u"crl::async("_q,
+			u"MZGram::RemoveWiped("_q,
+			u"\"archive_cleared\""_q,
+			u"\"archive_files_deleted\""_q,
+			u"\"archive_files_left\""_q,
+			u"Ui::FormatSizeText("_q,
+		}) {
+		if (!button.contains(needed)) {
+			problems.push_back(u"the button: no "_q + needed);
+		}
+	}
+	const auto store = ReadSource("mzgram/mzgram_message_store.cpp");
+	const auto wipe = store.mid(store.indexOf(u"MessageStore::wipeAll()"_q), 1400);
+	if (!wipe.contains(u"MZGram::SetAsideForWipe("_q) || wipe.contains(u"removeRecursively"_q)) {
+		problems.push_back(u"the store deletes on the main thread"_q);
+	}
+	if (!store.contains(u"MZGram::LeftFromWipe("_q)) {
+		problems.push_back(u"an unfinished wipe stays"_q);
+	}
+	Check(problems.isEmpty(), "clear archive: the files go aside at once and are deleted in the background, the result is shown", problems.join(u", "_q).toStdString().c_str());
+}
+
+// Ui::MakeConfirmBox closes itself only when it has no callback: a callback
+// without the close argument leaves the box open after its button (Clear
+// archive, Import archive and Delete Downloaded File did). Every MZGram box
+// takes close and calls it.
+void TestConfirmBoxesClose() {
+	auto problems = QStringList();
+	auto count = 0;
+	for (auto i = QDirIterator(QString::fromUtf8(MZGRAM_SOURCE_DIR) + u"/mzgram"_q, { u"*.cpp"_q }, QDir::Files); i.hasNext();) {
+		auto file = QFile(i.next());
+		if (i.fileName().startsWith(u"mzgram_tests"_q) || !file.open(QIODevice::ReadOnly)) {
+			continue;
+		}
+		const auto text = QString::fromUtf8(file.readAll()).replace(u"\r\n"_q, u"\n"_q);
+		for (auto at = text.indexOf(u".confirmed = "_q); at >= 0; at = text.indexOf(u".confirmed = "_q, at + 1)) {
+			++count;
+			const auto line = text.mid(at, text.indexOf('\n', at) - at);
+			const auto body = text.mid(at, 300);
+			if (!line.contains(u"(Fn<void()> close)"_q) || !body.contains(u"close();"_q)) {
+				problems.push_back(i.fileName() + u": "_q + line.trimmed());
+			}
+		}
+	}
+	if (count < 7) {
+		problems.push_back(u"only %1 boxes found"_q.arg(count));
+	}
+	const auto settings = ReadSource("mzgram/mzgram_settings.cpp");
+	const auto import = settings.mid(settings.indexOf(u"u\"mzgram/import-archive\"_q"_q), 1600);
+	if (!import.contains(u"(Fn<void()> close)"_q)) {
+		problems.push_back(u"import archive"_q);
+	}
+	const auto actions = ReadSource("mzgram/mzgram_context_actions.cpp");
+	const auto remove = actions.indexOf(u"delete_downloaded_confirm"_q);
+	if (remove < 0 || !actions.mid(remove, 400).contains(u"(Fn<void()> close)"_q)) {
+		problems.push_back(u"delete downloaded file"_q);
+	}
+	Check(problems.isEmpty(), "every MZGram confirm box closes after its button", problems.join(u"; "_q).toStdString().c_str());
+}
+
 } // namespace
 
 int main() {
@@ -3495,6 +3629,8 @@ int main() {
 		TestHiddenSettingsRows,
 		TestUnblockFiles,
 		TestMessageMenuItems,
+		TestArchiveWipe,
+		TestConfirmBoxesClose,
 	};
 	for (const auto &test : tests) {
 		test();

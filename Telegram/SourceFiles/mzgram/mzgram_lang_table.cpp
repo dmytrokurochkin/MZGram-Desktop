@@ -138,6 +138,9 @@ const std::vector<Phrase> kPhrases = {
 		"chat. Does not change the settings above.",
 		"Видаляє всі збережені повідомлення і медіафайли в усіх чатах. "
 		"Не змінює налаштування вище." },
+	{ "archive_cleared", "Archive cleared.", "Архів очищено." },
+	{ "archive_files_deleted", "Archive files deleted, %1 freed.", "Файли архіву видалено, звільнено %1." },
+	{ "archive_files_left", "Some archive files could not be deleted. MZGram will try again at the next start.", "Деякі файли архіву не вдалося видалити. MZGram спробує ще раз під час наступного запуску." },
 
 	// Ghost Mode.
 	{ "ghost_mode", "Ghost mode", "Режим привида" },
