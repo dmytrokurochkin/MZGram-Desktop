@@ -14,6 +14,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/weak_ptr.h"
 #include "core/application.h"
 #include "core/file_utilities.h"
+#include "core/mime_type.h"
 #include "data/data_document.h"
 #include "data/data_document_media.h"
 #include "data/data_file_origin.h"
@@ -31,6 +32,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/boxes/confirm_box.h"
 #include "ui/image/image.h"
 #include "ui/layers/generic_box.h"
+#include "ui/text/format_values.h"
 #include "ui/toast/toast.h"
 #include "ui/vertical_list.h"
 #include "ui/widgets/buttons.h"
@@ -53,11 +55,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <QtCore/QBuffer>
 #include <QtCore/QDir>
+#include <QtCore/QFileInfo>
+#include <QtCore/QPointer>
 #include <QtCore/QFile>
 #include <QtCore/QJsonArray>
 #include <QtCore/QJsonDocument>
 #include <QtCore/QJsonObject>
 #include <QtCore/QRegularExpression>
+#include <QtGui/QPainterPath>
 #include <QtCore/QStandardPaths>
 #include <QtGui/QClipboard>
 #include <QtGui/QGuiApplication>
@@ -264,6 +269,13 @@ public:
 	// Every message the page posts, after the window handled it.
 	void setObserver(Fn<void(QByteArray)> observer);
 
+	// The tests: the text is in and the files are ready, the status, the
+	// chooser's title, and its Add pressed.
+	[[nodiscard]] bool filesReadyForTest() const;
+	[[nodiscard]] QString statusForTest() const;
+	[[nodiscard]] QString filesTitleForTest() const;
+	bool addFilesForTest();
+
 	[[nodiscard]] rpl::producer<> closeRequests() const;
 	[[nodiscard]] rpl::lifetime &lifetime() {
 		return _lifetime;
@@ -280,7 +292,16 @@ private:
 	bool allowNavigation(const QString &url, bool newWindow);
 	void startLoading();
 	void checkLoading();
-	void attach();
+	void filesStatus();
+	[[nodiscard]] int readyCount() const;
+	void chooseFiles(Pick pick);
+	void filesBox(
+		not_null<Ui::GenericBox*> box,
+		std::vector<int> rows,
+		Pick pick);
+	[[nodiscard]] QImage thumbOf(int index) const;
+	void chooseOther(Pick pick);
+	void giveFiles(const std::vector<Attachment> &files);
 	void saveFiles();
 	[[nodiscard]] bool loadingDone() const;
 
@@ -305,7 +326,12 @@ private:
 	std::vector<bool> _failed;
 	bool _insertOnLoad = false;
 	bool _textInserted = false;
-	bool _attachSent = false;
+	// The files not given to the site yet, indices into the attachments.
+	std::vector<int> _remaining;
+	int _given = 0;
+	QPointer<Ui::BoxContent> _filesBox;
+	QString _filesTitle;
+	Fn<void()> _addFiles;
 	Fn<void(QByteArray)> _observer;
 	rpl::event_stream<> _closeRequests;
 	rpl::lifetime _lifetime;
@@ -435,6 +461,8 @@ void AiWindow::setupWebview() {
 		}
 	}, _container->lifetime());
 	raw->widget()->show();
+	// The site's button for adding files opens MZGram's chooser
+	raw->init(PickerHookScript());
 
 	raw->setNavigationPolicyHandler([=](const QString &url, bool newWindow) {
 		return allowNavigation(url, newWindow);
@@ -496,7 +524,14 @@ void AiWindow::show(Provider provider, Collected request) {
 	_provider = provider;
 	_request = std::move(request);
 	_textInserted = false;
-	_attachSent = false;
+	_given = 0;
+	_remaining.clear();
+	for (auto i = 0; i != int(_request.attachments.size()); ++i) {
+		_remaining.push_back(i);
+	}
+	if (_filesBox) {
+		_filesBox->closeBox();
+	}
 	_waiting.cancel();
 	_panel->setTitle(rpl::single(Name(_provider)));
 	const auto hasText = !_request.text.isEmpty();
@@ -635,37 +670,380 @@ void AiWindow::checkLoading() {
 		return;
 	}
 	_loading.cancel();
-	attach();
+	filesStatus();
 }
 
-// The attachments into the page once both they and the text are there.
-void AiWindow::attach() {
-	if (_attachSent
-		|| !_textInserted
-		|| !_webview
-		|| _request.attachments.empty()
-		|| !loadingDone()) {
+int AiWindow::readyCount() const {
+	auto result = 0;
+	for (const auto i : _remaining) {
+		if (!_request.attachments[i].bytes.isEmpty()) {
+			++result;
+		}
+	}
+	return result;
+}
+
+// Once the text is in and the files are downloaded: how to add them.
+void AiWindow::filesStatus() {
+	if (!_textInserted || !loadingDone()) {
+		return;
+	} else if (_given > 0) {
+		setStatus(_remaining.empty()
+			? TrNow("ai_status_attached").arg(_given)
+			: TrNow("ai_status_one_by_one").arg(readyCount()));
+	} else if (const auto ready = readyCount()) {
+		setStatus(TrNow("ai_status_press_add").arg(ready));
+	} else {
+		setStatus(TrNow("ai_status_inserted"));
+	}
+}
+
+// The site's button for adding files was pressed: MZGram's chooser with
+// the files of the messages, or the computer's dialog when there are none.
+void AiWindow::chooseFiles(Pick pick) {
+	if (_filesBox) {
 		return;
 	}
-	_attachSent = true;
+	auto rows = std::vector<int>();
+	for (const auto i : _remaining) {
+		if (!_failed[i]) {
+			rows.push_back(i);
+		}
+	}
+	if (rows.empty()) {
+		chooseOther(pick);
+		return;
+	}
+	auto box = Box([=](not_null<Ui::GenericBox*> box) {
+		filesBox(box, rows, pick);
+	});
+	_filesBox = box.data();
+	// The page is a window of its own above the panel: away while the
+	// chooser is shown
+	const auto widget = _webview ? _webview->widget() : nullptr;
+	if (widget) {
+		widget->hide();
+	}
+	_panel->showBox(
+		std::move(box),
+		Ui::LayerOption::KeepOther,
+		anim::type::normal);
+}
+
+void AiWindow::filesBox(
+		not_null<Ui::GenericBox*> box,
+		std::vector<int> rows,
+		Pick pick) {
+	struct State {
+		std::vector<Ui::Checkbox*> checks;
+		std::vector<bool> allowed;
+		std::vector<bool> wanted;
+		std::vector<bool> ready;
+		std::vector<QImage> thumbs;
+		rpl::variable<int> count;
+		base::Timer timer;
+		bool answered = false;
+	};
+	const auto state = box->lifetime().make_state<State>();
+	const auto count = int(rows.size());
+	_filesTitle = TrNow("ai_files_title").arg(Name(_provider));
+	box->setTitle(rpl::single(_filesTitle));
+	box->setWidth(st::boxWideWidth);
+	box->addRow(object_ptr<Ui::FlatLabel>(
+		box,
+		Tr("ai_files_hint"),
+		st::boxDividerLabel));
+	Ui::AddSkip(box->verticalLayout());
+
+	const auto ready = [=](int k) {
+		return !_request.attachments[rows[k]].bytes.isEmpty();
+	};
+	const auto label = [=](int k) {
+		const auto &file = _request.attachments[rows[k]];
+		return file.name + u" \u00B7 "_q + (ready(k)
+			? Ui::FormatSizeText(file.bytes.size())
+			: TrNow("ai_files_downloading"));
+	};
+	const auto recount = [=] {
+		auto result = 0;
+		for (auto k = 0; k != count; ++k) {
+			const auto on = state->allowed[k]
+				&& state->ready[k]
+				&& state->wanted[k];
+			if (state->checks[k]->checked() != on) {
+				state->checks[k]->setChecked(
+					on,
+					Ui::Checkbox::NotifyAboutChange::DontNotify);
+			}
+			result += on ? 1 : 0;
+		}
+		state->count = result;
+	};
+	const auto size = style::ConvertScale(44);
+	const auto height = style::ConvertScale(52);
+	const auto left = size + style::ConvertScale(14);
+	auto notAllowed = false;
+	for (auto k = 0; k != count; ++k) {
+		const auto &file = _request.attachments[rows[k]];
+		const auto allowed = AcceptsFile(pick.accept, file.name, file.mime);
+		notAllowed |= !allowed;
+		state->allowed.push_back(allowed);
+		state->wanted.push_back(allowed);
+		state->ready.push_back(ready(k));
+		state->thumbs.push_back(QImage());
+		if (const auto &view = _documentViews[rows[k]]) {
+			view->thumbnailWanted(file.origin);
+		}
+		const auto row = box->addRow(object_ptr<Ui::RpWidget>(box));
+		row->resize(row->width(), height);
+		const auto check = Ui::CreateChild<Ui::Checkbox>(
+			row,
+			label(k),
+			false,
+			st::defaultBoxCheckbox);
+		check->setDisabled(!allowed || !state->ready[k]);
+		state->checks.push_back(check);
+		check->checkedChanges() | rpl::on_next([=](bool checked) {
+			if (state->allowed[k] && state->ready[k]) {
+				state->wanted[k] = checked;
+			}
+			recount();
+		}, check->lifetime());
+		row->widthValue() | rpl::on_next([=](int width) {
+			check->resizeToNaturalWidth(std::max(width - left, 1));
+			check->moveToLeft(left, (height - check->height()) / 2, width);
+		}, row->lifetime());
+		row->paintRequest() | rpl::on_next([=] {
+			auto p = QPainter(row);
+			p.setRenderHint(QPainter::Antialiasing);
+			p.setOpacity(allowed ? 1. : 0.5);
+			const auto rect = QRect(0, (height - size) / 2, size, size);
+			const auto radius = style::ConvertScale(6);
+			auto path = QPainterPath();
+			path.addRoundedRect(rect, radius, radius);
+			auto &thumb = state->thumbs[k];
+			if (thumb.isNull()) {
+				thumb = thumbOf(rows[k]);
+			}
+			if (!thumb.isNull()) {
+				const auto ratio = row->devicePixelRatioF();
+				auto scaled = thumb.scaled(
+					rect.size() * ratio,
+					Qt::KeepAspectRatioByExpanding,
+					Qt::SmoothTransformation);
+				const auto from = QRect(
+					(scaled.width() - int(size * ratio)) / 2,
+					(scaled.height() - int(size * ratio)) / 2,
+					int(size * ratio),
+					int(size * ratio));
+				p.setClipPath(path);
+				p.drawImage(rect, scaled, from);
+				p.setClipping(false);
+			} else {
+				const auto &name = _request.attachments[rows[k]].name;
+				const auto dot = name.lastIndexOf('.');
+				const auto ext = (dot >= 0 && name.size() - dot <= 5)
+					? name.mid(dot + 1).toUpper()
+					: QString();
+				p.fillPath(path, st::windowBgActive);
+				p.setPen(st::windowFgActive);
+				p.setFont(st::semiboldFont);
+				p.drawText(rect, Qt::AlignCenter, ext);
+			}
+		}, row->lifetime());
+	}
+	recount();
+
+	if (notAllowed) {
+		box->addRow(object_ptr<Ui::FlatLabel>(
+			box,
+			Tr("ai_files_photos_only"),
+			st::boxDividerLabel));
+	}
+	if (const auto left = LeftOutText(_request.choice); !left.isEmpty()) {
+		box->addRow(object_ptr<Ui::FlatLabel>(
+			box,
+			rpl::single(left),
+			st::boxDividerLabel));
+	}
+
+	// The downloads still going
+	state->timer.setCallback([=] {
+		auto waiting = false;
+		for (auto k = 0; k != count; ++k) {
+			if (!state->ready[k] && ready(k)) {
+				state->ready[k] = true;
+				state->checks[k]->setText(label(k));
+				state->checks[k]->setDisabled(!state->allowed[k]);
+			}
+			waiting |= !state->ready[k] && state->allowed[k];
+			if (state->thumbs[k].isNull()) {
+				box->update();
+			}
+		}
+		recount();
+		if (!waiting) {
+			state->timer.cancel();
+		}
+	});
+	state->timer.callEach(500);
+
+	const auto add = [=] {
+		auto checked = std::vector<int>();
+		for (auto k = 0; k != count; ++k) {
+			if (state->checks[k]->checked()) {
+				checked.push_back(rows[k]);
+			}
+		}
+		if (checked.empty() || state->answered) {
+			return;
+		}
+		state->answered = true;
+		const auto give = GiveFiles(checked, pick.multiple);
+		_remaining = give.later;
+		_given += int(give.now.size());
+		auto files = std::vector<Attachment>();
+		for (const auto i : give.now) {
+			files.push_back(_request.attachments[i]);
+		}
+		box->closeBox();
+		giveFiles(files);
+	};
+	_addFiles = add;
+	box->addButton(rpl::combine(
+		Tr("ai_files_add"),
+		state->count.value()
+	) | rpl::map([](QString text, int count) {
+		return text.arg(count);
+	}), add);
+	box->addButton(Tr("button_cancel"), [=] {
+		box->closeBox();
+	});
+	box->addLeftButton(Tr("ai_files_other"), [=] {
+		state->answered = true;
+		box->closeBox();
+		crl::on_main(_body, [=] {
+			chooseOther(pick);
+		});
+	});
+	box->boxClosing() | rpl::on_next([=] {
+		_addFiles = nullptr;
+		if (!state->answered && _webview) {
+			_webview->eval(CancelPickScript());
+		}
+		if (const auto widget = _webview ? _webview->widget() : nullptr) {
+			widget->show();
+		}
+	}, box->lifetime());
+}
+
+// The small picture of a row: the thumbnail Telegram already has, or a
+// picture from the file itself when it is small; nothing big is decoded.
+QImage AiWindow::thumbOf(int index) const {
+	const auto &file = _request.attachments[index];
+	if (const auto &view = _photoViews[index]) {
+		for (const auto size : {
+				Data::PhotoSize::Thumbnail,
+				Data::PhotoSize::Small,
+				Data::PhotoSize::Large }) {
+			if (const auto image = view->image(size)) {
+				return image->original();
+			}
+		}
+	} else if (const auto &view = _documentViews[index]) {
+		if (const auto image = view->thumbnail()) {
+			return image->original();
+		}
+	}
+	constexpr auto kSmallPicture = 4 * 1024 * 1024;
+	if (file.mime.startsWith(u"image/"_q)
+		&& !file.bytes.isEmpty()
+		&& file.bytes.size() <= kSmallPicture) {
+		return QImage::fromData(file.bytes);
+	}
+	return QImage();
+}
+
+// Another file of the computer, by its own dialog.
+void AiWindow::chooseOther(Pick pick) {
+	const auto done = crl::guard(_body, [=](
+			const FileDialog::OpenResult &result) {
+		auto files = std::vector<Attachment>();
+		for (const auto &path : result.paths) {
+			auto file = QFile(path);
+			if (file.size() > kMaxAttachmentSize
+				|| !file.open(QIODevice::ReadOnly)) {
+				continue;
+			}
+			const auto info = QFileInfo(path);
+			files.push_back({
+				.name = info.fileName(),
+				.mime = Core::MimeTypeForFile(info).name(),
+				.bytes = file.readAll(),
+			});
+			if (!pick.multiple) {
+				break;
+			}
+		}
+		if (files.empty()) {
+			eval(CancelPickScript());
+		} else {
+			giveFiles(files);
+		}
+	});
+	const auto failed = crl::guard(_body, [=] {
+		eval(CancelPickScript());
+	});
+	const auto open = pick.multiple
+		? FileDialog::GetOpenPaths
+		: FileDialog::GetOpenPath;
+	open(
+		_panel.get(),
+		TrNow("ai_files_other"),
+		FileDialog::AllFilesFilter(),
+		done,
+		failed);
+}
+
+// The files to the input the site opened, as its dialog would give them.
+void AiWindow::giveFiles(const std::vector<Attachment> &files) {
+	if (!_webview) {
+		return;
+	}
 	auto index = 0;
-	for (const auto &attachment : _request.attachments) {
-		if (attachment.bytes.isEmpty()) {
+	for (const auto &file : files) {
+		if (file.bytes.isEmpty()) {
 			continue;
 		}
-		_webview->eval(FileStartScript(index, attachment.name, attachment.mime));
-		for (auto from = 0; from < attachment.bytes.size(); from += kChunkSize) {
+		_webview->eval(FileStartScript(index, file.name, file.mime));
+		for (auto from = 0; from < file.bytes.size(); from += kChunkSize) {
 			_webview->eval(FileChunkScript(
 				index,
-				attachment.bytes.mid(from, kChunkSize)));
+				file.bytes.mid(from, kChunkSize)));
 		}
 		++index;
 	}
-	if (!index) {
-		setStatus(TrNow("ai_status_no_attach"));
-		return;
+	_webview->eval(GiveFilesScript());
+}
+
+bool AiWindow::filesReadyForTest() const {
+	return _textInserted && loadingDone();
+}
+
+QString AiWindow::statusForTest() const {
+	return _statusText.current();
+}
+
+QString AiWindow::filesTitleForTest() const {
+	return _filesTitle;
+}
+
+bool AiWindow::addFilesForTest() {
+	if (const auto add = _addFiles) {
+		add();
+		return true;
 	}
-	_webview->eval(AttachScript(_provider));
+	return false;
 }
 
 // The downloaded attachments into the Downloads folder, to add them by hand.
@@ -703,10 +1081,16 @@ void AiWindow::setStatus(const QString &text) {
 }
 
 void AiWindow::handleMessage(const QByteArray &message) {
-	if (const auto attached = ParseAttach(message)) {
-		setStatus(attached->attached
-			? TrNow("ai_status_attached").arg(attached->count)
-			: TrNow("ai_status_no_attach"));
+	if (const auto pick = ParsePick(message)) {
+		chooseFiles(*pick);
+	} else if (const auto given = ParseGiven(message)) {
+		if (!*given) {
+			setStatus(TrNow("ai_status_no_attach"));
+		} else if (_given > 0) {
+			filesStatus();
+		} else {
+			setStatus(TrNow("ai_status_attached").arg(*given));
+		}
 	} else {
 		switch (ParseStatus(message)) {
 		case Status::Inserted:
@@ -714,8 +1098,8 @@ void AiWindow::handleMessage(const QByteArray &message) {
 			_textInserted = true;
 			if (_request.attachments.empty()) {
 				setStatus(TrNow("ai_status_inserted"));
-			} else if (loadingDone()) {
-				attach();
+			} else {
+				filesStatus();
 			}
 			break;
 		case Status::NoField:
@@ -779,7 +1163,9 @@ void Open(
 		return;
 	}
 	controller->show(Ui::MakeConfirmBox({
-		.text = TrNow("ai_privacy_text").arg(Name(provider)),
+		.text = TrNow("ai_privacy_text").arg(Name(provider))
+			+ u"\n\n"_q
+			+ TrNow("ai_warning_files"),
 		.confirmed = [=](Fn<void()> close) {
 			OptionAiWarned.set(true);
 			close();
@@ -1002,9 +1388,12 @@ void StartTestHook() {
 #ifdef MZGRAM_TEST_HOOKS
 	// The AI window test of the Windows CI (mzgram_ai_window_test.ps1):
 	// the window of every site in turn, on a local page with an input field
-	// like the site's, a file input (Gemini: none, its field takes a paste)
-	// and a Send button that marks a send. Two files go with the text. Only
-	// a build configured with MZGRAM_TEST_HOOKS has it.
+	// like the site's, its button for adding files (a file input in the
+	// page, Claude's with a label for it; Gemini's makes one when pressed)
+	// and a Send button that marks a send. The text goes in by itself, the
+	// files do not: the site's button opens MZGram's chooser, whose Add
+	// gives both files at once. Then a field that takes one file at a time.
+	// Only a build configured with MZGRAM_TEST_HOOKS has it.
 	if (qEnvironmentVariableIsEmpty("MZGRAM_TEST_AI")) {
 		return;
 	}
@@ -1025,21 +1414,33 @@ void StartTestHook() {
 		}
 		return QByteArray();
 	};
-	const auto page = [=](const ProviderInfo &info) -> QByteArray {
+	const auto page = [=](const ProviderInfo &info, bool multiple) {
 		const auto input = (info.id == Provider::Gemini)
 			? QByteArray()
-			: QByteArray("<input type=\"file\" id=\"files\" multiple "
-				"style=\"display:none\">");
+			: (QByteArray("<input type=\"file\" id=\"files\" ")
+				+ (multiple ? "multiple " : "")
+				+ "style=\"display:none\">");
+		const auto label = (info.id == Provider::Claude)
+			? QByteArray("<label for=\"files\" id=\"label\">Attach</label>")
+			: QByteArray();
 		return "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><style>"
 			"textarea,[contenteditable]{display:block;width:600px;"
 			"min-height:80px;border:1px solid #888}</style></head><body>"
-			"<form id=\"form\">" + field(info) + input + "<button id=\"send\" "
-			"type=\"submit\">Send</button></form><script>"
+			"<form id=\"form\">" + field(info) + input + label
+			+ "<button id=\"plus\" type=\"button\">+</button>"
+			"<button id=\"send\" type=\"submit\">Send</button></form><script>"
 			"window.mzgramSent=false;window.mzgramFiles=[];"
-			"const record=(list)=>{window.mzgramFiles=Array.from(list)"
-			".map(f=>f.name+':'+f.size);};"
+			"window.mzgramChanges=0;"
+			"const record=(list)=>{window.mzgramChanges++;"
+			"window.mzgramFiles=window.mzgramFiles.concat(Array.from(list)"
+			".map(f=>f.name+':'+f.size));};"
 			"const files=document.getElementById('files');"
 			"if(files){files.addEventListener('change',()=>record(files.files));}"
+			"document.getElementById('plus').addEventListener('click',()=>{"
+			"let input=files;if(!input){input=document.createElement('input');"
+			"input.type='file';input.multiple=true;"
+			"input.addEventListener('change',()=>record(input.files));}"
+			"input.click();});"
 			"document.addEventListener('paste',e=>{if(e.clipboardData"
 			"&&e.clipboardData.files.length){record(e.clipboardData.files);"
 			"e.preventDefault();}},true);"
@@ -1051,12 +1452,23 @@ void StartTestHook() {
 			"{window.mzgramSent=true;}},true);"
 			"</script></body></html>";
 	};
+	// The site's button for adding files, pressed: Claude's label, else
+	// the button
+	const auto press = [](const ProviderInfo &info) -> QByteArray {
+		return (info.id == Provider::Claude)
+			? "document.getElementById('label').click();"
+			: "document.getElementById('plus').click();";
+	};
+	const auto before = QByteArray(
+		"window.external.invoke(JSON.stringify({mzgram_ai_before:"
+		"window.mzgramFiles.length}));");
 	const auto check = [](const ProviderInfo &info) -> QByteArray {
 		return "(function(){const e=document.querySelector("
 			+ ScriptString(QString::fromLatin1(info.inputSelectors.front()))
 			+ ");window.external.invoke(JSON.stringify({mzgram_ai_test:{"
 			"value:e?((e.tagName==='TEXTAREA')?e.value:e.innerText):null,"
 			"files:window.mzgramFiles,"
+			"changes:window.mzgramChanges,"
 			"sent:window.mzgramSent===true}}));})();";
 	};
 	const auto text = ComposeText(
@@ -1088,7 +1500,9 @@ void StartTestHook() {
 	const auto run = std::make_shared<Fn<void(int)>>();
 	*run = [=](int index) {
 		const auto &providers = Providers();
-		if (index >= int(providers.size())) {
+		// The five sites, then DeepSeek's field taking one file at a time
+		const auto oneByOne = (index == int(providers.size()));
+		if (index > int(providers.size())) {
 			CloseWindow();
 			LOG(("MZGram AI test: done"));
 			base::call_delayed(1000, [] {
@@ -1096,9 +1510,13 @@ void StartTestHook() {
 			});
 			return;
 		}
-		const auto &info = providers[index];
+		const auto &info = oneByOne
+			? Info(Provider::DeepSeek)
+			: providers[index];
 		const auto key = QString::fromLatin1(info.key);
 		const auto finished = std::make_shared<bool>(false);
+		const auto started = std::make_shared<bool>(false);
+		const auto gives = std::make_shared<int>(0);
 		const auto finish = [=](const QString &result) {
 			if (*finished) {
 				return;
@@ -1113,7 +1531,10 @@ void StartTestHook() {
 				});
 			});
 		};
-		const auto window = OpenWindow(info.id, request(), page(info));
+		const auto window = OpenWindow(
+			info.id,
+			request(),
+			page(info, !oneByOne));
 		if (!window->created()) {
 			const auto available = Webview::Availability();
 			finish(u"FAIL %1: no webview (%2, %3)"_q
@@ -1126,42 +1547,101 @@ void StartTestHook() {
 			).arg(key
 			).arg(QString::fromLatin1(info.startUrl)
 			).arg(InsertScript(info.id, text).size()));
+		// Once the text is in and the files are ready: nothing is in the
+		// page yet, the window says to press the site's button
+		const auto waitReady = std::make_shared<Fn<void()>>();
+		*waitReady = [=] {
+			if (*finished) {
+				return;
+			} else if (!window->filesReadyForTest()) {
+				base::call_delayed(300, *waitReady);
+				return;
+			}
+			const auto status = TrNow("ai_status_press_add").arg(2);
+			if (window->statusForTest() != status) {
+				finish(u"FAIL %1: the status is \"%2\""_q
+					.arg(key)
+					.arg(window->statusForTest()));
+				return;
+			}
+			window->eval(before);
+		};
 		window->setObserver([=](QByteArray message) {
-			if (const auto attached = ParseAttach(message)) {
-				if (!attached->attached) {
-					finish(u"FAIL %1: no place for the files"_q.arg(key));
+			if (ParsePick(message)) {
+				crl::on_main([=] {
+					if (*finished) {
+						return;
+					}
+					const auto title = TrNow("ai_files_title").arg(Name(info.id));
+					if (window->filesTitleForTest() != title) {
+						finish(u"FAIL %1: the chooser is \"%2\""_q
+							.arg(key)
+							.arg(window->filesTitleForTest()));
+					} else if (!window->addFilesForTest()) {
+						finish(u"FAIL %1: no chooser"_q.arg(key));
+					}
+				});
+				return;
+			} else if (const auto given = ParseGiven(message)) {
+				LOG(("MZGram AI test: %1 files given by chooser: %2"
+					).arg(key
+					).arg(*given));
+				if (oneByOne && ++*gives == 1) {
+					const auto status = TrNow("ai_status_one_by_one").arg(1);
+					if (*given != 1 || window->statusForTest() != status) {
+						finish(u"FAIL one file at a time: %1, \"%2\""_q
+							.arg(*given)
+							.arg(window->statusForTest()));
+					} else {
+						window->eval(press(info));
+					}
 					return;
 				}
-				LOG(("MZGram AI test: %1 files given by %2: %3"
-					).arg(key
-					).arg(attached->how
-					).arg(attached->count));
 				window->eval(check(info));
 				return;
 			} else if (ParseStatus(message) == Status::NoField) {
 				finish(u"FAIL %1: no input field"_q.arg(key));
 				return;
+			} else if (ParseStatus(message) == Status::Inserted) {
+				if (!*started) {
+					*started = true;
+					(*waitReady)();
+				}
+				return;
 			}
-			const auto result = QJsonDocument::fromJson(message).object().value(
-				u"mzgram_ai_test"_q).toObject();
+			const auto object = QJsonDocument::fromJson(message).object();
+			if (object.contains(u"mzgram_ai_before"_q)) {
+				if (object.value(u"mzgram_ai_before"_q).toInt() != 0) {
+					finish(u"FAIL %1: files in the page by themselves"_q.arg(key));
+				} else {
+					window->eval(press(info));
+				}
+				return;
+			}
+			const auto result = object.value(u"mzgram_ai_test"_q).toObject();
 			if (result.isEmpty()) {
 				return;
 			}
 			const auto value = result.value(u"value"_q).toString();
 			const auto sent = result.value(u"sent"_q).toBool();
+			const auto changes = result.value(u"changes"_q).toInt();
 			auto files = QStringList();
 			for (const auto &file : result.value(u"files"_q).toArray()) {
 				files.push_back(file.toString());
 			}
 			if (value.simplified() == text.simplified()
 				&& files == expectedFiles
+				&& changes == (oneByOne ? 2 : 1)
 				&& !sent) {
-				finish(u"PASS %1: the field has the text, 2 files attached, nothing sent"_q.arg(key));
+				finish(oneByOne
+					? u"PASS one file at a time"_q
+					: u"PASS %1: the field has the text, 2 files attached, nothing sent"_q.arg(key));
 			} else {
-				finish(u"FAIL %1: the field has \"%2\", files %3, sent %4"_q
+				finish(u"FAIL %1: the field has \"%2\", files %3 in %4, sent %5"_q
 					.arg(key)
 					.arg(value)
 					.arg(files.join(u", "_q))
+					.arg(changes)
 					.arg(sent ? u"yes"_q : u"no"_q));
 			}
 		});

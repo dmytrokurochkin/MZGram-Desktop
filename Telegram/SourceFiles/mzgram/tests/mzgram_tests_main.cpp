@@ -2915,6 +2915,15 @@ void TestAiTexts() {
 		"ai_status_no_attach",
 		"ai_save_files",
 		"ai_files_saved",
+		"ai_warning_files",
+		"ai_files_title",
+		"ai_files_hint",
+		"ai_files_add",
+		"ai_files_other",
+		"ai_files_photos_only",
+		"ai_files_downloading",
+		"ai_status_press_add",
+		"ai_status_one_by_one",
 		"ai_menu_buttons",
 		"ai_menu_buttons_info",
 		"section_other",
@@ -3005,8 +3014,39 @@ void TestAiIsWired() {
 	if (!ai.contains(u"if (OptionAiWarned.value()) {"_q) || ai.contains(u"ai_privacy_note"_q)) {
 		problems.push_back(u"the warning is not once"_q);
 	}
-	if (!ai.contains(u"AttachScript(_provider)"_q) || !ai.contains(u"FileChunkScript("_q)) {
-		problems.push_back(u"the attachments do not go to the page"_q);
+	// The files go only by the site's own button for adding files and
+	// MZGram's chooser: nothing is put into the page by itself
+	for (const auto needed : {
+			"raw->init(PickerHookScript());",
+			"ParsePick(message)",
+			"ParseGiven(message)",
+			"GiveFiles(checked, pick.multiple)",
+			"AcceptsFile(pick.accept, file.name, file.mime)",
+			"FileChunkScript(",
+			"_webview->eval(GiveFilesScript());",
+			"FileDialog::GetOpenPaths",
+			"Tr(\"ai_files_other\")",
+			"TrNow(\"ai_files_title\").arg(Name(_provider))",
+			"TrNow(\"ai_status_press_add\")",
+			"TrNow(\"ai_status_one_by_one\")",
+			"TrNow(\"ai_warning_files\")",
+			"widget->hide();",
+			"new Ui::Checkbox" }) {
+		if (!ai.contains(QString::fromLatin1(needed))
+			&& !(QByteArray(needed) == "new Ui::Checkbox"
+				&& ai.contains(u"Ui::CreateChild<Ui::Checkbox>("_q))) {
+			problems.push_back(u"the chooser: no "_q + QString::fromLatin1(needed));
+		}
+	}
+	for (const auto never : { "AttachScript", "ParseAttach", "ClipboardEvent", "SendInput", "QClipboard::setMimeData", "setMimeData(" }) {
+		if (ai.contains(QString::fromLatin1(never))) {
+			problems.push_back(u"the files by themselves: "_q + QString::fromLatin1(never));
+		}
+	}
+	// The files given by the chooser are what the attachments are: at most
+	// kMaxAttachments, thumbnails only from small pictures
+	if (!ai.contains(u"kSmallPicture = 4 * 1024 * 1024"_q)) {
+		problems.push_back(u"the thumbnails decode big pictures"_q);
 	}
 	if (!ReadSource("core/application.cpp").contains(u"MZGram::Ai::StartTestHook()"_q)) {
 		problems.push_back(u"the test hook is never started"_q);
@@ -3105,8 +3145,9 @@ void TestAiChooseAttachments() {
 	Check(problems.isEmpty(), "ai: at most 10 attachments, the rest counted by reason", problems.join(u", "_q).toStdString().c_str());
 }
 
-// The files go into the page in pieces and then to the site's file input
-// or as a paste into its field; nothing presses a key or a button.
+// The site's button for adding files opens MZGram's chooser in place of the
+// browser's dialog; the chosen files go into the page in pieces and then to
+// that input. Nothing presses a key or a button, nothing is sent.
 void TestAiFileScripts() {
 	using namespace MZGram::Ai;
 	auto problems = QStringList();
@@ -3127,55 +3168,141 @@ void TestAiFileScripts() {
 		|| !chunk.contains(u"[3].parts.push("_q)) {
 		problems.push_back(u"chunk: "_q + chunk);
 	}
-	for (const auto &info : Providers()) {
-		const auto script = QString::fromLatin1(AttachScript(info.id));
-		const auto label = QString::fromLatin1(info.key);
-		for (const auto needed : { "input[type=\"file\"]", "new DataTransfer()", "ClipboardEvent('paste'", "'change'", "'attached'", "'no_attach_target'", "atob(" }) {
-			if (!script.contains(QString::fromLatin1(needed))) {
-				problems.push_back(label + u": no "_q + QString::fromLatin1(needed));
-			}
+	const auto never = {
+		"submit", "keydown", "KeyboardEvent", "Enter", "fetch(",
+		"XMLHttpRequest", "ClipboardEvent", "clipboard", "requestSubmit",
+	};
+	const auto hook = QString::fromLatin1(PickerHookScript());
+	for (const auto needed : {
+			"HTMLInputElement.prototype.click",
+			"HTMLInputElement.prototype.showPicker",
+			"addEventListener('click'",
+			"node.control",
+			"e.preventDefault()",
+			"mzgram_ai: 'pick'",
+			"multiple: !!input.multiple",
+			"accept: input.accept",
+			"window.__mzgramAiPick = input",
+			"window.external.invoke(" }) {
+		if (!hook.contains(QString::fromLatin1(needed))) {
+			problems.push_back(u"hook: no "_q + QString::fromLatin1(needed));
 		}
-		for (const auto never : { "click(", "submit", "keydown", "KeyboardEvent", "Enter", "fetch(", "XMLHttpRequest" }) {
-			if (script.contains(QString::fromLatin1(never))) {
-				problems.push_back(label + u": "_q + QString::fromLatin1(never));
-			}
+	}
+	for (const auto bad : never) {
+		if (hook.contains(QString::fromLatin1(bad))) {
+			problems.push_back(u"hook: "_q + QString::fromLatin1(bad));
 		}
-		for (const auto selector : info.inputSelectors) {
-			if (!script.contains(QString::fromLatin1(ScriptString(QString::fromLatin1(selector))))) {
-				problems.push_back(label + u": no field "_q + QString::fromLatin1(selector));
-			}
+	}
+	if (hook.contains(u"dispatchEvent"_q)) {
+		problems.push_back(u"hook: makes events"_q);
+	}
+	const auto give = QString::fromLatin1(GiveFilesScript());
+	for (const auto needed : {
+			"window.__mzgramAiPick",
+			"new DataTransfer()",
+			"input.files = data.files",
+			"new Event('change'",
+			"new Event('input'",
+			"mzgram_ai: 'given'",
+			"atob(" }) {
+		if (!give.contains(QString::fromLatin1(needed))) {
+			problems.push_back(u"give: no "_q + QString::fromLatin1(needed));
 		}
+	}
+	for (const auto bad : never) {
+		if (give.contains(QString::fromLatin1(bad))) {
+			problems.push_back(u"give: "_q + QString::fromLatin1(bad));
+		}
+	}
+	if (give.contains(u"click("_q)) {
+		problems.push_back(u"give: clicks"_q);
+	}
+	const auto cancel = QString::fromLatin1(CancelPickScript());
+	if (!cancel.contains(u"'cancel'"_q) || cancel.contains(u"click("_q)) {
+		problems.push_back(u"cancel: "_q + cancel);
 	}
 	if (kChunkSize > 1024 * 1024) {
 		problems.push_back(u"pieces too large for one script"_q);
 	}
-	Check(problems.isEmpty(), "ai: the files go in pieces, then to the file input or a paste, never sent", problems.join(u", "_q).toStdString().c_str());
+	Check(problems.isEmpty(), "ai: the site's button opens MZGram's chooser, the files go in pieces to that input, never sent", problems.join(u", "_q).toStdString().c_str());
 }
 
-void TestAiParseAttach() {
+// All the checked files at once to an input that takes several; to one
+// that takes one file, one at a press of the site's button. The input's
+// accept list decides which files it takes.
+void TestAiGiveFiles() {
 	using namespace MZGram::Ai;
 	auto problems = QStringList();
-	const auto input = ParseAttach("{\"mzgram_ai\":\"attached\",\"how\":\"input\",\"count\":3}");
-	if (!input || !input->attached || input->how != u"input"_q || input->count != 3) {
-		problems.push_back(u"input"_q);
+	const auto all = GiveFiles({ 3, 1, 4 }, true);
+	if (all.now != std::vector<int>{ 3, 1, 4 } || !all.later.empty()) {
+		problems.push_back(u"several at once"_q);
 	}
-	const auto paste = ParseAttach("{\"mzgram_ai\":\"attached\",\"how\":\"paste\",\"count\":1}");
-	if (!paste || !paste->attached || paste->how != u"paste"_q || paste->count != 1) {
-		problems.push_back(u"paste"_q);
+	const auto one = GiveFiles({ 3, 1, 4 }, false);
+	if (one.now != std::vector<int>{ 3 } || one.later != std::vector<int>{ 1, 4 }) {
+		problems.push_back(u"one at a time"_q);
 	}
-	const auto none = ParseAttach("{\"mzgram_ai\":\"no_attach_target\"}");
-	if (!none || none->attached) {
-		problems.push_back(u"no target"_q);
+	const auto none = GiveFiles({}, false);
+	if (!none.now.empty() || !none.later.empty()) {
+		problems.push_back(u"none"_q);
 	}
-	for (const auto other : { "{\"mzgram_ai\":\"inserted\"}", "", "[1]", "{\"other\":1}" }) {
-		if (ParseAttach(QByteArray(other))) {
+	struct Case {
+		const char *accept;
+		const char *name;
+		const char *mime;
+		bool takes;
+	};
+	for (const auto &c : {
+			Case{ "", "notes.txt", "text/plain", true },
+			Case{ "*/*", "a.zip", "application/zip", true },
+			Case{ "image/*", "pixel.png", "image/png", true },
+			Case{ "image/*", "a.pdf", "application/pdf", false },
+			Case{ "image/png, image/jpeg", "a.jpg", "image/jpeg", true },
+			Case{ "image/png", "a.jpg", "image/jpeg", false },
+			Case{ ".pdf, .TXT", "Notes.txt", "", true },
+			Case{ ".pdf", "notes.txt", "text/plain", false },
+			Case{ "application/pdf", "a.pdf", "application/pdf", true },
+			Case{ "image/*", "file", "", true },
+			Case{ " , ", "notes.txt", "text/plain", true } }) {
+		if (AcceptsFile(
+				QString::fromLatin1(c.accept),
+				QString::fromLatin1(c.name),
+				QString::fromLatin1(c.mime)) != c.takes) {
+			problems.push_back(u"accept \"%1\" for %2"_q
+				.arg(QString::fromLatin1(c.accept))
+				.arg(QString::fromLatin1(c.name)));
+		}
+	}
+	Check(problems.isEmpty(), "ai: the checked files all at once, or one at a time, by the input's accept list", problems.join(u", "_q).toStdString().c_str());
+}
+
+void TestAiParsePick() {
+	using namespace MZGram::Ai;
+	auto problems = QStringList();
+	const auto several = ParsePick("{\"mzgram_ai\":\"pick\",\"multiple\":true,\"accept\":\"image/*,.pdf\"}");
+	if (!several || !several->multiple || several->accept != u"image/*,.pdf"_q) {
+		problems.push_back(u"several"_q);
+	}
+	const auto one = ParsePick("{\"mzgram_ai\":\"pick\",\"multiple\":false,\"accept\":\"\"}");
+	if (!one || one->multiple || !one->accept.isEmpty()) {
+		problems.push_back(u"one"_q);
+	}
+	const auto given = ParseGiven("{\"mzgram_ai\":\"given\",\"count\":2}");
+	if (!given || *given != 2) {
+		problems.push_back(u"given"_q);
+	}
+	for (const auto other : { "{\"mzgram_ai\":\"inserted\"}", "", "[1]", "{\"other\":1}", "{\"mzgram_ai\":\"attached\",\"count\":3}" }) {
+		if (ParsePick(QByteArray(other)) || ParseGiven(QByteArray(other))) {
 			problems.push_back(QString::fromLatin1(other));
 		}
 	}
-	if (ParseStatus("{\"mzgram_ai\":\"attached\",\"how\":\"input\",\"count\":3}") != Status::None) {
-		problems.push_back(u"an attach message is a text status"_q);
+	if (ParseGiven("{\"mzgram_ai\":\"pick\",\"multiple\":true}") || ParsePick("{\"mzgram_ai\":\"given\",\"count\":1}")) {
+		problems.push_back(u"pick and given mixed"_q);
 	}
-	Check(problems.isEmpty(), "ai: what the attach script says", problems.join(u", "_q).toStdString().c_str());
+	if (ParseStatus("{\"mzgram_ai\":\"pick\",\"multiple\":true}") != Status::None
+		|| ParseStatus("{\"mzgram_ai\":\"given\",\"count\":2}") != Status::None) {
+		problems.push_back(u"a file message is a text status"_q);
+	}
+	Check(problems.isEmpty(), "ai: what the chooser scripts say", problems.join(u", "_q).toStdString().c_str());
 }
 
 // Settings > MZGram > AI: a main menu button for each site, off by default.
@@ -3634,7 +3761,8 @@ int main() {
 		TestAiAttachmentKinds,
 		TestAiChooseAttachments,
 		TestAiFileScripts,
-		TestAiParseAttach,
+		TestAiGiveFiles,
+		TestAiParsePick,
 		TestAiMenuButtons,
 		TestHiddenSettingsRows,
 		TestUnblockFiles,

@@ -476,39 +476,65 @@ QByteArray FileChunkScript(int index, const QByteArray &bytes) {
 		+ "].parts.push(\"" + bytes.toBase64() + "\");";
 }
 
-QByteArray AttachScript(Provider provider) {
-	auto selectors = QByteArray();
-	const auto add = [&](const char *selector) {
-		if (!selectors.isEmpty()) {
-			selectors.append(',');
-		}
-		selectors.append(ScriptString(QString::fromLatin1(selector)));
-	};
-	for (const auto selector : Info(provider).inputSelectors) {
-		add(selector);
-	}
-	for (const auto selector : kAnyInput) {
-		add(selector);
-	}
-	// The files as File objects: to the site's file input, as choosing them
-	// in its file dialog would, or else as a paste into its input field.
-	// Nothing here presses a key or a button.
+QByteArray PickerHookScript() {
+	// The site's file input: the browser's dialog stays closed, MZGram's
+	// chooser opens. Nothing here presses a key or a button.
 	return R"JS((function(){
-const selectors = [)JS" + selectors + R"JS(];
+if (window.__mzgramAiHook) return;
+window.__mzgramAiHook = true;
 const tell = (message) => {
 	try { window.external.invoke(JSON.stringify(message)); } catch (e) {}
 };
-const shown = (e) => {
-	const r = e.getBoundingClientRect();
-	return r.width > 0 && r.height > 0;
+const isFile = (e) => !!e
+	&& e.tagName === 'INPUT'
+	&& String(e.type).toLowerCase() === 'file';
+let last = 0;
+const pick = (input) => {
+	if (input.disabled) return;
+	const now = Date.now();
+	if (window.__mzgramAiPick === input && now - last < 400) return;
+	last = now;
+	window.__mzgramAiPick = input;
+	tell({
+		mzgram_ai: 'pick',
+		multiple: !!input.multiple,
+		accept: input.accept || '',
+	});
 };
-const field = () => {
-	for (const s of selectors) {
-		for (const e of document.querySelectorAll(s)) {
-			if (shown(e)) return e;
+const click = HTMLInputElement.prototype.click;
+HTMLInputElement.prototype.click = function () {
+	if (isFile(this)) { pick(this); return; }
+	return click.apply(this, arguments);
+};
+const show = HTMLInputElement.prototype.showPicker;
+if (show) {
+	HTMLInputElement.prototype.showPicker = function () {
+		if (isFile(this)) { pick(this); return; }
+		return show.apply(this, arguments);
+	};
+}
+document.addEventListener('click', (e) => {
+	const path = e.composedPath ? e.composedPath() : [e.target];
+	for (const node of path) {
+		const input = isFile(node)
+			? node
+			: (node && node.tagName === 'LABEL' && isFile(node.control))
+			? node.control
+			: null;
+		if (input) {
+			e.preventDefault();
+			pick(input);
+			return;
 		}
 	}
-	return null;
+}, true);
+})();)JS";
+}
+
+QByteArray GiveFilesScript() {
+	return R"JS((function(){
+const tell = (message) => {
+	try { window.external.invoke(JSON.stringify(message)); } catch (e) {}
 };
 const files = [];
 for (const f of (window.__mzgramAiFiles || [])) {
@@ -519,60 +545,75 @@ for (const f of (window.__mzgramAiFiles || [])) {
 	files.push(new File([bytes], f.name, { type: f.type }));
 }
 window.__mzgramAiFiles = [];
-const list = (some) => {
-	const data = new DataTransfer();
-	for (const f of some) data.items.add(f);
-	return data;
-};
-const inputs = Array.from(document.querySelectorAll('input[type="file"]'))
-	.filter((i) => !i.disabled);
-const input = inputs.find((i) => i.multiple) || inputs[0];
-if (input) {
-	const put = (some) => {
-		input.files = list(some).files;
-		input.dispatchEvent(new Event('input', { bubbles: true }));
-		input.dispatchEvent(new Event('change', { bubbles: true }));
-	};
-	if (input.multiple || files.length < 2) {
-		put(files);
-	} else {
-		for (const f of files) put([f]);
-	}
-	tell({ mzgram_ai: 'attached', how: 'input', count: files.length });
+const input = window.__mzgramAiPick;
+if (!input || !files.length) {
+	tell({ mzgram_ai: 'given', count: 0 });
 	return;
 }
-const e = field();
-if (e) {
-	e.focus();
-	e.dispatchEvent(new ClipboardEvent('paste', {
-		clipboardData: list(files),
-		bubbles: true,
-		cancelable: true,
-	}));
-	tell({ mzgram_ai: 'attached', how: 'paste', count: files.length });
-	return;
-}
-tell({ mzgram_ai: 'no_attach_target' });
+const data = new DataTransfer();
+for (const f of files) data.items.add(f);
+input.files = data.files;
+input.dispatchEvent(new Event('input', { bubbles: true }));
+input.dispatchEvent(new Event('change', { bubbles: true }));
+tell({ mzgram_ai: 'given', count: files.length });
 })();)JS";
 }
 
-std::optional<AttachResult> ParseAttach(const QByteArray &message) {
-	const auto document = QJsonDocument::fromJson(message);
-	if (!document.isObject()) {
+QByteArray CancelPickScript() {
+	return "(function(){const i=window.__mzgramAiPick;"
+		"if(i){i.dispatchEvent(new Event('cancel',{bubbles:true}));}})();";
+}
+
+std::optional<Pick> ParsePick(const QByteArray &message) {
+	const auto object = QJsonDocument::fromJson(message).object();
+	if (object.value(u"mzgram_ai"_q).toString() != u"pick"_q) {
 		return std::nullopt;
 	}
-	const auto object = document.object();
-	const auto status = object.value(u"mzgram_ai"_q).toString();
-	if (status == u"attached"_q) {
-		return AttachResult{
-			.attached = true,
-			.how = object.value(u"how"_q).toString(),
-			.count = object.value(u"count"_q).toInt(),
-		};
-	} else if (status == u"no_attach_target"_q) {
-		return AttachResult();
+	return Pick{
+		.multiple = object.value(u"multiple"_q).toBool(),
+		.accept = object.value(u"accept"_q).toString(),
+	};
+}
+
+std::optional<int> ParseGiven(const QByteArray &message) {
+	const auto object = QJsonDocument::fromJson(message).object();
+	if (object.value(u"mzgram_ai"_q).toString() != u"given"_q) {
+		return std::nullopt;
 	}
-	return std::nullopt;
+	return object.value(u"count"_q).toInt();
+}
+
+Give GiveFiles(const std::vector<int> &checked, bool multiple) {
+	auto result = Give();
+	for (auto i = 0; i != int(checked.size()); ++i) {
+		((multiple || !i) ? result.now : result.later).push_back(checked[i]);
+	}
+	return result;
+}
+
+bool AcceptsFile(
+		const QString &accept,
+		const QString &name,
+		const QString &mime) {
+	const auto lowerName = name.toLower();
+	const auto type = mime.trimmed().toLower();
+	auto any = false;
+	for (const auto &part : accept.split(',')) {
+		const auto item = part.trimmed().toLower();
+		if (item.isEmpty()) {
+			continue;
+		}
+		any = true;
+		if (item == u"*/*"_q
+			|| (item.startsWith('.') && lowerName.endsWith(item))
+			|| (item == type)
+			|| (item.endsWith(u"/*"_q)
+				&& type.startsWith(item.left(item.size() - 1)))) {
+			return true;
+		}
+	}
+	// Nothing listed, or nothing known of the file: the site decides
+	return !any || (type.isEmpty() && !lowerName.contains('.'));
 }
 
 QString MenuButtonOption(Provider provider) {
