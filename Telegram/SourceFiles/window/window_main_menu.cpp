@@ -28,6 +28,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_user.h"
 #include "info/info_memento.h"
 #include "info/profile/info_profile_badge.h"
+#include "mzgram/mzgram_ai.h"
 #include "settings/settings_common.h"
 #include "info/profile/info_profile_emoji_status_panel.h"
 #include "info/profile/info_profile_icon.h"
@@ -744,6 +745,9 @@ void MainMenu::setupMenu() {
 			controller->window().hideSettingsAndLayer();
 			Wallet::ShowWallet(session);
 		});
+		// MZGram: buttons that open an AI site with no message, each shown
+		// while its switch in Settings > MZGram > AI is on
+		MZGram::Ai::AddMainMenuButtons(_menu, controller);
 	} else {
 		addAction(
 			tr::lng_profile_add_contact(),

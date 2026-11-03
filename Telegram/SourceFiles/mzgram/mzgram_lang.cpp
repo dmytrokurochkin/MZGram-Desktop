@@ -14,16 +14,19 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 namespace MZGram {
 
-// The choice in Settings, else the system's language (System).
+// The choice in Settings: Telegram's language (the default), the system's
+// or one of MZGram's languages.
 QString CurrentLanguage() {
-	const auto chosen = LanguageChoice();
-	if (!chosen.isEmpty()) {
-		return chosen;
-	}
 	const auto languages = QLocale::system().uiLanguages();
-	return SupportedLanguage(languages.isEmpty()
+	const auto system = languages.isEmpty()
 		? QLocale::system().name()
-		: languages.front());
+		: languages.front();
+	// A custom language pack is a copy of an official one
+	const auto &instance = Lang::GetInstance();
+	const auto telegram = instance.id().startsWith('#')
+		? instance.baseId()
+		: instance.id();
+	return ResolveLanguage(LanguageChoice(), telegram, system);
 }
 
 QString TrNow(const char *key) {

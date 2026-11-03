@@ -59,4 +59,39 @@ void AddOpenInAction(
 	not_null<Ui::PopupMenu*> menu,
 	not_null<DocumentData*> document);
 
+// As on MZGram Android (showCopyPhoto): copies a photo, or a jpg, png or
+// webp sent as a file, to the clipboard; a photo not downloaded yet is
+// downloaded first. While its switch is on it stands for Telegram's own
+// "Copy Image" (CopyPhotoAction), so the menu has one such item.
+void AddCopyPhotoAction(
+	not_null<Ui::PopupMenu*> menu,
+	not_null<HistoryItem*> item,
+	not_null<Window::SessionController*> controller,
+	bool copyRestricted);
+
+// As on MZGram Android (showDeleteDownloadedFile): removes a message's
+// downloaded file from this computer after a confirmation; the message
+// stays and the file can be downloaded again.
+void AddDeleteDownloadedFileAction(
+	not_null<Ui::PopupMenu*> menu,
+	not_null<HistoryItem*> item,
+	not_null<Window::SessionController*> controller);
+
+// As on MZGram Android (showNoQuoteForward): the forward box with the
+// sender's name already hidden.
+void AddForwardNoQuoteAction(
+	not_null<Ui::PopupMenu*> menu,
+	not_null<HistoryItem*> item,
+	not_null<Window::SessionController*> controller);
+
+// The MZGram items of one message's menu, the same in the main chat and in
+// topics, replies and other sections: Repeat, Details, Save Message, Set a
+// reminder, Forward without sender, Copy Photo, Delete Downloaded File,
+// each behind its own switch, and Ask AI where copying is allowed.
+void AddMessageMenuActions(
+	not_null<Ui::PopupMenu*> menu,
+	not_null<HistoryItem*> item,
+	not_null<Window::SessionController*> controller,
+	bool copyRestricted);
+
 } // namespace MZGram

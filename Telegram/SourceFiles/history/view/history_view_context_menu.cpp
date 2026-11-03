@@ -30,6 +30,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "mzgram/mzgram_anti_recall.h"
 #include "mzgram/mzgram_ai.h"
 #include "mzgram/mzgram_context_actions.h"
+#include "mzgram/mzgram_options.h"
 #include "mzgram/mzgram_qr_scan.h"
 #include "history/history_item_helpers.h"
 #include "history/history_item_text.h"
@@ -380,12 +381,15 @@ void AddPhotoActions(
 				&photo->session(),
 				[=] { SavePhotoToFile(photo); }),
 			&st::menuIconSaveImage);
-		menu->addAction(tr::lng_context_copy_image(tr::now), [=] {
-			const auto item = photo->owner().message(contextId);
-			if (!list->showCopyMediaRestriction(item)) {
-				CopyImage(photo);
-			}
-		}, &st::menuIconCopy);
+		// MZGram: its Copy Photo stands for this while its switch is on
+		if (!MZGram::CopyPhotoAction()) {
+			menu->addAction(tr::lng_context_copy_image(tr::now), [=] {
+				const auto item = photo->owner().message(contextId);
+				if (!list->showCopyMediaRestriction(item)) {
+					CopyImage(photo);
+				}
+			}, &st::menuIconCopy);
+		}
 	}
 	if (photo->hasAttachedStickers()) {
 		const auto controller = list->controller();
@@ -1411,22 +1415,20 @@ void AddMessageActions(
 	AddPostLinkAction(menu, request);
 	AddForwardAction(menu, request, list);
 	if (request.item && request.selectedItems.empty()) {
-		MZGram::AddRepeatMessageAction(
+		// MZGram: its items of one message, as in the main chat
+		MZGram::AddMessageMenuActions(
 			menu,
 			request.item,
-			list->controller());
-		MZGram::AddMessageDetailsAction(
+			list->controller(),
+			list->hasCopyRestriction(request.item));
+	} else if (!request.selectedItems.empty()) {
+		// MZGram: "Ask AI" about the selected messages
+		MZGram::Ai::AddAskAiSelectedAction(
 			menu,
-			request.item,
-			list->controller());
-		MZGram::AddSaveMessageAction(
-			menu,
-			request.item,
-			list->controller());
-		MZGram::AddSetReminderAction(
-			menu,
-			request.item,
-			list->controller());
+			list->controller(),
+			ExtractIdsList(request.selectedItems),
+			list->getSelectedText().rich.text,
+			list->hasCopyRestrictionForSelected());
 	}
 	AddOfferAction(menu, request, list);
 	AddSendNowAction(menu, request, list);
@@ -1921,13 +1923,6 @@ void FillContextMenuItems(
 					}
 				}, &st::menuIconCopy);
 			}
-			// MZGram: "Ask AI", only where copying is allowed
-			MZGram::Ai::AddAskAiAction(
-				result.get(),
-				view->data(),
-				list->controller(),
-				list->hasCopyRestriction(view->data()));
-
 			const auto translate = mediaHasTextForCopy
 				? (HistoryView::TransribedText(item)
 					.append('\n')

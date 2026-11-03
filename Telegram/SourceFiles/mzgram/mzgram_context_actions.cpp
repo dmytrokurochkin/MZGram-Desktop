@@ -6,12 +6,20 @@ For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "mzgram/mzgram_context_actions.h"
+#include "mzgram/mzgram_ai.h"
+#include "mzgram/mzgram_ai_rules.h"
 #include "mzgram/mzgram_lang.h"
 
 #include "api/api_common.h"
 #include "apiwrap.h"
 #include "base/unixtime.h"
+#include "base/timer.h"
+#include "core/application.h"
 #include "core/file_utilities.h"
+#include "data/data_document_media.h"
+#include "data/data_download_manager.h"
+#include "data/data_photo_media.h"
+#include "storage/cache/storage_cache_database.h"
 #include "data/data_document.h"
 #include "data/data_media_types.h"
 #include "data/data_photo.h"
@@ -27,7 +35,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "menu/menu_send_details.h"
 #include "mzgram/mzgram_options.h"
 #include "mzgram/mzgram_presence.h"
+#include "ui/boxes/confirm_box.h"
 #include "ui/layers/generic_box.h"
+#include "ui/toast/toast.h"
+#include "window/window_peer_menu.h"
 #include "ui/text/format_values.h"
 #include "ui/widgets/labels.h"
 #include "ui/widgets/popup_menu.h"
@@ -35,6 +46,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_boxes.h"
 #include "styles/style_layers.h"
 #include "styles/style_menu_icons.h"
+
+#include <QtCore/QFile>
+#include <QtGui/QClipboard>
+#include <QtGui/QGuiApplication>
 
 namespace MZGram {
 namespace {
@@ -341,6 +356,174 @@ void AddSetReminderAction(
 			},
 			submit));
 	}, &st::menuIconSchedule);
+}
+
+namespace {
+
+// A picture sent as a file, by its name and type.
+[[nodiscard]] bool IsPictureFile(not_null<DocumentData*> document) {
+	return !document->sticker()
+		&& !document->isAnimation()
+		&& (Ai::ClassifyFile(document->filename(), document->mimeString())
+			== Ai::AttachmentKind::Photo);
+}
+
+void CopyToClipboard(QImage image) {
+	if (image.isNull()) {
+		return;
+	}
+	QGuiApplication::clipboard()->setImage(std::move(image));
+	Ui::Toast::Show(MZGram::TrNow("photo_copied"));
+}
+
+// The large photo, once downloaded: a menu item does not wait for it.
+void CopyPhotoWhenLoaded(
+		std::shared_ptr<Data::PhotoMedia> media,
+		FullMsgId origin) {
+	media->wanted(Data::PhotoSize::Large, origin);
+	const auto copy = [=] {
+		if (const auto image = media->image(Data::PhotoSize::Large)) {
+			CopyToClipboard(image->original());
+			return true;
+		}
+		return false;
+	};
+	if (copy()) {
+		return;
+	}
+	const auto tries = std::make_shared<int>(0);
+	const auto timer = std::make_shared<base::Timer>();
+	timer->setCallback([=] {
+		if (copy() || ++*tries > 120) {
+			timer->cancel();
+			// The timer holds itself in its callback: let go of it later
+			crl::on_main([timer] {
+				timer->setCallback(nullptr);
+			});
+		}
+	});
+	timer->callEach(250);
+}
+
+} // namespace
+
+void AddCopyPhotoAction(
+		not_null<Ui::PopupMenu*> menu,
+		not_null<HistoryItem*> item,
+		not_null<Window::SessionController*> controller,
+		bool copyRestricted) {
+	const auto media = item->media();
+	if (!CopyPhotoAction() || copyRestricted || !media) {
+		return;
+	}
+	const auto origin = item->fullId();
+	if (const auto photo = media->photo()) {
+		if (photo->isNull()) {
+			return;
+		}
+		menu->addAction(MZGram::TrNow("show_copy_photo"), [=] {
+			CopyPhotoWhenLoaded(photo->createMediaView(), origin);
+		}, &st::menuIconCopy);
+	} else if (const auto document = media->document()) {
+		if (!IsPictureFile(document)) {
+			return;
+		}
+		const auto view = document->createMediaView();
+		const auto path = document->filepath(true);
+		if (path.isEmpty() && !view->loaded()) {
+			return; // Not on this computer: download it first
+		}
+		menu->addAction(MZGram::TrNow("show_copy_photo"), [=] {
+			const auto bytes = view->bytes();
+			CopyToClipboard(bytes.isEmpty()
+				? QImage(path)
+				: QImage::fromData(bytes));
+		}, &st::menuIconCopy);
+	}
+}
+
+void AddDeleteDownloadedFileAction(
+		not_null<Ui::PopupMenu*> menu,
+		not_null<HistoryItem*> item,
+		not_null<Window::SessionController*> controller) {
+	const auto media = item->media();
+	const auto document = media ? media->document() : nullptr;
+	if (!DeleteDownloadedFileAction() || !document || document->loading()) {
+		return;
+	}
+	const auto path = document->filepath(true);
+	const auto view = document->activeMediaView();
+	const auto cached = view && view->loaded();
+	if (path.isEmpty() && !cached) {
+		return;
+	}
+	const auto itemId = item->fullId();
+	const auto session = &item->history()->session();
+	menu->addAction(MZGram::TrNow("show_delete_downloaded"), [=] {
+		const auto remove = [=](Fn<void()> close) {
+			close();
+			if (const auto current = session->data().message(itemId)) {
+				Core::App().downloadManager().deleteFiles({
+					current->globalId(),
+				});
+			}
+			if (!path.isEmpty()) {
+				QFile(path).remove();
+			}
+			session->data().cache().remove(document->cacheKey());
+			[[maybe_unused]] const auto location = document->location(true);
+			if (const auto current = session->data().message(itemId)) {
+				session->data().requestItemRepaint(current);
+			}
+			Ui::Toast::Show(MZGram::TrNow("downloaded_file_deleted"));
+		};
+		controller->show(Ui::MakeConfirmBox({
+			.text = path.isEmpty()
+				? MZGram::TrNow("delete_downloaded_confirm")
+				: MZGram::TrNow("delete_downloaded_confirm_path").arg(path),
+			.confirmed = remove,
+			.confirmText = MZGram::Tr("button_delete"),
+			.cancelText = MZGram::Tr("button_cancel"),
+			.confirmStyle = &st::attentionBoxButton,
+		}));
+	}, &st::menuIconDelete);
+}
+
+void AddForwardNoQuoteAction(
+		not_null<Ui::PopupMenu*> menu,
+		not_null<HistoryItem*> item,
+		not_null<Window::SessionController*> controller) {
+	if (!ForwardNoQuoteAction()
+		|| !item->isHistoryEntry()
+		|| item->isService()
+		|| item->isLocal()
+		|| !item->allowsForward()
+		|| item->id <= 0) {
+		return;
+	}
+	const auto itemId = item->fullId();
+	menu->addAction(MZGram::TrNow("show_forward_no_quote"), [=] {
+		Window::ShowForwardMessagesBox(controller, Data::ForwardDraft{
+			.ids = { itemId },
+			.options = Data::ForwardOptions::NoSenderNames,
+		});
+	}, &st::menuIconForward);
+}
+
+void AddMessageMenuActions(
+		not_null<Ui::PopupMenu*> menu,
+		not_null<HistoryItem*> item,
+		not_null<Window::SessionController*> controller,
+		bool copyRestricted) {
+	AddRepeatMessageAction(menu, item, controller);
+	AddMessageDetailsAction(menu, item, controller);
+	AddSaveMessageAction(menu, item, controller);
+	AddSetReminderAction(menu, item, controller);
+	AddForwardNoQuoteAction(menu, item, controller);
+	AddCopyPhotoAction(menu, item, controller, copyRestricted);
+	AddDeleteDownloadedFileAction(menu, item, controller);
+	// "Ask AI", only where copying is allowed
+	Ai::AddAskAiAction(menu, item, controller, copyRestricted);
 }
 
 void AddOpenInAction(

@@ -41,6 +41,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history_inner_widget_accessibility.h"
 #include "history/history_item_components.h"
 #include "mzgram/mzgram_ai.h"
+#include "mzgram/mzgram_context_actions.h"
+#include "mzgram/mzgram_options.h"
+#include "mzgram/mzgram_qr_scan.h"
 #include "mzgram/mzgram_message_dim.h"
 #include "history/history_item_text.h"
 #include "payments/payments_reaction_process.h"
@@ -3078,9 +3081,12 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 			_menu->addAction(tr::lng_context_save_image(tr::now), base::fn_delayed(st::defaultDropdownMenu.menu.ripple.hideDuration, this, [=] {
 				savePhotoToFile(photo);
 			}), &st::menuIconSaveImage);
-			_menu->addAction(tr::lng_context_copy_image(tr::now), [=] {
-				copyContextImage(photo, itemId);
-			}, &st::menuIconCopy);
+			// MZGram: its Copy Photo stands for this while its switch is on
+			if (!MZGram::CopyPhotoAction()) {
+				_menu->addAction(tr::lng_context_copy_image(tr::now), [=] {
+					copyContextImage(photo, itemId);
+				}, &st::menuIconCopy);
+			}
 		}
 		if (photo->hasAttachedStickers()) {
 			_menu->addAction(tr::lng_context_attached_stickers(tr::now), [=] {
@@ -3089,6 +3095,8 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 					photo);
 			}, &st::menuIconStickers);
 		}
+		// MZGram: as in topics and other sections
+		MZGram::AddScanQrCodeAction(_menu.get(), photo, item, controller);
 	};
 	auto rateTranscriptionItem = (HistoryItem*)(nullptr);
 	const auto addDocumentActions = [&](not_null<DocumentData*> document, HistoryItem *item) {
@@ -3122,6 +3130,8 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 			_menu->addAction(Platform::IsMac() ? tr::lng_context_show_in_finder(tr::now) : tr::lng_context_show_in_folder(tr::now), [=] {
 				showContextInFolder(document);
 			}, &st::menuIconShowInFolder);
+			// MZGram: as in topics and other sections
+			MZGram::AddOpenInAction(_menu.get(), document);
 		}
 		if (item
 			&& !hasCopyMediaRestriction(item)
@@ -3414,6 +3424,15 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 			} else {
 				addDocumentActions(lnkDocument, item);
 			}
+			if (item) {
+				// MZGram: its items of one message, Ask AI only where
+				// copying is allowed
+				MZGram::AddMessageMenuActions(
+					_menu.get(),
+					item,
+					_controller,
+					hasCopyRestriction(item));
+			}
 		}
 		if (item
 			&& item->hasDirectLink()
@@ -3430,6 +3449,13 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 					_widget->forwardSelected();
 				}, &st::menuIconForward);
 			}
+			// MZGram: "Ask AI" about the selected messages
+			MZGram::Ai::AddAskAiSelectedAction(
+				_menu.get(),
+				_controller,
+				getSelectedItems(),
+				getSelectedText().rich.text,
+				hasCopyRestrictionForSelected());
 			if (selectedState.count > 0 && selectedState.canDeleteCount == selectedState.count) {
 				_menu->addAction(tr::lng_context_delete_selected(tr::now), [=] {
 					_widget->confirmDeleteSelected();
@@ -3662,8 +3688,9 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 							[=] { copyContextText(itemId); },
 							&st::menuIconCopy);
 					}
-					// MZGram: "Ask AI", only where copying is allowed
-					MZGram::Ai::AddAskAiAction(
+					// MZGram: its items of one message, Ask AI only where
+					// copying is allowed
+					MZGram::AddMessageMenuActions(
 						_menu.get(),
 						item,
 						_controller,
@@ -3739,6 +3766,13 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 					_widget->forwardSelected();
 				}, &st::menuIconForward);
 			}
+			// MZGram: "Ask AI" about the selected messages
+			MZGram::Ai::AddAskAiSelectedAction(
+				_menu.get(),
+				_controller,
+				getSelectedItems(),
+				getSelectedText().rich.text,
+				hasCopyRestrictionForSelected());
 			if (selectedState.count > 0 && selectedState.count == selectedState.canDeleteCount) {
 				_menu->addAction(tr::lng_context_delete_selected(tr::now), [=] {
 					_widget->confirmDeleteSelected();

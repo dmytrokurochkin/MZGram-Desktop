@@ -29,9 +29,6 @@ const std::vector<Phrase> kPhrases = {
 	{ "section_media_calls", "Media and calls", "Медіа і дзвінки" },
 	{ "section_interface", "Interface", "Інтерфейс" },
 	{ "section_ads_filters", "Ads and filters", "Реклама і фільтри" },
-	{ "settings_topics_info",
-		"Every MZGram feature is on one of these pages.",
-		"Кожна функція MZGram є на одній із цих сторінок." },
 
 	// Archive.
 	{ "save_deleted_messages",
@@ -427,17 +424,12 @@ const std::vector<Phrase> kPhrases = {
 	{ "ai_sign_out", "Sign out of AI sites", "Вийти з сайтів ШІ" },
 	{ "ai_sign_out_confirm", "Sign out of every AI site in MZGram? Your Telegram accounts stay signed in.", "Вийти з усіх сайтів ШІ в MZGram? Ваші акаунти Telegram лишаться в системі." },
 	{ "ai_signed_out", "Signed out of the AI sites.", "Ви вийшли з сайтів ШІ." },
-	{ "ai_info", "Ask AI opens the chosen AI site in an MZGram window, with a sign-in of its own apart from Telegram's. No paid API is used: you sign in to the site with your own account. The message and your prompt are put into the site's input field, and nothing is sent until you press Send there yourself. Messages in chats that restrict copying have no Ask AI.", "«Запитати ШІ» відкриває вибраний сайт ШІ у вікні MZGram з окремим входом, не пов'язаним із Telegram. Платний API не використовується: ви входите на сайт зі своїм акаунтом. Повідомлення і ваш промпт підставляються в поле вводу сайту, і нічого не надсилається, поки ви самі не натиснете там «Надіслати». У чатах, що забороняють копіювання, «Запитати ШІ» немає." },
 	{ "ai_ask", "Ask AI", "Запитати ШІ" },
 	{ "ai_message", "Message", "Повідомлення" },
 	{ "ai_prompt", "Your prompt (optional)", "Ваш промпт (необов'язково)" },
 	{ "ai_provider", "AI site", "Сайт ШІ" },
-	{ "ai_model", "Model", "Модель" },
-	{ "ai_model_on_site", "Chosen on the %1 site: MZGram cannot choose a model there reliably.", "Обирається на сайті %1: MZGram не може надійно вибрати там модель." },
 	{ "ai_open", "Open", "Відкрити" },
 	{ "ai_privacy_title", "The text leaves Telegram", "Текст залишає Telegram" },
-	{ "ai_privacy_text", "The message and your prompt will be put into the chat of %1, a service outside Telegram and MZGram, under the account you sign in with there. It is sent only when you press Send on the site. Continue?", "Повідомлення і ваш промпт буде підставлено в чат %1, сервісу поза Telegram і MZGram, під акаунтом, з яким ви там увійдете. Його буде надіслано, лише коли ви натиснете «Надіслати» на сайті. Продовжити?" },
-	{ "ai_privacy_note", "Nothing is sent until you press Send on the site yourself.", "Нічого не надсилається, поки ви самі не натиснете «Надіслати» на сайті." },
 	{ "ai_continue", "Continue", "Продовжити" },
 	{ "ai_status_opening", "Opening %1…", "Відкриваю %1…" },
 	{ "ai_status_inserted", "The text is in the input field. Check it and press Send yourself.", "Текст у полі вводу. Перевірте його і натисніть «Надіслати» самі." },
@@ -446,6 +438,50 @@ const std::vector<Phrase> kPhrases = {
 	{ "ai_copy", "Copy text", "Копіювати текст" },
 	{ "ai_copied", "Text copied.", "Текст скопійовано." },
 	{ "ai_no_webview", "The built-in browser cannot start here. On Windows install Microsoft Edge WebView2 Runtime, on Linux WebKitGTK, then try again.", "Вбудований браузер тут не запускається. На Windows встановіть Microsoft Edge WebView2 Runtime, на Linux WebKitGTK, і спробуйте ще раз." },
+	// The 1.0.9 batch: Ask AI attachments, hidden rows, AI menu buttons,
+	// Other, the moved message menu items, the unblock button
+	{ "mzgram_language_telegram", "Same as Telegram", "Як у Telegram" },
+	{ "section_other", "Other", "Інше" },
+	{ "hide_rows_title", "Hide in Telegram's Settings", "Приховати в налаштуваннях Telegram" },
+	{ "hide_rows_info", "A hidden row is gone from Telegram's Settings and from its search; nothing else changes.", "Прихований рядок зникає з налаштувань Telegram і з пошуку в них; більше нічого не змінюється." },
+	{ "hide_row_premium", "Telegram Premium", "Telegram Premium" },
+	{ "hide_row_stars", "My Stars", "Мої зірки" },
+	{ "hide_row_currency", "Gram Earnings", "Заробіток у Gram" },
+	{ "hide_row_business", "Telegram Business", "Telegram Business" },
+	{ "hide_row_send_gift", "Premium Gifting", "Подарувати Premium" },
+	{ "hide_row_faq", "Telegram FAQ", "Часті запитання про Telegram" },
+	{ "hide_row_features", "Telegram Features", "Можливості Telegram" },
+	{ "hide_row_ask_question", "Ask a Question", "Поставити запитання" },
+	{ "unblock_files", "Unblock MZGram files", "Розблокувати файли MZGram" },
+	{ "unblock_files_confirm", "MZGram will remove the \"downloaded from the internet\" mark from the files in its folder, so Windows stops asking before they run. Windows protection stays on. Do this only if you downloaded MZGram from its GitHub page. Continue?", "MZGram зніме з файлів у своїй теці позначку «завантажено з інтернету», і Windows перестане питати перед їх запуском. Захист Windows лишається увімкненим. Робіть це, лише якщо завантажили MZGram з його сторінки на GitHub. Продовжити?" },
+	{ "unblock_files_done", "Files unblocked: %1.", "Розблоковано файлів: %1." },
+	{ "unblock_files_denied", "Windows did not allow it: MZGram's folder needs administrator rights. Run PowerShell as administrator and use Unblock-File on that folder.", "Windows не дозволив: для теки MZGram потрібні права адміністратора. Запустіть PowerShell від імені адміністратора і виконайте Unblock-File для цієї теки." },
+	{ "unblock_files_info", "If Windows asks before starting MZGram (\"Windows protected your PC\"), this removes the \"downloaded from the internet\" mark from MZGram's own files. Windows protection stays on, and nothing happens until you press the button.", "Якщо Windows питає перед запуском MZGram («Windows protected your PC»), ця кнопка знімає позначку «завантажено з інтернету» з власних файлів MZGram. Захист Windows лишається увімкненим, і нічого не відбувається, поки ви не натиснете кнопку." },
+	{ "show_copy_photo", "Copy Photo", "Копіювати фото" },
+	{ "photo_copied", "Photo copied to clipboard", "Фото скопійовано в буфер обміну" },
+	{ "show_delete_downloaded", "Delete Downloaded File", "Видалити завантажений файл" },
+	{ "show_forward_no_quote", "Forward without sender", "Переслати без автора" },
+	{ "message_menu_more_info", "Copy Photo copies a photo or a picture sent as a file; while it is on, it stands for Telegram's Copy Image. Delete Downloaded File removes a message's file from this computer; the message stays. Forward without sender opens the forward box with the sender's name hidden.", "Копіювати фото копіює фото або картинку, надіслану файлом; поки перемикач увімкнено, він заміняє «Копіювати зображення» Telegram. Видалити завантажений файл прибирає файл повідомлення з цього комп'ютера; повідомлення лишається. Переслати без автора відкриває вікно пересилання з уже прихованим іменем автора." },
+	{ "downloaded_file_deleted", "The downloaded file is deleted.", "Завантажений файл видалено." },
+	{ "delete_downloaded_confirm", "Delete the downloaded file from this computer? The message stays, and the file can be downloaded again.", "Видалити завантажений файл з цього комп'ютера? Повідомлення лишиться, а файл можна буде завантажити знову." },
+	{ "delete_downloaded_confirm_path", "Delete %1 from this computer? The message stays, and the file can be downloaded again.", "Видалити %1 з цього комп'ютера? Повідомлення лишиться, а файл можна буде завантажити знову." },
+	{ "ai_attachments", "Attachments (%1): %2", "Вкладення (%1): %2" },
+	{ "ai_left_out", "Not attached: %1", "Не додано: %1" },
+	{ "ai_left_over_limit", "over the limit of 10: %1", "понад ліміт у 10: %1" },
+	{ "ai_left_too_large", "larger than 30 MB: %1", "більші за 30 МБ: %1" },
+	{ "ai_left_archives", "archives: %1", "архіви: %1" },
+	{ "ai_left_media", "video, GIFs, stickers, voice and music: %1", "відео, GIF, стікери, голосові й музика: %1" },
+	{ "ai_left_other", "other file types: %1", "інші типи файлів: %1" },
+	{ "ai_status_downloading", "Downloading attachments: %1 of %2…", "Завантажую вкладення: %1 з %2…" },
+	{ "ai_status_attached", "Attachments added: %1. Check the message on the site and press Send yourself.", "Додано вкладень: %1. Перевірте повідомлення на сайті й натисніть «Надіслати» самі." },
+	{ "ai_status_no_attach", "The site took no attachments: press Save files and add them on the site by hand.", "Сайт не прийняв вкладення: натисніть «Зберегти файли» і додайте їх на сайті вручну." },
+	{ "ai_save_files", "Save files", "Зберегти файли" },
+	{ "ai_files_saved", "Files saved to %1", "Файли збережено в %1" },
+	{ "ai_menu_buttons", "Buttons in the main menu", "Кнопки в головному меню" },
+	{ "ai_menu_buttons_info", "A button opens that AI site in MZGram's window, without a message.", "Кнопка відкриває цей сайт ШІ у вікні MZGram, без повідомлення." },
+	{ "ai_model_on_site", "Model: chosen on the %1 site.", "Модель: обирається на сайті %1." },
+	{ "ai_privacy_text", "The text, the attachments and your prompt will go into the chat of %1, a service outside Telegram and MZGram, under the account you sign in with there. The site uploads attachments to its servers as soon as they are added, before you press Send; the text is sent only when you press Send. This warning is shown once.", "Текст, вкладення і ваш промпт потраплять у чат %1, сервісу поза Telegram і MZGram, під акаунтом, з яким ви там увійдете. Сайт вивантажує вкладення на свої сервери одразу, щойно їх додано, ще до натискання «Надіслати»; текст надсилається, лише коли ви натиснете «Надіслати». Це попередження показується один раз." },
+	{ "ai_info", "Ask AI opens the chosen AI site in an MZGram window, with a sign-in of its own apart from Telegram's. No paid API is used: you sign in to the site with your own account. The text, your prompt and up to 10 photos and files go into the site's message, and you send it there yourself. Messages in chats that restrict copying have no Ask AI.", "«Запитати ШІ» відкриває вибраний сайт ШІ у вікні MZGram з окремим входом, не пов'язаним із Telegram. Платний API не використовується: ви входите на сайт зі своїм акаунтом. Текст, ваш промпт і до 10 фото та файлів потрапляють у повідомлення на сайті, і ви надсилаєте його там самі. У чатах, що забороняють копіювання, «Запитати ШІ» немає." },
 };
 
 const std::map<std::string, const Phrase*> &Index() {
@@ -471,19 +507,36 @@ base::options::option<QString> OptionLanguage({
 	.id = kOptionLanguage,
 	.name = "MZGram language",
 	.description = "The language of MZGram's own settings and features: "
-		"empty for the system's language, or en, uk, ru, pl, es, de, fr, "
-		"pt-BR, tr, ar, be, kk",
+		"empty for Telegram's language, system for the system's, or en, uk, "
+		"ru, pl, es, de, fr, pt-BR, tr, ar, be, kk",
 	.defaultValue = QString(),
 });
 
 QString LanguageChoice() {
 	const auto value = OptionLanguage.value();
+	if (value == QString::fromLatin1(kLanguageSystem)) {
+		return value;
+	}
 	for (const auto code : kLanguages) {
 		if (value == QString::fromLatin1(code)) {
 			return value;
 		}
 	}
 	return QString();
+}
+
+QString ResolveLanguage(
+		const QString &choice,
+		const QString &telegramLanguage,
+		const QString &systemLocale) {
+	for (const auto code : kLanguages) {
+		if (choice == QString::fromLatin1(code)) {
+			return choice;
+		}
+	}
+	return SupportedLanguage((choice == QString::fromLatin1(kLanguageSystem))
+		? systemLocale
+		: telegramLanguage);
 }
 
 QString SupportedLanguage(const QString &localeName) {
@@ -499,7 +552,7 @@ QString SupportedLanguage(const QString &localeName) {
 			return language;
 		}
 	}
-	return QString::fromLatin1("en");
+	return u"en"_q;
 }
 
 QString TranslateTo(const char *key, const QString &language) {
@@ -529,17 +582,6 @@ QString Translate(const char *key, bool ukrainian) {
 		return QString::fromUtf8(key);
 	}
 	return QString::fromUtf8(ukrainian ? i->second->ukrainian : i->second->english);
-}
-
-// The tests come first: Same as Telegram is not written yet.
-QString ResolveLanguage(
-		const QString &choice,
-		const QString &telegramLanguage,
-		const QString &systemLocale) {
-	Q_UNUSED(choice);
-	Q_UNUSED(telegramLanguage);
-	Q_UNUSED(systemLocale);
-	return QString::fromLatin1("en");
 }
 
 } // namespace MZGram

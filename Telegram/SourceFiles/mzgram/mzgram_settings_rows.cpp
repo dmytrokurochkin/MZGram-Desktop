@@ -50,24 +50,49 @@ base::options::toggle OptionHideAskQuestion({
 
 } // namespace
 
-// The tests come first: the rows are not written yet.
 const std::vector<HideableRow> &HideableRows() {
-	static const auto result = std::vector<HideableRow>();
+	static const auto result = std::vector<HideableRow>{
+		{ "premium", "mzgram-hide-row-premium", "hide_row_premium" },
+		{ "stars", "mzgram-hide-row-stars", "hide_row_stars" },
+		{ "currency", "mzgram-hide-row-currency", "hide_row_currency" },
+		{ "business", "mzgram-hide-row-business", "hide_row_business" },
+		{ "send-gift", "mzgram-hide-row-send-gift", "hide_row_send_gift" },
+		{ "faq", "mzgram-hide-row-faq", "hide_row_faq", true },
+		{ "features", "mzgram-hide-row-features", "hide_row_features", true },
+		{
+			"ask-question",
+			"mzgram-hide-row-ask-question",
+			"hide_row_ask_question",
+			true,
+		},
+	};
 	return result;
 }
 
 bool RowHidden(const char *key) {
-	Q_UNUSED(key);
+	for (const auto &row : HideableRows()) {
+		if (!std::strcmp(row.key, key)) {
+			return base::options::lookup<bool>(row.option).value();
+		}
+	}
 	return false;
 }
 
 void SetRowHidden(const char *key, bool hidden) {
-	Q_UNUSED(key);
-	Q_UNUSED(hidden);
+	for (const auto &row : HideableRows()) {
+		if (!std::strcmp(row.key, key)) {
+			base::options::lookup<bool>(row.option).set(hidden);
+		}
+	}
 }
 
 bool HelpHidden() {
-	return false;
+	for (const auto &row : HideableRows()) {
+		if (row.help && !RowHidden(row.key)) {
+			return false;
+		}
+	}
+	return true;
 }
 
 } // namespace MZGram

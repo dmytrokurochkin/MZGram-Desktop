@@ -10,7 +10,7 @@ Built in CI for Windows x64, Windows ARM64 and Linux x64.
 
 Everything MZGram adds to Telegram, on Desktop and on Android, with the version each feature came in: [FEATURES.md](FEATURES.md).
 
-All MZGram features are in **Settings > MZGram**, grouped by topic. Every MZGram text is available in 12 languages (English, Ukrainian, Russian, Polish, Spanish, German, French, Portuguese (Brazil), Turkish, Arabic, Belarusian and Kazakh), chosen in Settings > MZGram > Interface apart from Telegram's language.
+All MZGram features are in **Settings > MZGram**, grouped by topic. Every MZGram text is available in 12 languages (English, Ukrainian, Russian, Polish, Spanish, German, French, Portuguese (Brazil), Turkish, Arabic, Belarusian and Kazakh), chosen in Settings > MZGram > Interface: the same as Telegram's by default, or another one.
 
 ### Archive of deleted and edited messages
 
@@ -39,6 +39,8 @@ All MZGram features are in **Settings > MZGram**, grouped by topic. Every MZGram
 - Repeat, Save message (to Saved Messages), Set a reminder, Open in... (downloaded files).
 - Message details: ids, dates, views, file and media of a message. For your own messages it shows when the other side read them.
 - Scan for QR code: decodes a QR code in a downloaded photo, on the device.
+- Copy Photo, Delete Downloaded File, Forward without sender.
+- Ask AI: the text, photos and files of one or several messages go into the chat of Gemini, Claude, ChatGPT, DeepSeek or Grok in MZGram's own window; you sign in with your own account and press Send there yourself.
 
 ### Media and calls
 
@@ -65,6 +67,17 @@ All MZGram features are in **Settings > MZGram**, grouped by topic. Every MZGram
 Releases are published on the [Releases](https://github.com/dmytrokurochkin/MZGram-Desktop/releases) page: a zip for Windows x64 and ARM64, a tar.xz for Linux x64 and ARM64, the source and `SHA256SUMS`.
 
 MZGram updates itself from this page: when a newer stable release is out, Update in the bar downloads the archive for this system from GitHub, checks it against `SHA256SUMS` and installs it with the Updater, which backs up the files it replaces and puts them back if anything fails. Your data is not touched. The first version that can do this is installed by hand once. When the MZGram folder cannot be written, the bar offers the release page instead. Settings > MZGram turns the check off.
+
+### "Windows protected your PC"
+
+MZGram is not signed with a paid code signing certificate, so Windows SmartScreen may stop the first start of `MZGram.exe` downloaded from this page with "Windows protected your PC". Check that the zip came from this page (and, if you like, its SHA-256 against `SHA256SUMS`), then do one of these. Windows protection stays on in every case; nothing here turns off SmartScreen or Defender or adds exclusions.
+
+- Before unpacking: right-click the zip, Properties, tick **Unblock** at the bottom of the General tab, OK. The unpacked files then carry no "downloaded from the internet" mark.
+- After unpacking: in PowerShell, `Get-ChildItem -Recurse "C:\path\to\MZGram" | Unblock-File` (the folder where `MZGram.exe` is). For a folder in Program Files, run PowerShell as administrator.
+- In SmartScreen's window: More info, then Run anyway.
+- From MZGram itself: Settings > MZGram > Other > Unblock MZGram files does the same for MZGram's folder, only when you press it and after a warning.
+
+Updates that MZGram installs itself carry no such mark.
 
 ## Build
 

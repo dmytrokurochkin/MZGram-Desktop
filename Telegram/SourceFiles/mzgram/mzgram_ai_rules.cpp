@@ -115,6 +115,96 @@ const auto kAnyInput = {
 	"[contenteditable=\"true\"]",
 };
 
+// Pictures the sites take as images.
+const auto kImageExtensions = { "jpg", "jpeg", "png", "webp" };
+const auto kImageTypes = { "image/jpeg", "image/png", "image/webp" };
+
+// Documents an AI reads: text, data, code, pdf and office files.
+const auto kFileExtensions = {
+	"txt", "text", "md", "markdown", "rst", "csv", "tsv", "json", "jsonl",
+	"xml", "yaml", "yml", "toml", "ini", "cfg", "conf", "log", "tex", "srt",
+	"vtt", "html", "htm", "css", "js", "mjs", "cjs", "ts", "jsx", "tsx",
+	"py", "ipynb", "java", "kt", "kts", "c", "h", "cpp", "cc", "cxx", "hpp",
+	"cs", "go", "rs", "rb", "php", "swift", "m", "mm", "scala", "dart",
+	"lua", "pl", "r", "sql", "sh", "bash", "zsh", "ps1", "bat", "cmd",
+	"gradle", "properties", "vue", "svelte", "pdf", "doc", "docx", "xls",
+	"xlsx", "ppt", "pptx", "rtf", "odt", "ods", "odp", "epub",
+};
+// Text files that usually have no extension.
+const auto kFileNames = {
+	"readme", "license", "licence", "changelog", "makefile", "dockerfile",
+	"notice", "authors", "contributing",
+};
+const auto kFileTypes = {
+	"application/pdf", "application/json", "application/xml",
+	"application/rtf", "application/msword", "application/vnd.ms-excel",
+	"application/vnd.ms-powerpoint",
+};
+const auto kFileTypePrefixes = {
+	"application/vnd.openxmlformats-officedocument.",
+	"application/vnd.oasis.opendocument.",
+};
+
+// Archives and packages: large, and the sites read them badly or not at
+// all.
+const auto kArchiveExtensions = {
+	"zip", "rar", "7z", "tar", "gz", "tgz", "bz2", "tbz", "tbz2", "xz",
+	"txz", "zst", "lz", "lzma", "lz4", "z", "cab", "iso", "dmg", "apk",
+	"apks", "xapk", "aab", "ipa", "jar", "war", "deb", "rpm", "msix",
+	"appx",
+};
+const auto kArchiveTypes = {
+	"application/zip", "application/x-zip-compressed", "application/gzip",
+	"application/x-gzip", "application/x-tar", "application/x-7z-compressed",
+	"application/x-rar-compressed", "application/vnd.rar",
+	"application/x-bzip2", "application/x-xz", "application/zstd",
+	"application/vnd.android.package-archive", "application/java-archive",
+	"application/x-iso9660-image",
+};
+
+[[nodiscard]] bool OneOf(
+		const QString &value,
+		std::initializer_list<const char*> list) {
+	for (const auto item : list) {
+		if (value == QString::fromLatin1(item)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+base::options::toggle OptionMenuGemini({
+	.id = "mzgram-ai-menu-gemini",
+	.name = "MZGram: Gemini in the main menu",
+});
+base::options::toggle OptionMenuClaude({
+	.id = "mzgram-ai-menu-claude",
+	.name = "MZGram: Claude in the main menu",
+});
+base::options::toggle OptionMenuChatGpt({
+	.id = "mzgram-ai-menu-chatgpt",
+	.name = "MZGram: ChatGPT in the main menu",
+});
+base::options::toggle OptionMenuDeepSeek({
+	.id = "mzgram-ai-menu-deepseek",
+	.name = "MZGram: DeepSeek in the main menu",
+});
+base::options::toggle OptionMenuGrok({
+	.id = "mzgram-ai-menu-grok",
+	.name = "MZGram: Grok in the main menu",
+});
+
+[[nodiscard]] base::options::toggle &MenuOption(Provider provider) {
+	switch (provider) {
+	case Provider::Gemini: return OptionMenuGemini;
+	case Provider::Claude: return OptionMenuClaude;
+	case Provider::ChatGpt: return OptionMenuChatGpt;
+	case Provider::DeepSeek: return OptionMenuDeepSeek;
+	case Provider::Grok: return OptionMenuGrok;
+	}
+	return OptionMenuGemini;
+}
+
 } // namespace
 
 const char kOptionAiProvider[] = "mzgram-ai-provider";
@@ -315,56 +405,186 @@ NewWindow NewWindowTarget(Provider provider, const QString &url) {
 	return NewWindow::Browser;
 }
 
-// The tests come first: the attachments and the menu buttons are not
-// written yet.
 AttachmentKind ClassifyFile(const QString &name, const QString &mime) {
-	Q_UNUSED(name);
-	Q_UNUSED(mime);
+	const auto lower = name.trimmed().toLower();
+	const auto type = mime.trimmed().toLower();
+	const auto dot = lower.lastIndexOf('.');
+	const auto extension = (dot >= 0) ? lower.mid(dot + 1) : QString();
+	const auto base = (dot > 0) ? lower.left(dot) : lower;
+	if (OneOf(extension, kArchiveExtensions) || OneOf(type, kArchiveTypes)) {
+		return AttachmentKind::Archive;
+	} else if (OneOf(extension, kImageExtensions)
+		|| (extension.isEmpty() && OneOf(type, kImageTypes))) {
+		return AttachmentKind::Photo;
+	} else if (type.startsWith(u"video/"_q)
+		|| type.startsWith(u"audio/"_q)
+		|| type == u"image/gif"_q
+		|| OneOf(extension, {
+			"gif", "tgs", "webm", "mp4", "mov", "mkv", "avi", "m4v", "mp3",
+			"ogg", "oga", "opus", "m4a", "wav", "flac", "aac" })) {
+		return AttachmentKind::Media;
+	} else if (OneOf(extension, kFileExtensions)
+		|| OneOf(base, kFileNames)
+		|| OneOf(lower, kFileNames)
+		|| type.startsWith(u"text/"_q)
+		|| OneOf(type, kFileTypes)) {
+		return AttachmentKind::File;
+	}
+	for (const auto prefix : kFileTypePrefixes) {
+		if (type.startsWith(QString::fromLatin1(prefix))) {
+			return AttachmentKind::File;
+		}
+	}
 	return AttachmentKind::Unsupported;
 }
 
 AttachmentChoice ChooseAttachments(
 		const std::vector<AttachmentCandidate> &candidates) {
-	Q_UNUSED(candidates);
-	return {};
+	auto result = AttachmentChoice();
+	for (auto i = 0; i != int(candidates.size()); ++i) {
+		const auto &candidate = candidates[i];
+		switch (candidate.kind) {
+		case AttachmentKind::Archive: ++result.archives; break;
+		case AttachmentKind::Media: ++result.media; break;
+		case AttachmentKind::Unsupported: ++result.unsupported; break;
+		case AttachmentKind::Photo:
+		case AttachmentKind::File:
+			if (candidate.size > kMaxAttachmentSize) {
+				++result.tooLarge;
+			} else if (int(result.chosen.size()) >= kMaxAttachments) {
+				++result.overLimit;
+			} else {
+				result.chosen.push_back(i);
+			}
+			break;
+		}
+	}
+	return result;
 }
 
 QByteArray FileStartScript(int index, const QString &name, const QString &mime) {
-	Q_UNUSED(index);
-	Q_UNUSED(name);
-	Q_UNUSED(mime);
-	return QByteArray();
+	return "(window.__mzgramAiFiles = window.__mzgramAiFiles || [])["
+		+ QByteArray::number(index)
+		+ "] = { name: " + ScriptString(name)
+		+ ", type: " + ScriptString(mime)
+		+ ", parts: [] };";
 }
 
 QByteArray FileChunkScript(int index, const QByteArray &bytes) {
-	Q_UNUSED(index);
-	Q_UNUSED(bytes);
-	return QByteArray();
+	return "window.__mzgramAiFiles["
+		+ QByteArray::number(index)
+		+ "].parts.push(\"" + bytes.toBase64() + "\");";
 }
 
 QByteArray AttachScript(Provider provider) {
-	Q_UNUSED(provider);
-	return QByteArray();
+	auto selectors = QByteArray();
+	const auto add = [&](const char *selector) {
+		if (!selectors.isEmpty()) {
+			selectors.append(',');
+		}
+		selectors.append(ScriptString(QString::fromLatin1(selector)));
+	};
+	for (const auto selector : Info(provider).inputSelectors) {
+		add(selector);
+	}
+	for (const auto selector : kAnyInput) {
+		add(selector);
+	}
+	// The files as File objects: to the site's file input, as choosing them
+	// in its file dialog would, or else as a paste into its input field.
+	// Nothing here presses a key or a button.
+	return R"JS((function(){
+const selectors = [)JS" + selectors + R"JS(];
+const tell = (message) => {
+	try { window.external.invoke(JSON.stringify(message)); } catch (e) {}
+};
+const shown = (e) => {
+	const r = e.getBoundingClientRect();
+	return r.width > 0 && r.height > 0;
+};
+const field = () => {
+	for (const s of selectors) {
+		for (const e of document.querySelectorAll(s)) {
+			if (shown(e)) return e;
+		}
+	}
+	return null;
+};
+const files = [];
+for (const f of (window.__mzgramAiFiles || [])) {
+	if (!f) continue;
+	const binary = atob(f.parts.join(''));
+	const bytes = new Uint8Array(binary.length);
+	for (let i = 0; i < binary.length; ++i) bytes[i] = binary.charCodeAt(i);
+	files.push(new File([bytes], f.name, { type: f.type }));
+}
+window.__mzgramAiFiles = [];
+const list = (some) => {
+	const data = new DataTransfer();
+	for (const f of some) data.items.add(f);
+	return data;
+};
+const inputs = Array.from(document.querySelectorAll('input[type="file"]'))
+	.filter((i) => !i.disabled);
+const input = inputs.find((i) => i.multiple) || inputs[0];
+if (input) {
+	const put = (some) => {
+		input.files = list(some).files;
+		input.dispatchEvent(new Event('input', { bubbles: true }));
+		input.dispatchEvent(new Event('change', { bubbles: true }));
+	};
+	if (input.multiple || files.length < 2) {
+		put(files);
+	} else {
+		for (const f of files) put([f]);
+	}
+	tell({ mzgram_ai: 'attached', how: 'input', count: files.length });
+	return;
+}
+const e = field();
+if (e) {
+	e.focus();
+	e.dispatchEvent(new ClipboardEvent('paste', {
+		clipboardData: list(files),
+		bubbles: true,
+		cancelable: true,
+	}));
+	tell({ mzgram_ai: 'attached', how: 'paste', count: files.length });
+	return;
+}
+tell({ mzgram_ai: 'no_attach_target' });
+})();)JS";
 }
 
 std::optional<AttachResult> ParseAttach(const QByteArray &message) {
-	Q_UNUSED(message);
+	const auto document = QJsonDocument::fromJson(message);
+	if (!document.isObject()) {
+		return std::nullopt;
+	}
+	const auto object = document.object();
+	const auto status = object.value(u"mzgram_ai"_q).toString();
+	if (status == u"attached"_q) {
+		return AttachResult{
+			.attached = true,
+			.how = object.value(u"how"_q).toString(),
+			.count = object.value(u"count"_q).toInt(),
+		};
+	} else if (status == u"no_attach_target"_q) {
+		return AttachResult();
+	}
 	return std::nullopt;
 }
 
 QString MenuButtonOption(Provider provider) {
-	Q_UNUSED(provider);
-	return QString();
+	return u"mzgram-ai-menu-"_q + QString::fromLatin1(Info(provider).key);
 }
 
 bool MenuButton(Provider provider) {
-	Q_UNUSED(provider);
-	return false;
+	return MenuOption(provider).value();
 }
 
 void SetMenuButton(Provider provider, bool shown) {
-	Q_UNUSED(provider);
-	Q_UNUSED(shown);
+	MenuOption(provider).set(shown);
 }
 
 } // namespace MZGram::Ai

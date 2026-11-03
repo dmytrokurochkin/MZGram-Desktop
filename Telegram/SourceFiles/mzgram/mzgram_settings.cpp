@@ -21,9 +21,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "mzgram/mzgram_message_store.h"
 #include "mzgram/mzgram_options.h"
 #include "mzgram/mzgram_protected_content.h"
+#include "mzgram/mzgram_settings_rows.h"
+#include "mzgram/mzgram_unblock.h"
 #include "mzgram/mzgram_update.h"
 #include "settings/settings_builder.h"
 #include "settings/settings_common_session.h"
+#include "settings.h"
 #include "ui/boxes/confirm_box.h"
 #include "ui/layers/generic_box.h"
 #include "ui/toast/toast.h"
@@ -96,6 +99,32 @@ void AddOptionToggle(
 	}, button->lifetime());
 }
 
+// A switch titled with a name shown as is in every language.
+void AddNamedOptionToggle(
+		SectionBuilder &builder,
+		const QString &id,
+		const QString &title,
+		const char optionId[],
+		QStringList keywords) {
+	const auto button = builder.addButton({
+		.id = id,
+		.title = rpl::single(title),
+		.st = &st::settingsButtonNoIcon,
+		.toggled = OptionValue(optionId),
+		.keywords = std::move(keywords),
+	});
+	if (!button) {
+		return;
+	}
+	const auto option = &base::options::lookup<bool>(optionId);
+	button->toggledChanges(
+	) | rpl::filter([=](bool toggled) {
+		return (toggled != option->value());
+	}) | rpl::on_next([=](bool toggled) {
+		option->set(toggled);
+	}, button->lifetime());
+}
+
 // The current text of a mark option, kept up to date.
 [[nodiscard]] rpl::producer<QString> MarkValue(const char optionId[]) {
 	const auto option = &base::options::lookup<QString>(optionId);
@@ -146,10 +175,11 @@ void LanguageBox(not_null<Ui::GenericBox*> box) {
 	const auto option = &base::options::lookup<QString>(
 		MZGram::kOptionLanguage);
 	box->setTitle(Text("mzgram_language"));
-	auto selected = 0;
+	const auto system = QString::fromLatin1(MZGram::kLanguageSystem);
+	auto selected = (MZGram::LanguageChoice() == system) ? 1 : 0;
 	for (auto i = 0; i != MZGram::kLanguageCount; ++i) {
 		if (MZGram::LanguageChoice() == QString::fromLatin1(MZGram::kLanguages[i])) {
-			selected = i + 1;
+			selected = i + 2;
 		}
 	}
 	const auto group = std::make_shared<Ui::RadiobuttonGroup>(selected);
@@ -161,13 +191,16 @@ void LanguageBox(not_null<Ui::GenericBox*> box) {
 			label,
 			st::defaultBoxCheckbox));
 	};
-	add(0, MZGram::TrNow("mzgram_language_system"));
+	add(0, MZGram::TrNow("mzgram_language_telegram"));
+	add(1, MZGram::TrNow("mzgram_language_system"));
 	for (auto i = 0; i != MZGram::kLanguageCount; ++i) {
-		add(i + 1, QString::fromUtf8(MZGram::kLanguageNames[i]));
+		add(i + 2, QString::fromUtf8(MZGram::kLanguageNames[i]));
 	}
 	group->setChangedCallback([=](int value) {
-		option->set(value
-			? QString::fromLatin1(MZGram::kLanguages[value - 1])
+		option->set((value > 1)
+			? QString::fromLatin1(MZGram::kLanguages[value - 2])
+			: (value == 1)
+			? system
 			: QString());
 		box->closeBox();
 	});
@@ -178,14 +211,19 @@ void LanguageBox(not_null<Ui::GenericBox*> box) {
 
 // The current choice, by its name.
 [[nodiscard]] rpl::producer<QString> LanguageValue() {
-	return MZGram::Tr("mzgram_language_system") | rpl::map([](QString system) {
+	return rpl::combine(
+		MZGram::Tr("mzgram_language_telegram"),
+		MZGram::Tr("mzgram_language_system")
+	) | rpl::map([](QString telegram, QString system) {
 		const auto chosen = MZGram::LanguageChoice();
 		for (auto i = 0; i != MZGram::kLanguageCount; ++i) {
 			if (chosen == QString::fromLatin1(MZGram::kLanguages[i])) {
 				return QString::fromUtf8(MZGram::kLanguageNames[i]);
 			}
 		}
-		return system;
+		return (chosen == QString::fromLatin1(MZGram::kLanguageSystem))
+			? system
+			: telegram;
 	});
 }
 
@@ -496,6 +534,28 @@ void BuildMessageMenu(SectionBuilder &builder) {
 		{ u"open"_q, u"file"_q, u"video"_q });
 	builder.addSkip();
 	builder.addDividerText(Text("message_menu_info"));
+
+	builder.addSkip();
+	AddOptionToggle(
+		builder,
+		u"mzgram/copy-photo"_q,
+		"show_copy_photo",
+		kOptionCopyPhoto,
+		{ u"copy"_q, u"photo"_q, u"image"_q, u"clipboard"_q });
+	AddOptionToggle(
+		builder,
+		u"mzgram/delete-downloaded-file"_q,
+		"show_delete_downloaded",
+		kOptionDeleteDownloadedFile,
+		{ u"delete"_q, u"file"_q, u"download"_q, u"disk"_q });
+	AddOptionToggle(
+		builder,
+		u"mzgram/forward-no-quote"_q,
+		"show_forward_no_quote",
+		kOptionForwardNoQuote,
+		{ u"forward"_q, u"sender"_q, u"quote"_q, u"name"_q });
+	builder.addSkip();
+	builder.addDividerText(Text("message_menu_more_info"));
 	builder.addSkip();
 	AddOptionToggle(
 		builder,
@@ -599,32 +659,19 @@ void BuildInterface(SectionBuilder &builder) {
 	builder.addSkip();
 	builder.addDividerText(Text("open_archive_on_pull_info"));
 
+	// Rows of Telegram's own Settings page, each hidden by its own switch
 	builder.addSkip();
-	AddOptionToggle(
-		builder,
-		u"mzgram/check-updates"_q,
-		"check_updates",
-		kOptionCheckUpdates,
-		{ u"update"_q, u"version"_q, u"release"_q, u"github"_q });
-	builder.addButton({
-		.id = u"mzgram/check-updates-now"_q,
-		.title = Text("check_updates_now"),
-		.st = &st::settingsButtonNoIcon,
-		.onClick = [=] {
-			MZGram::Update::CheckNow([](MZGram::Update::ManualOutcome outcome) {
-				using Result = MZGram::Update::ManualResult;
-				Ui::Toast::Show((outcome.result == Result::Available)
-					? MZGram::TrNow("update_check_available").arg(
-						outcome.release->version())
-					: (outcome.result == Result::Latest)
-					? MZGram::TrNow("update_check_latest")
-					: MZGram::TrNow("update_check_failed"));
-			});
-		},
-		.keywords = { u"update"_q, u"check"_q, u"version"_q },
-	});
+	builder.addSubsectionTitle(Text("hide_rows_title"));
+	for (const auto &row : HideableRows()) {
+		AddOptionToggle(
+			builder,
+			u"mzgram/hide-row-"_q + QString::fromLatin1(row.key),
+			row.phrase,
+			row.option,
+			{ u"hide"_q, u"settings"_q, QString::fromLatin1(row.key) });
+	}
 	builder.addSkip();
-	builder.addDividerText(Text("check_updates_info"));
+	builder.addDividerText(Text("hide_rows_info"));
 }
 
 // The default site of "Ask AI": a choice applies at once.
@@ -706,6 +753,21 @@ void BuildAi(SectionBuilder &builder) {
 	});
 	builder.addSkip();
 	builder.addDividerText(Text("ai_info"));
+
+	// A button for each site in the main menu, to open it with no message
+	builder.addSkip();
+	builder.addSubsectionTitle(Text("ai_menu_buttons"));
+	for (const auto &info : Providers()) {
+		const auto option = MenuButtonOption(info.id).toLatin1();
+		AddNamedOptionToggle(
+			builder,
+			u"mzgram/ai-menu-"_q + QString::fromLatin1(info.key),
+			QString::fromLatin1(info.name),
+			option.constData(),
+			{ u"ai"_q, u"menu"_q, QString::fromLatin1(info.key) });
+	}
+	builder.addSkip();
+	builder.addDividerText(Text("ai_menu_buttons_info"));
 }
 
 void BuildAdsFilters(SectionBuilder &builder) {
@@ -732,6 +794,67 @@ void BuildAdsFilters(SectionBuilder &builder) {
 	builder.addDividerText(Text("zalgo_filter_info"));
 }
 
+void BuildOther(SectionBuilder &builder) {
+	using namespace MZGram;
+
+	builder.addSkip();
+	AddOptionToggle(
+		builder,
+		u"mzgram/check-updates"_q,
+		"check_updates",
+		kOptionCheckUpdates,
+		{ u"update"_q, u"version"_q, u"release"_q, u"github"_q });
+	builder.addButton({
+		.id = u"mzgram/check-updates-now"_q,
+		.title = Text("check_updates_now"),
+		.st = &st::settingsButtonNoIcon,
+		.onClick = [=] {
+			MZGram::Update::CheckNow([](MZGram::Update::ManualOutcome outcome) {
+				using Result = MZGram::Update::ManualResult;
+				Ui::Toast::Show((outcome.result == Result::Available)
+					? MZGram::TrNow("update_check_available").arg(
+						outcome.release->version())
+					: (outcome.result == Result::Latest)
+					? MZGram::TrNow("update_check_latest")
+					: MZGram::TrNow("update_check_failed"));
+			});
+		},
+		.keywords = { u"update"_q, u"check"_q, u"version"_q },
+	});
+	builder.addSkip();
+	builder.addDividerText(Text("check_updates_info"));
+#ifdef Q_OS_WIN
+	// Only when pressed: the mark Windows asks about goes from MZGram's own
+	// files; Windows protection is never changed
+	builder.addSkip();
+	const auto controller = builder.controller();
+	builder.addButton({
+		.id = u"mzgram/unblock-files"_q,
+		.title = Text("unblock_files"),
+		.st = &st::settingsButtonNoIcon,
+		.onClick = [=] {
+			controller->show(Ui::MakeConfirmBox({
+				.text = MZGram::TrNow("unblock_files_confirm"),
+				.confirmed = [](Fn<void()> close) {
+					const auto folder = cExeDir();
+					const auto count = MZGram::UnblockFolder(folder);
+					close();
+					Ui::Toast::Show(MZGram::MarkedFiles(folder)
+						? MZGram::TrNow("unblock_files_denied")
+						: MZGram::TrNow("unblock_files_done").arg(count));
+				},
+				.confirmText = Text("unblock_files"),
+				.cancelText = Text("button_cancel"),
+				.title = Text("unblock_files"),
+			}));
+		},
+		.keywords = { u"unblock"_q, u"smartscreen"_q, u"windows"_q },
+	});
+	builder.addSkip();
+	builder.addDividerText(Text("unblock_files_info"));
+#endif // Q_OS_WIN
+}
+
 struct Topic {
 	const char *title = nullptr;
 	const style::icon *icon = nullptr;
@@ -739,8 +862,8 @@ struct Topic {
 };
 
 // The topics, in the order the MZGram page lists them.
-[[nodiscard]] const std::array<Topic, 7> &Topics() {
-	static const auto result = std::array<Topic, 7>{ {
+[[nodiscard]] const std::array<Topic, 8> &Topics() {
+	static const auto result = std::array<Topic, 8>{ {
 		{ "section_archive", &st::menuIconArchive, BuildArchive },
 		{ "section_ghost_mode", &st::menuIconStealth, BuildGhostMode },
 		{ "section_message_menu", &st::menuIconChatBubble, BuildMessageMenu },
@@ -748,6 +871,7 @@ struct Topic {
 		{ "section_interface", &st::menuIconPalette, BuildInterface },
 		{ "section_ads_filters", &st::menuIconBlock, BuildAdsFilters },
 		{ "section_ai", &st::menuIconBot, BuildAi },
+		{ "section_other", &st::menuIconInfo, BuildOther },
 	} };
 	return result;
 }
@@ -766,7 +890,6 @@ void BuildMZGramSection(SectionBuilder &builder) {
 		});
 	}
 	builder.addSkip();
-	builder.addDividerText(Text("settings_topics_info"));
 }
 
 class MZGramSection : public Section<MZGramSection> {
@@ -858,6 +981,7 @@ Type TopicId(int index) {
 	case 4: return MZGramTopicSection<4>::Id();
 	case 5: return MZGramTopicSection<5>::Id();
 	case 6: return MZGramTopicSection<6>::Id();
+	case 7: return MZGramTopicSection<7>::Id();
 	}
 	Unexpected("Index in MZGram TopicId.");
 }

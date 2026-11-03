@@ -172,6 +172,29 @@ base::options::toggle OptionOpenIn({
 	.description = "Adds the OS \"Open with\" dialog to the file menu",
 });
 
+// As on MZGram Android (showCopyPhoto).
+base::options::toggle OptionCopyPhoto({
+	.id = kOptionCopyPhoto,
+	.name = "Show \"Copy Photo\" in the message menu",
+	.description = "Copies a photo, or a picture sent as a file, to paste "
+		"it elsewhere",
+});
+
+// As on MZGram Android (showDeleteDownloadedFile).
+base::options::toggle OptionDeleteDownloadedFile({
+	.id = kOptionDeleteDownloadedFile,
+	.name = "Show \"Delete Downloaded File\" in the message menu",
+	.description = "Removes a message's downloaded file from this computer; "
+		"the message stays",
+});
+
+// As on MZGram Android (showNoQuoteForward).
+base::options::toggle OptionForwardNoQuote({
+	.id = kOptionForwardNoQuote,
+	.name = "Show \"Forward without sender\" in the message menu",
+	.description = "Opens the forward box with the sender's name hidden",
+});
+
 base::options::toggle OptionMediaPreviewOnChatPreview({
 	.id = kOptionMediaPreviewOnChatPreview,
 	.name = "Media preview instead of Chat Preview",
@@ -206,6 +229,9 @@ const char kOptionOpenArchiveOnPull[] = "mzgram-open-archive-on-pull";
 const char kOptionSaveMessage[] = "mzgram-save-message";
 const char kOptionSetReminder[] = "mzgram-set-reminder";
 const char kOptionOpenIn[] = "mzgram-open-in";
+const char kOptionCopyPhoto[] = "mzgram-copy-photo";
+const char kOptionDeleteDownloadedFile[] = "mzgram-delete-downloaded-file";
+const char kOptionForwardNoQuote[] = "mzgram-forward-no-quote";
 const char kOptionMediaPreviewOnChatPreview[] =
 	"mzgram-media-preview-on-chat-preview";
 
@@ -355,6 +381,18 @@ bool SetReminderAction() {
 
 bool OpenInAction() {
 	return OptionOpenIn.value();
+}
+
+bool CopyPhotoAction() {
+	return OptionCopyPhoto.value();
+}
+
+bool DeleteDownloadedFileAction() {
+	return OptionDeleteDownloadedFile.value();
+}
+
+bool ForwardNoQuoteAction() {
+	return OptionForwardNoQuote.value();
 }
 
 bool MediaPreviewOnChatPreview() {

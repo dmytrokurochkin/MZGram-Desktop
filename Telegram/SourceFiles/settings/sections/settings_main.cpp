@@ -41,6 +41,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lottie/lottie_icon.h"
 #include "menu/menu_checked_action.h"
 #include "mzgram/mzgram_settings.h"
+#include "mzgram/mzgram_settings_rows.h"
 #include "main/main_account.h"
 #include "main/main_app_config.h"
 #include "main/main_domain.h"
@@ -520,103 +521,130 @@ void BuildPremiumSection(SectionBuilder &builder) {
 	builder.addDivider();
 	builder.addSkip();
 
-	builder.addPremiumButton({
-		.id = u"main/premium"_q,
-		.title = tr::lng_premium_summary_title(),
-		.onClick = [=] {
-			controller->setPremiumRef("settings");
-			showOther(PremiumId());
-		},
-		.keywords = { u"subscription"_q },
-	});
+	// MZGram: Settings > MZGram > Interface can hide it
+	if (!MZGram::RowHidden("premium")) {
+		builder.addPremiumButton({
+			.id = u"main/premium"_q,
+			.title = tr::lng_premium_summary_title(),
+			.onClick = [=] {
+				controller->setPremiumRef("settings");
+				showOther(PremiumId());
+			},
+			.keywords = { u"subscription"_q },
+		});
+	}
 
 	session->credits().load();
-	builder.addPremiumButton({
-		.id = u"main/credits"_q,
-		.title = tr::lng_settings_credits(),
-		.label = session->credits().balanceValue(
-		) | rpl::map([](CreditsAmount c) {
-			return c
-				? Lang::FormatCreditsAmountToShort(c).string
-				: QString();
-		}),
-		.credits = true,
-		.onClick = [=] {
-			controller->setPremiumRef("settings");
-			showOther(CreditsId());
-		},
-		.keywords = { u"stars"_q, u"balance"_q },
-	});
+	// MZGram: Settings > MZGram > Interface can hide it
+	if (!MZGram::RowHidden("stars")) {
+		builder.addPremiumButton({
+			.id = u"main/credits"_q,
+			.title = tr::lng_settings_credits(),
+			.label = session->credits().balanceValue(
+			) | rpl::map([](CreditsAmount c) {
+				return c
+					? Lang::FormatCreditsAmountToShort(c).string
+					: QString();
+			}),
+			.credits = true,
+			.onClick = [=] {
+				controller->setPremiumRef("settings");
+				showOther(CreditsId());
+			},
+			.keywords = { u"stars"_q, u"balance"_q },
+		});
+	}
 
 	session->credits().tonLoad();
-	builder.addButton({
-		.id = u"main/currency"_q,
-		.title = tr::lng_settings_currency(),
-		.icon = { &st::menuIconTon },
-		.label = session->credits().tonBalanceValue(
-		) | rpl::map([](CreditsAmount c) {
-			return c ? Lang::FormatCreditsAmountToShort(c).string : u""_q;
-		}),
-		.onClick = [=] {
-			controller->setPremiumRef("settings");
-			showOther(CurrencyId());
-		},
-		.keywords = { u"ton"_q, u"crypto"_q, u"wallet"_q },
-		.shown = session->credits().tonBalanceValue(
-		) | rpl::map([](CreditsAmount c) { return !c.empty(); }),
-	});
+	// MZGram: Settings > MZGram > Interface can hide it
+	if (!MZGram::RowHidden("currency")) {
+		builder.addButton({
+			.id = u"main/currency"_q,
+			.title = tr::lng_settings_currency(),
+			.icon = { &st::menuIconTon },
+			.label = session->credits().tonBalanceValue(
+			) | rpl::map([](CreditsAmount c) {
+				return c ? Lang::FormatCreditsAmountToShort(c).string : u""_q;
+			}),
+			.onClick = [=] {
+				controller->setPremiumRef("settings");
+				showOther(CurrencyId());
+			},
+			.keywords = { u"ton"_q, u"crypto"_q, u"wallet"_q },
+			.shown = session->credits().tonBalanceValue(
+			) | rpl::map([](CreditsAmount c) { return !c.empty(); }),
+		});
+	}
 
-	builder.addButton({
-		.id = u"main/business"_q,
-		.title = tr::lng_business_title(),
-		.icon = { .icon = &st::menuIconShop },
-		.onClick = [=] { showOther(BusinessId()); },
-		.keywords = { u"work"_q, u"company"_q },
-	});
+	// MZGram: Settings > MZGram > Interface can hide it
+	if (!MZGram::RowHidden("business")) {
+		builder.addButton({
+			.id = u"main/business"_q,
+			.title = tr::lng_business_title(),
+			.icon = { .icon = &st::menuIconShop },
+			.onClick = [=] { showOther(BusinessId()); },
+			.keywords = { u"work"_q, u"company"_q },
+		});
+	}
 
 	if (session->premiumCanBuy()) {
-		builder.addButton({
-			.id = u"main/send-gift"_q,
-			.title = tr::lng_settings_gift_premium(),
-			.icon = { .icon = &st::menuIconGiftPremium, .newBadge = true },
-			.onClick = [=] { Ui::ChooseStarGiftRecipient(controller); },
-			.keywords = { u"present"_q, u"send"_q },
-		});
+		// MZGram: Settings > MZGram > Interface can hide it
+		if (!MZGram::RowHidden("send-gift")) {
+			builder.addButton({
+				.id = u"main/send-gift"_q,
+				.title = tr::lng_settings_gift_premium(),
+				.icon = { .icon = &st::menuIconGiftPremium, .newBadge = true },
+				.onClick = [=] { Ui::ChooseStarGiftRecipient(controller); },
+				.keywords = { u"present"_q, u"send"_q },
+			});
+		}
 	}
 
 	builder.addSkip();
 }
 
 void BuildHelpSection(SectionBuilder &builder) {
+	if (MZGram::HelpHidden()) {
+		return;
+	}
 	builder.addDivider();
 	builder.addSkip();
 
 	const auto controller = builder.controller();
-	builder.addButton({
-		.id = u"main/faq"_q,
-		.title = tr::lng_settings_faq(),
-		.icon = { &st::menuIconFaq },
-		.onClick = [=] { OpenFaq(controller); },
-		.keywords = { u"help"_q, u"support"_q, u"questions"_q },
-	});
+	// MZGram: Settings > MZGram > Interface can hide it
+	if (!MZGram::RowHidden("faq")) {
+		builder.addButton({
+			.id = u"main/faq"_q,
+			.title = tr::lng_settings_faq(),
+			.icon = { &st::menuIconFaq },
+			.onClick = [=] { OpenFaq(controller); },
+			.keywords = { u"help"_q, u"support"_q, u"questions"_q },
+		});
+	}
 
-	builder.addButton({
-		.id = u"main/features"_q,
-		.title = tr::lng_settings_features(),
-		.icon = { &st::menuIconEmojiObjects },
-		.onClick = [] {
-			UrlClickHandler::Open(tr::lng_telegram_features_url(tr::now));
-		},
-		.keywords = { u"tips"_q, u"tutorial"_q },
-	});
+	// MZGram: Settings > MZGram > Interface can hide it
+	if (!MZGram::RowHidden("features")) {
+		builder.addButton({
+			.id = u"main/features"_q,
+			.title = tr::lng_settings_features(),
+			.icon = { &st::menuIconEmojiObjects },
+			.onClick = [] {
+				UrlClickHandler::Open(tr::lng_telegram_features_url(tr::now));
+			},
+			.keywords = { u"tips"_q, u"tutorial"_q },
+		});
+	}
 
-	builder.addButton({
-		.id = u"main/ask-question"_q,
-		.title = tr::lng_settings_ask_question(),
-		.icon = { &st::menuIconDiscussion },
-		.onClick = [=] { OpenAskQuestionConfirm(controller); },
-		.keywords = { u"contact"_q, u"feedback"_q },
-	});
+	// MZGram: Settings > MZGram > Interface can hide it
+	if (!MZGram::RowHidden("ask-question")) {
+		builder.addButton({
+			.id = u"main/ask-question"_q,
+			.title = tr::lng_settings_ask_question(),
+			.icon = { &st::menuIconDiscussion },
+			.onClick = [=] { OpenAskQuestionConfirm(controller); },
+			.keywords = { u"contact"_q, u"feedback"_q },
+		});
+	}
 
 	builder.addSkip();
 }

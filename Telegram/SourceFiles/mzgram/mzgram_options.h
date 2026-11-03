@@ -107,6 +107,17 @@ extern const char kOptionSetReminder[];
 extern const char kOptionOpenIn[];
 [[nodiscard]] bool OpenInAction();
 
+// As on MZGram Android (showCopyPhoto, showDeleteDownloadedFile,
+// showNoQuoteForward): Copy Photo for photos and pictures sent as files,
+// Delete Downloaded File for a document on this computer, Forward without
+// sender opening the forward box with the sender's name hidden.
+extern const char kOptionCopyPhoto[];
+[[nodiscard]] bool CopyPhotoAction();
+extern const char kOptionDeleteDownloadedFile[];
+[[nodiscard]] bool DeleteDownloadedFileAction();
+extern const char kOptionForwardNoQuote[];
+[[nodiscard]] bool ForwardNoQuoteAction();
+
 // Long-pressing
 // (Android) or press-and-holding the avatar (Desktop) on a chat list row
 // normally opens the native Chat Preview peek. When the chat's last
