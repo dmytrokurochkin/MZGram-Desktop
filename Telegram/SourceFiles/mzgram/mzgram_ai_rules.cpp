@@ -476,39 +476,14 @@ QByteArray FileChunkScript(int index, const QByteArray &bytes) {
 		+ "].parts.push(\"" + bytes.toBase64() + "\");";
 }
 
-QByteArray AttachScript(Provider provider) {
-	auto selectors = QByteArray();
-	const auto add = [&](const char *selector) {
-		if (!selectors.isEmpty()) {
-			selectors.append(',');
-		}
-		selectors.append(ScriptString(QString::fromLatin1(selector)));
-	};
-	for (const auto selector : Info(provider).inputSelectors) {
-		add(selector);
-	}
-	for (const auto selector : kAnyInput) {
-		add(selector);
-	}
-	// The files as File objects: to the site's file input, as choosing them
-	// in its file dialog would, or else as a paste into its input field.
-	// Nothing here presses a key or a button.
+QByteArray PickerHookScript() {
+	return QByteArray(); // Red: not yet
+}
+
+QByteArray GiveFilesScript() {
 	return R"JS((function(){
-const selectors = [)JS" + selectors + R"JS(];
 const tell = (message) => {
 	try { window.external.invoke(JSON.stringify(message)); } catch (e) {}
-};
-const shown = (e) => {
-	const r = e.getBoundingClientRect();
-	return r.width > 0 && r.height > 0;
-};
-const field = () => {
-	for (const s of selectors) {
-		for (const e of document.querySelectorAll(s)) {
-			if (shown(e)) return e;
-		}
-	}
-	return null;
 };
 const files = [];
 for (const f of (window.__mzgramAiFiles || [])) {
@@ -519,60 +494,42 @@ for (const f of (window.__mzgramAiFiles || [])) {
 	files.push(new File([bytes], f.name, { type: f.type }));
 }
 window.__mzgramAiFiles = [];
-const list = (some) => {
-	const data = new DataTransfer();
-	for (const f of some) data.items.add(f);
-	return data;
-};
-const inputs = Array.from(document.querySelectorAll('input[type="file"]'))
-	.filter((i) => !i.disabled);
-const input = inputs.find((i) => i.multiple) || inputs[0];
-if (input) {
-	const put = (some) => {
-		input.files = list(some).files;
-		input.dispatchEvent(new Event('input', { bubbles: true }));
-		input.dispatchEvent(new Event('change', { bubbles: true }));
-	};
-	if (input.multiple || files.length < 2) {
-		put(files);
-	} else {
-		for (const f of files) put([f]);
-	}
-	tell({ mzgram_ai: 'attached', how: 'input', count: files.length });
+const input = window.__mzgramAiPick;
+if (!input || !files.length) {
+	tell({ mzgram_ai: 'given', count: 0 });
 	return;
 }
-const e = field();
-if (e) {
-	e.focus();
-	e.dispatchEvent(new ClipboardEvent('paste', {
-		clipboardData: list(files),
-		bubbles: true,
-		cancelable: true,
-	}));
-	tell({ mzgram_ai: 'attached', how: 'paste', count: files.length });
-	return;
-}
-tell({ mzgram_ai: 'no_attach_target' });
+const data = new DataTransfer();
+for (const f of files) data.items.add(f);
+input.files = data.files;
+input.dispatchEvent(new Event('input', { bubbles: true }));
+input.dispatchEvent(new Event('change', { bubbles: true }));
+tell({ mzgram_ai: 'given', count: files.length });
 })();)JS";
 }
 
-std::optional<AttachResult> ParseAttach(const QByteArray &message) {
-	const auto document = QJsonDocument::fromJson(message);
-	if (!document.isObject()) {
-		return std::nullopt;
-	}
-	const auto object = document.object();
-	const auto status = object.value(u"mzgram_ai"_q).toString();
-	if (status == u"attached"_q) {
-		return AttachResult{
-			.attached = true,
-			.how = object.value(u"how"_q).toString(),
-			.count = object.value(u"count"_q).toInt(),
-		};
-	} else if (status == u"no_attach_target"_q) {
-		return AttachResult();
-	}
-	return std::nullopt;
+QByteArray CancelPickScript() {
+	return "(function(){const i=window.__mzgramAiPick;"
+		"if(i){i.dispatchEvent(new Event('cancel',{bubbles:true}));}})();";
+}
+
+std::optional<Pick> ParsePick(const QByteArray &message) {
+	return std::nullopt; // Red: not yet
+}
+
+std::optional<int> ParseGiven(const QByteArray &message) {
+	return std::nullopt; // Red: not yet
+}
+
+Give GiveFiles(const std::vector<int> &checked, bool multiple) {
+	return Give(); // Red: not yet
+}
+
+bool AcceptsFile(
+		const QString &accept,
+		const QString &name,
+		const QString &mime) {
+	return false; // Red: not yet
 }
 
 QString MenuButtonOption(Provider provider) {

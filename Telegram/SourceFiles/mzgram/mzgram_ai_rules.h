@@ -134,26 +134,49 @@ struct AttachmentChoice {
 [[nodiscard]] AttachmentChoice ChooseAttachments(
 	const std::vector<AttachmentCandidate> &candidates);
 
-// The files go into the page in pieces of kChunkSize bytes (base64 in a
-// script each), then AttachScript makes them File objects and hands them
-// to the site: to its file input, or as a paste into its input field. It
-// posts {"mzgram_ai":"attached","how":"input"|"paste","count":N} or
-// {"mzgram_ai":"no_attach_target"}. Nothing is sent.
+// The site's own button for adding files. PickerHookScript, added to every
+// page before the page's scripts run, keeps the browser's file dialog from
+// opening for a file input (a click on it or on its label, its click() and
+// showPicker()) and posts {"mzgram_ai":"pick","multiple":bool,"accept":"..."}
+// in its place: MZGram shows its own chooser. The chosen files go into the
+// page in pieces of kChunkSize bytes (base64 in a script each), then
+// GiveFilesScript gives them to that input as the dialog would and posts
+// {"mzgram_ai":"given","count":N}. Nothing is sent.
 inline constexpr auto kChunkSize = 512 * 1024;
+[[nodiscard]] QByteArray PickerHookScript();
 [[nodiscard]] QByteArray FileStartScript(
 	int index,
 	const QString &name,
 	const QString &mime);
 [[nodiscard]] QByteArray FileChunkScript(int index, const QByteArray &bytes);
-[[nodiscard]] QByteArray AttachScript(Provider provider);
+[[nodiscard]] QByteArray GiveFilesScript();
+// The chooser closed with nothing chosen: the input hears "cancel", as
+// from its dialog.
+[[nodiscard]] QByteArray CancelPickScript();
 
-struct AttachResult {
-	bool attached = false; // false: the page had nowhere to put them.
-	QString how; // "input" or "paste".
-	int count = 0;
+struct Pick {
+	bool multiple = false;
+	QString accept; // The input's accept list, as the page has it.
 };
-[[nodiscard]] std::optional<AttachResult> ParseAttach(
-	const QByteArray &message);
+[[nodiscard]] std::optional<Pick> ParsePick(const QByteArray &message);
+// How many files the input got, from GiveFilesScript.
+[[nodiscard]] std::optional<int> ParseGiven(const QByteArray &message);
+
+// The checked files: all of them now to an input that takes several, else
+// the first now and the rest at the next press of the site's button.
+struct Give {
+	std::vector<int> now;
+	std::vector<int> later;
+};
+[[nodiscard]] Give GiveFiles(const std::vector<int> &checked, bool multiple);
+
+// Whether the site's file input takes the file, by its accept list
+// ("image/*", "application/pdf", ".pdf"); an empty list or "*/*" takes
+// everything.
+[[nodiscard]] bool AcceptsFile(
+	const QString &accept,
+	const QString &name,
+	const QString &mime);
 
 // Settings > MZGram > AI: a button for each site in the main menu, which
 // opens the site with no text; all off by default.
