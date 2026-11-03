@@ -46,9 +46,27 @@ base::options::toggle OptionSaveReactions({
 	.defaultValue = true,
 });
 
+base::options::toggle OptionSaveFromUsers({
+	.id = kOptionSaveFromUsers,
+	.name = "Keep messages from users",
+	.defaultValue = true,
+});
+
 base::options::toggle OptionSaveForBots({
 	.id = kOptionSaveForBots,
-	.name = "Save in chats with bots",
+	.name = "Keep messages from bots",
+	.defaultValue = true,
+});
+
+base::options::toggle OptionSaveInGroups({
+	.id = kOptionSaveInGroups,
+	.name = "Keep messages in groups",
+	.defaultValue = true,
+});
+
+base::options::toggle OptionSaveInChannels({
+	.id = kOptionSaveInChannels,
+	.name = "Keep messages in channels",
 	.defaultValue = true,
 });
 
@@ -77,7 +95,10 @@ const char kOptionSaveEditHistory[] = "mzgram-save-edit-history";
 const char kOptionSaveArchiveMedia[] = "mzgram-save-archive-media";
 const char kOptionSaveFormatting[] = "mzgram-save-formatting";
 const char kOptionSaveReactions[] = "mzgram-save-reactions";
+const char kOptionSaveFromUsers[] = "mzgram-save-from-users";
 const char kOptionSaveForBots[] = "mzgram-save-for-bots";
+const char kOptionSaveInGroups[] = "mzgram-save-in-groups";
+const char kOptionSaveInChannels[] = "mzgram-save-in-channels";
 const char kOptionSemiTransparentDeleted[] = "mzgram-semi-transparent-deleted";
 const char kOptionDeletedMark[] = "mzgram-deleted-mark";
 const char kOptionEditedMark[] = "mzgram-edited-mark";
@@ -102,8 +123,32 @@ bool SaveReactions() {
 	return OptionSaveReactions.value();
 }
 
+bool SaveFromUsers() {
+	return OptionSaveFromUsers.value();
+}
+
 bool SaveForBots() {
 	return OptionSaveForBots.value();
+}
+
+bool SaveInGroups() {
+	return OptionSaveInGroups.value();
+}
+
+bool SaveInChannels() {
+	return OptionSaveInChannels.value();
+}
+
+ArchiveSource SourceOf(bool authorBot, ChatKind chat) {
+	return ArchiveSource::User; // Red: not yet
+}
+
+bool SavesFrom(ArchiveSource source) {
+	return true; // Red: not yet
+}
+
+bool MaySaveChat(bool botChat, ChatKind chat) {
+	return true; // Red: not yet
 }
 
 bool SemiTransparentDeleted() {
@@ -126,18 +171,18 @@ QString DefaultEditedMark() {
 	return QString::fromUtf8("\xe2\x9c\x8f\xef\xb8\x8f");
 }
 
-bool KeepsDeleted(bool service, bool own, bool bot) {
+bool KeepsDeleted(bool service, bool own, ArchiveSource source) {
 	return SaveDeletedMessages()
 		&& !service
 		&& !own
-		&& (!bot || SaveForBots());
+		&& SavesFrom(source);
 }
 
-bool KeepsEdit(bool service, bool own, bool bot) {
+bool KeepsEdit(bool service, bool own, ArchiveSource source) {
 	return SaveEditHistory()
 		&& !service
 		&& !own
-		&& (!bot || SaveForBots());
+		&& SavesFrom(source);
 }
 
 int KeptChatListMessage(const std::vector<ChatListCandidate> &items) {

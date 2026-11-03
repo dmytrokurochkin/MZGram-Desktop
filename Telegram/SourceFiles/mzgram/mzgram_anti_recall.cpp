@@ -28,18 +28,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 namespace MZGram {
 namespace {
 
-[[nodiscard]] bool IsBotChat(not_null<const HistoryItem*> item) {
-	const auto user = item->history()->peer->asUser();
-	return user && user->isBot();
-}
-
 // Other people's messages, in every chat; never the owner's own.
 [[nodiscard]] bool ChatQualifies(not_null<const HistoryItem*> item) {
-	return KeepsDeleted(item->isService(), item->out(), IsBotChat(item));
+	return KeepsDeleted(item->isService(), item->out(), SourceOfItem(item));
 }
 
 [[nodiscard]] bool EditQualifies(not_null<const HistoryItem*> item) {
-	return KeepsEdit(item->isService(), item->out(), IsBotChat(item));
+	return KeepsEdit(item->isService(), item->out(), SourceOfItem(item));
 }
 
 } // namespace
