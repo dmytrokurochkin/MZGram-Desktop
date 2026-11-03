@@ -315,4 +315,56 @@ NewWindow NewWindowTarget(Provider provider, const QString &url) {
 	return NewWindow::Browser;
 }
 
+// The tests come first: the attachments and the menu buttons are not
+// written yet.
+AttachmentKind ClassifyFile(const QString &name, const QString &mime) {
+	Q_UNUSED(name);
+	Q_UNUSED(mime);
+	return AttachmentKind::Unsupported;
+}
+
+AttachmentChoice ChooseAttachments(
+		const std::vector<AttachmentCandidate> &candidates) {
+	Q_UNUSED(candidates);
+	return {};
+}
+
+QByteArray FileStartScript(int index, const QString &name, const QString &mime) {
+	Q_UNUSED(index);
+	Q_UNUSED(name);
+	Q_UNUSED(mime);
+	return QByteArray();
+}
+
+QByteArray FileChunkScript(int index, const QByteArray &bytes) {
+	Q_UNUSED(index);
+	Q_UNUSED(bytes);
+	return QByteArray();
+}
+
+QByteArray AttachScript(Provider provider) {
+	Q_UNUSED(provider);
+	return QByteArray();
+}
+
+std::optional<AttachResult> ParseAttach(const QByteArray &message) {
+	Q_UNUSED(message);
+	return std::nullopt;
+}
+
+QString MenuButtonOption(Provider provider) {
+	Q_UNUSED(provider);
+	return QString();
+}
+
+bool MenuButton(Provider provider) {
+	Q_UNUSED(provider);
+	return false;
+}
+
+void SetMenuButton(Provider provider, bool shown) {
+	Q_UNUSED(provider);
+	Q_UNUSED(shown);
+}
+
 } // namespace MZGram::Ai

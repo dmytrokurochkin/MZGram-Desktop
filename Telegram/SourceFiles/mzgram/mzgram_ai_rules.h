@@ -98,6 +98,69 @@ enum class Status {
 };
 [[nodiscard]] Status ParseStatus(const QByteArray &message);
 
+// Attachments: photos and documents of the chosen messages go with the
+// text, at most kMaxAttachments (what the sites take in one message), each
+// at most kMaxAttachmentSize (the smallest limit of the five sites).
+inline constexpr auto kMaxAttachments = 10;
+inline constexpr auto kMaxAttachmentSize = qint64(30) * 1024 * 1024;
+
+enum class AttachmentKind {
+	Photo, // A photo, or a jpg, png or webp sent as a file.
+	File, // A document an AI reads: text, code, pdf, office files.
+	Archive, // zip, rar, 7z, tar, gz, apk and the like: never sent.
+	Media, // Video, GIF, sticker, voice, round video, music: never sent.
+	Unsupported, // Any other file.
+};
+
+// A file by its name and MIME type (a photo is Photo without a name).
+[[nodiscard]] AttachmentKind ClassifyFile(
+	const QString &name,
+	const QString &mime);
+
+struct AttachmentCandidate {
+	AttachmentKind kind = AttachmentKind::Unsupported;
+	qint64 size = 0;
+};
+struct AttachmentChoice {
+	std::vector<int> chosen; // Indices into the candidates, in order.
+	int overLimit = 0; // Past kMaxAttachments.
+	int tooLarge = 0; // Over kMaxAttachmentSize.
+	int archives = 0;
+	int media = 0;
+	int unsupported = 0;
+};
+// The first kMaxAttachments photos and files that are not too large, and
+// what is left out and why.
+[[nodiscard]] AttachmentChoice ChooseAttachments(
+	const std::vector<AttachmentCandidate> &candidates);
+
+// The files go into the page in pieces of kChunkSize bytes (base64 in a
+// script each), then AttachScript makes them File objects and hands them
+// to the site: to its file input, or as a paste into its input field. It
+// posts {"mzgram_ai":"attached","how":"input"|"paste","count":N} or
+// {"mzgram_ai":"no_attach_target"}. Nothing is sent.
+inline constexpr auto kChunkSize = 512 * 1024;
+[[nodiscard]] QByteArray FileStartScript(
+	int index,
+	const QString &name,
+	const QString &mime);
+[[nodiscard]] QByteArray FileChunkScript(int index, const QByteArray &bytes);
+[[nodiscard]] QByteArray AttachScript(Provider provider);
+
+struct AttachResult {
+	bool attached = false; // false: the page had nowhere to put them.
+	QString how; // "input" or "paste".
+	int count = 0;
+};
+[[nodiscard]] std::optional<AttachResult> ParseAttach(
+	const QByteArray &message);
+
+// Settings > MZGram > AI: a button for each site in the main menu, which
+// opens the site with no text; all off by default.
+[[nodiscard]] QString MenuButtonOption(Provider provider);
+[[nodiscard]] bool MenuButton(Provider provider);
+void SetMenuButton(Provider provider, bool shown);
+
 // The window goes only to https addresses.
 [[nodiscard]] bool AllowedNavigation(const QString &url);
 

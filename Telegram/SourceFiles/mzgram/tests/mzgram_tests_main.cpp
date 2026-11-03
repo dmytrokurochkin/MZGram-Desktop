@@ -15,6 +15,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "mzgram/mzgram_presence_rules.h"
 #include "mzgram/mzgram_protected_content.h"
 #include "mzgram/mzgram_self_update_rules.h"
+#include "mzgram/mzgram_settings_rows.h"
+#include "mzgram/mzgram_unblock.h"
 #include "mzgram/mzgram_text_filters.h"
 #include "mzgram/mzgram_update_install.h"
 #include "mzgram/mzgram_update_rules.h"
@@ -109,7 +111,12 @@ void TestStripHandlesEmpty() {
 // Every MZGram text is in English and Ukrainian, with the same %1, %2.
 void TestEveryPhraseInBothLanguages() {
 	// Read the same in both languages.
-	const auto same = QSet<QString>{ u"settings_title"_q, u"details_id"_q };
+	const auto same = QSet<QString>{
+		u"settings_title"_q,
+		u"details_id"_q,
+		u"hide_row_premium"_q,
+		u"hide_row_business"_q,
+	};
 	const auto cyrillic = QRegularExpression(u"[\\x{0400}-\\x{04FF}]"_q);
 	const auto placeholders = [](const QString &text) {
 		auto result = QStringList();
@@ -711,6 +718,7 @@ void TestSettingsAreTopicPages() {
 		u"Interface"_q,
 		u"AdsFilters"_q,
 		u"Ai"_q,
+		u"Other"_q,
 	};
 	auto toggles = 0;
 	for (const auto &topic : topics) {
@@ -723,6 +731,7 @@ void TestSettingsAreTopicPages() {
 		const auto end = text.indexOf(u"\n}\n"_q, start);
 		const auto body = text.mid(start, end - start);
 		const auto count = int(body.count(u"AddOptionToggle("_q))
+			+ int(body.count(u"AddNamedOptionToggle("_q))
 			+ int(body.count(u"addButton({"_q));
 		if (!count) {
 			problems.push_back(topic + u": empty page"_q);
@@ -742,9 +751,27 @@ void TestSettingsAreTopicPages() {
 		|| !mainBody.contains(u"addSectionButton("_q)) {
 		problems.push_back(u"list page"_q);
 	}
+	// Only the topics: no note under them saying so
+	if (mainBody.contains(u"addDividerText("_q) || text.contains(u"settings_topics_info"_q)) {
+		problems.push_back(u"a note under the topics"_q);
+	}
+	// In Android's order
+	auto order = QStringList();
+	for (const auto &title : {
+			"section_archive", "section_ghost_mode", "section_message_menu",
+			"section_media_calls", "section_interface", "section_ads_filters",
+			"section_ai", "section_other" }) {
+		order.push_back(QString::number(text.indexOf(u"{ \""_q + QString::fromLatin1(title) + u"\","_q)));
+	}
+	for (auto i = 1; i < order.size(); ++i) {
+		if (order[i].toInt() <= order[i - 1].toInt()) {
+			problems.push_back(u"topic order"_q);
+			break;
+		}
+	}
 	std::printf("settings topic pages: %d switches and buttons\n", toggles);
 	Check(
-		problems.isEmpty() && toggles == 44,
+		problems.isEmpty() && toggles == 50,
 		"settings are a list of topic pages, every switch on one",
 		problems.join(u", "_q).toStdString().c_str());
 }
@@ -1694,7 +1721,12 @@ void TestEveryPhraseInEveryLanguage() {
 	const auto belarusianOnly = QRegularExpression(QString::fromUtf8("[ўЎ]"));
 	const auto kazakhOnly = QRegularExpression(QString::fromUtf8("[әғқңөұүһӘҒҚҢӨҰҮҺ]"));
 	// Texts that read the same in every language: names, ids
-	const auto same = QSet<QString>{ u"settings_title"_q, u"details_id"_q };
+	const auto same = QSet<QString>{
+		u"settings_title"_q,
+		u"details_id"_q,
+		u"hide_row_premium"_q,
+		u"hide_row_business"_q,
+	};
 	auto problems = QStringList();
 	auto english = std::map<QString, QString>();
 	const auto longDash = QChar(0x2014);
@@ -1819,7 +1851,22 @@ void TestLanguageChoice() {
 	expect(QString(), u"en"_q);
 	auto &option = base::options::lookup<QString>(MZGram::kOptionLanguage);
 	if (!option.value().isEmpty() || !MZGram::LanguageChoice().isEmpty()) {
-		problems.push_back(u"not System by default"_q);
+		problems.push_back(u"not Same as Telegram by default"_q);
+	}
+	const auto resolve = [&](const QString &choice, const QString &telegram, const QString &system, const QString &language) {
+		if (MZGram::ResolveLanguage(choice, telegram, system) != language) {
+			problems.push_back(choice + u"/"_q + telegram + u"/"_q + system + u" -> "_q + MZGram::ResolveLanguage(choice, telegram, system));
+		}
+	};
+	const auto system = QString::fromLatin1(MZGram::kLanguageSystem);
+	resolve(QString(), u"uk"_q, u"de_DE"_q, u"uk"_q);
+	resolve(QString(), u"pt-br"_q, u"de_DE"_q, u"pt-BR"_q);
+	resolve(QString(), u"it"_q, u"uk_UA"_q, u"en"_q);
+	resolve(system, u"uk"_q, u"de_DE"_q, u"de"_q);
+	resolve(u"pl"_q, u"uk"_q, u"de_DE"_q, u"pl"_q);
+	option.set(system);
+	if (MZGram::LanguageChoice() != system) {
+		problems.push_back(u"System is not kept"_q);
 	}
 	option.set(u"pl"_q);
 	if (MZGram::LanguageChoice() != u"pl"_q) {
@@ -1839,7 +1886,7 @@ void TestLanguageChoice() {
 	}
 	Check(
 		problems.isEmpty(),
-		"the MZGram language: the choice, else the system's, else English",
+		"the MZGram language: the choice, else Telegram's (or the system's), else English",
 		problems.join(u", "_q).toStdString().c_str());
 }
 
@@ -1849,6 +1896,8 @@ void TestLanguagePickerIsWired() {
 	const auto wired = std::vector<std::pair<const char*, QString>>{
 		{ "mzgram/mzgram_settings.cpp", u"Box(LanguageBox)"_q },
 		{ "mzgram/mzgram_settings.cpp", u"Text(\"mzgram_language\")"_q },
+		{ "mzgram/mzgram_settings.cpp", u"TrNow(\"mzgram_language_telegram\")"_q },
+		{ "mzgram/mzgram_lang.cpp", u"ResolveLanguage(LanguageChoice(), telegram, system)"_q },
 		{ "mzgram/mzgram_lang.cpp", u"lookup<QString>(kOptionLanguage).changes()"_q },
 		{ "mzgram/mzgram_lang.cpp", u"TranslateTo(key, CurrentLanguage())"_q },
 		{ "../CMakeLists.txt", u"mzgram/mzgram_lang_translations.cpp"_q },
@@ -2843,13 +2892,42 @@ void TestAiTexts() {
 		"ai_message",
 		"ai_prompt",
 		"ai_provider",
-		"ai_model",
 		"ai_model_on_site",
 		"ai_open",
 		"ai_privacy_title",
 		"ai_privacy_text",
-		"ai_privacy_note",
 		"ai_continue",
+		"ai_attachments",
+		"ai_left_out",
+		"ai_left_over_limit",
+		"ai_left_too_large",
+		"ai_left_archives",
+		"ai_left_media",
+		"ai_left_other",
+		"ai_status_downloading",
+		"ai_status_attached",
+		"ai_status_no_attach",
+		"ai_save_files",
+		"ai_files_saved",
+		"ai_menu_buttons",
+		"ai_menu_buttons_info",
+		"section_other",
+		"hide_rows_title",
+		"hide_rows_info",
+		"unblock_files",
+		"unblock_files_confirm",
+		"unblock_files_done",
+		"unblock_files_denied",
+		"unblock_files_info",
+		"show_copy_photo",
+		"photo_copied",
+		"show_delete_downloaded",
+		"show_forward_no_quote",
+		"message_menu_more_info",
+		"downloaded_file_deleted",
+		"delete_downloaded_confirm",
+		"delete_downloaded_confirm_path",
+		"mzgram_language_telegram",
 		"ai_status_opening",
 		"ai_status_inserted",
 		"ai_status_no_field",
@@ -2861,6 +2939,16 @@ void TestAiTexts() {
 		if (!keys.contains(QString::fromLatin1(key))) {
 			missing.push_back(QString::fromLatin1(key));
 		}
+	}
+	// Said once in the warning, not on every box
+	for (const auto gone : { "ai_privacy_note", "ai_model", "settings_topics_info" }) {
+		if (keys.contains(QString::fromLatin1(gone))) {
+			missing.push_back(QString::fromLatin1(gone) + u" is still there"_q);
+		}
+	}
+	if (!MZGram::Translate("ai_privacy_text", false).contains(u"attachments"_q)
+		|| MZGram::Translate("ai_info", false).contains(u"nothing is sent"_q)) {
+		missing.push_back(u"the warning or the note"_q);
 	}
 	Check(missing.isEmpty(), "ai: every text is in the string table", missing.join(u", "_q).toStdString().c_str());
 }
@@ -2902,15 +2990,17 @@ void TestAiIsWired() {
 	if (guard < 0 || hook < guard || ai.indexOf(u"#endif // MZGRAM_TEST_HOOKS"_q, guard) < ai.lastIndexOf(u"MZGRAM_TEST_AI"_q)) {
 		problems.push_back(u"the test hook is not behind MZGRAM_TEST_HOOKS"_q);
 	}
-	// The menu item is where Copy text is, with its restriction
-	for (const auto path : { "history/history_inner_widget.cpp", "history/view/history_view_context_menu.cpp" }) {
-		const auto text = ReadSource(path);
-		const auto at = text.indexOf(u"MZGram::Ai::AddAskAiAction("_q);
-		if (at < 0) {
-			problems.push_back(QString::fromLatin1(path) + u": no Ask AI"_q);
-		} else if (!text.mid(at, 300).contains(u"hasCopyRestriction("_q)) {
-			problems.push_back(QString::fromLatin1(path) + u": Ask AI without the copy restriction"_q);
-		}
+	// The menu item is one of the MZGram items of a message, with the copy
+	// restriction of the menu (TestMessageMenuItems checks both menus)
+	if (!ReadSource("mzgram/mzgram_context_actions.cpp").contains(u"Ai::AddAskAiAction(menu, item, controller, copyRestricted)"_q)) {
+		problems.push_back(u"no Ask AI in the message items"_q);
+	}
+	// The warning once, and no note on every box
+	if (!ai.contains(u"if (OptionAiWarned.value()) {"_q) || ai.contains(u"ai_privacy_note"_q)) {
+		problems.push_back(u"the warning is not once"_q);
+	}
+	if (!ai.contains(u"AttachScript(_provider)"_q) || !ai.contains(u"FileChunkScript("_q)) {
+		problems.push_back(u"the attachments do not go to the page"_q);
 	}
 	if (!ReadSource("core/application.cpp").contains(u"MZGram::Ai::StartTestHook()"_q)) {
 		problems.push_back(u"the test hook is never started"_q);
@@ -2924,6 +3014,398 @@ void TestAiIsWired() {
 		problems.push_back(u"the Windows CI does not open the AI window"_q);
 	}
 	Check(problems.isEmpty(), "ai: menu item, own profile, warning and the window test are wired", problems.join(u", "_q).toStdString().c_str());
+}
+
+
+// The photos and files that go with "Ask AI": what each one is.
+void TestAiAttachmentKinds() {
+	using namespace MZGram::Ai;
+	auto problems = QStringList();
+	const auto expect = [&](const char *name, const char *mime, AttachmentKind kind) {
+		if (ClassifyFile(QString::fromUtf8(name), QString::fromLatin1(mime)) != kind) {
+			problems.push_back(QString::fromUtf8(name) + u" "_q + QString::fromLatin1(mime));
+		}
+	};
+	using Kind = AttachmentKind;
+	// Pictures sent as files are photos
+	expect("scan.JPG", "image/jpeg", Kind::Photo);
+	expect("chart.png", "", Kind::Photo);
+	expect("sticker.webp", "image/webp", Kind::Photo);
+	expect("photo", "image/png", Kind::Photo);
+	// Documents an AI reads
+	for (const auto name : {
+			"README", "README.md", "notes.txt", "data.csv", "config.json",
+			"feed.xml", "server.log", "main.cpp", "app.py", "Main.kt", "doc.pdf",
+			"letter.doc", "letter.docx", "table.xls", "table.xlsx", "slides.ppt",
+			"slides.pptx", "text.rtf", "text.odt", "sheet.ods", "show.odp",
+			"Makefile", "Dockerfile", "query.sql" }) {
+		expect(name, "", Kind::File);
+	}
+	expect("report", "application/pdf", Kind::File);
+	expect("unknown.bin", "text/plain", Kind::File);
+	expect("sheet", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", Kind::File);
+	// Never: archives, packages, media
+	for (const auto name : {
+			"backup.zip", "backup.rar", "backup.7z", "backup.tar", "backup.tar.gz",
+			"backup.tgz", "backup.bz2", "backup.xz", "app.apk", "app.jar", "disk.iso" }) {
+		expect(name, "", Kind::Archive);
+	}
+	expect("download", "application/zip", Kind::Archive);
+	expect("download", "application/vnd.android.package-archive", Kind::Archive);
+	expect("clip.mp4", "video/mp4", Kind::Media);
+	expect("voice.ogg", "audio/ogg", Kind::Media);
+	expect("song.mp3", "", Kind::Media);
+	expect("funny.gif", "image/gif", Kind::Media);
+	expect("sticker.tgs", "application/x-tgsticker", Kind::Media);
+	expect("setup.exe", "application/x-msdownload", Kind::Unsupported);
+	expect("photo.heic", "image/heic", Kind::Unsupported);
+	Check(problems.isEmpty(), "ai: photos, documents, archives and media sorted apart", problems.join(u", "_q).toStdString().c_str());
+}
+
+// At most 10 attachments, none over 30 MB, and what is left out is counted.
+void TestAiChooseAttachments() {
+	using namespace MZGram::Ai;
+	using Kind = AttachmentKind;
+	auto problems = QStringList();
+	auto list = std::vector<AttachmentCandidate>();
+	for (auto i = 0; i != 8; ++i) {
+		list.push_back({ Kind::Photo, 1000 });
+	}
+	list.push_back({ Kind::Archive, 1000 });
+	list.push_back({ Kind::File, kMaxAttachmentSize + 1 });
+	list.push_back({ Kind::Media, 1000 });
+	list.push_back({ Kind::File, 2000 });
+	list.push_back({ Kind::Unsupported, 1000 });
+	list.push_back({ Kind::Photo, kMaxAttachmentSize });
+	list.push_back({ Kind::File, 3000 });
+	list.push_back({ Kind::Photo, 4000 });
+	const auto choice = ChooseAttachments(list);
+	const auto chosen = std::vector<int>{ 0, 1, 2, 3, 4, 5, 6, 7, 11, 13 };
+	if (choice.chosen != chosen) {
+		problems.push_back(u"chosen"_q);
+	}
+	if (choice.overLimit != 2) {
+		problems.push_back(u"over the limit: %1"_q.arg(choice.overLimit));
+	}
+	if (choice.tooLarge != 1 || choice.archives != 1 || choice.media != 1 || choice.unsupported != 1) {
+		problems.push_back(u"left out counts"_q);
+	}
+	if (kMaxAttachments != 10) {
+		problems.push_back(u"the limit is not 10"_q);
+	}
+	if (!ChooseAttachments({}).chosen.empty()) {
+		problems.push_back(u"nothing gives something"_q);
+	}
+	Check(problems.isEmpty(), "ai: at most 10 attachments, the rest counted by reason", problems.join(u", "_q).toStdString().c_str());
+}
+
+// The files go into the page in pieces and then to the site's file input
+// or as a paste into its field; nothing presses a key or a button.
+void TestAiFileScripts() {
+	using namespace MZGram::Ai;
+	auto problems = QStringList();
+	const auto start = QString::fromLatin1(FileStartScript(
+		3,
+		QString::fromUtf8("\xd0\xb7\xd0\xb2\xd1\x96\xd1\x82 \"q\" </script>.pdf"),
+		u"application/pdf"_q));
+	if (!start.contains(u"__mzgramAiFiles"_q)
+		|| !start.contains(u"[3]"_q)
+		|| !start.contains(QString::fromLatin1(ScriptString(QString::fromUtf8(
+			"\xd0\xb7\xd0\xb2\xd1\x96\xd1\x82 \"q\" </script>.pdf"))))
+		|| start.contains(u"</script>"_q)) {
+		problems.push_back(u"start: "_q + start);
+	}
+	const auto bytes = QByteArray("\x00\x01\xff text \"'<>", 13);
+	const auto chunk = QString::fromLatin1(FileChunkScript(3, bytes));
+	if (!chunk.contains(QString::fromLatin1(bytes.toBase64()))
+		|| !chunk.contains(u"[3].parts.push("_q)) {
+		problems.push_back(u"chunk: "_q + chunk);
+	}
+	for (const auto &info : Providers()) {
+		const auto script = QString::fromLatin1(AttachScript(info.id));
+		const auto label = QString::fromLatin1(info.key);
+		for (const auto needed : { "input[type=\"file\"]", "new DataTransfer()", "ClipboardEvent('paste'", "'change'", "'attached'", "'no_attach_target'", "atob(" }) {
+			if (!script.contains(QString::fromLatin1(needed))) {
+				problems.push_back(label + u": no "_q + QString::fromLatin1(needed));
+			}
+		}
+		for (const auto never : { "click(", "submit", "keydown", "KeyboardEvent", "Enter", "fetch(", "XMLHttpRequest" }) {
+			if (script.contains(QString::fromLatin1(never))) {
+				problems.push_back(label + u": "_q + QString::fromLatin1(never));
+			}
+		}
+		for (const auto selector : info.inputSelectors) {
+			if (!script.contains(QString::fromLatin1(ScriptString(QString::fromLatin1(selector))))) {
+				problems.push_back(label + u": no field "_q + QString::fromLatin1(selector));
+			}
+		}
+	}
+	if (kChunkSize > 1024 * 1024) {
+		problems.push_back(u"pieces too large for one script"_q);
+	}
+	Check(problems.isEmpty(), "ai: the files go in pieces, then to the file input or a paste, never sent", problems.join(u", "_q).toStdString().c_str());
+}
+
+void TestAiParseAttach() {
+	using namespace MZGram::Ai;
+	auto problems = QStringList();
+	const auto input = ParseAttach("{\"mzgram_ai\":\"attached\",\"how\":\"input\",\"count\":3}");
+	if (!input || !input->attached || input->how != u"input"_q || input->count != 3) {
+		problems.push_back(u"input"_q);
+	}
+	const auto paste = ParseAttach("{\"mzgram_ai\":\"attached\",\"how\":\"paste\",\"count\":1}");
+	if (!paste || !paste->attached || paste->how != u"paste"_q || paste->count != 1) {
+		problems.push_back(u"paste"_q);
+	}
+	const auto none = ParseAttach("{\"mzgram_ai\":\"no_attach_target\"}");
+	if (!none || none->attached) {
+		problems.push_back(u"no target"_q);
+	}
+	for (const auto other : { "{\"mzgram_ai\":\"inserted\"}", "", "[1]", "{\"other\":1}" }) {
+		if (ParseAttach(QByteArray(other))) {
+			problems.push_back(QString::fromLatin1(other));
+		}
+	}
+	if (ParseStatus("{\"mzgram_ai\":\"attached\",\"how\":\"input\",\"count\":3}") != Status::None) {
+		problems.push_back(u"an attach message is a text status"_q);
+	}
+	Check(problems.isEmpty(), "ai: what the attach script says", problems.join(u", "_q).toStdString().c_str());
+}
+
+// Settings > MZGram > AI: a main menu button for each site, off by default.
+void TestAiMenuButtons() {
+	using namespace MZGram::Ai;
+	auto problems = QStringList();
+	for (const auto &info : Providers()) {
+		const auto label = QString::fromLatin1(info.key);
+		if (MenuButtonOption(info.id) != u"mzgram-ai-menu-"_q + label) {
+			problems.push_back(label + u": option id"_q);
+		}
+		if (MenuButton(info.id)) {
+			problems.push_back(label + u": on by default"_q);
+		}
+		SetMenuButton(info.id, true);
+		if (!MenuButton(info.id)) {
+			problems.push_back(label + u": not kept"_q);
+		}
+		SetMenuButton(info.id, false);
+	}
+	if (!ReadSource("window/window_main_menu.cpp").contains(u"MZGram::Ai::AddMainMenuButtons(_menu, controller)"_q)) {
+		problems.push_back(u"not in the main menu"_q);
+	}
+	const auto ai = ReadSource("mzgram/mzgram_ai.cpp");
+	const auto buttons = ai.indexOf(u"void AddMainMenuButtons("_q);
+	if (buttons < 0
+		|| !ai.mid(buttons, 1500).contains(u"MenuButtonOption(provider)"_q)
+		|| !ai.mid(buttons, 1500).contains(u"OpenSite(provider)"_q)) {
+		problems.push_back(u"the buttons do not follow the switches"_q);
+	}
+	// The site alone: no text leaves Telegram, so no warning
+	const auto site = ai.indexOf(u"void OpenSite(Provider provider) {"_q);
+	if (site < 0 || ai.mid(site, 200).contains(u"OptionAiWarned"_q)) {
+		problems.push_back(u"OpenSite"_q);
+	}
+	if (!ReadSource("mzgram/mzgram_settings.cpp").contains(u"MenuButtonOption(info.id)"_q)) {
+		problems.push_back(u"no switches in Settings"_q);
+	}
+	Check(problems.isEmpty(), "ai: the main menu buttons, one per site, off by default", problems.join(u", "_q).toStdString().c_str());
+}
+
+// Settings > MZGram > Interface: rows of Telegram's Settings hidden one by
+// one, also from its search.
+void TestHiddenSettingsRows() {
+	auto problems = QStringList();
+	const auto expected = QStringList{
+		u"premium"_q, u"stars"_q, u"currency"_q, u"business"_q,
+		u"send-gift"_q, u"faq"_q, u"features"_q, u"ask-question"_q,
+	};
+	auto keys = QStringList();
+	auto phrases = QSet<QString>();
+	for (const auto &phrase : MZGram::Phrases()) {
+		phrases.insert(QString::fromUtf8(phrase.key));
+	}
+	const auto main = ReadSource("settings/sections/settings_main.cpp");
+	for (const auto &row : MZGram::HideableRows()) {
+		const auto key = QString::fromLatin1(row.key);
+		keys.push_back(key);
+		if (MZGram::RowHidden(row.key)) {
+			problems.push_back(key + u": hidden by default"_q);
+		}
+		MZGram::SetRowHidden(row.key, true);
+		if (!MZGram::RowHidden(row.key)) {
+			problems.push_back(key + u": not kept"_q);
+		}
+		if (!phrases.contains(QString::fromLatin1(row.phrase))) {
+			problems.push_back(key + u": no text"_q);
+		}
+		const auto at = main.indexOf(u"MZGram::RowHidden(\""_q + key + u"\")"_q);
+		if (at < 0) {
+			problems.push_back(key + u": not in Settings"_q);
+		}
+	}
+	if (keys != expected) {
+		problems.push_back(u"rows: "_q + keys.join(u","_q));
+	}
+	if (!MZGram::HelpHidden()) {
+		problems.push_back(u"help shown with all its rows hidden"_q);
+	}
+	MZGram::SetRowHidden("features", false);
+	if (MZGram::HelpHidden()) {
+		problems.push_back(u"help hidden with a row shown"_q);
+	}
+	for (const auto &row : MZGram::HideableRows()) {
+		MZGram::SetRowHidden(row.key, false);
+	}
+	if (MZGram::RowHidden("main/language")) {
+		problems.push_back(u"an unknown row is hidden"_q);
+	}
+	if (!main.contains(u"if (MZGram::HelpHidden()) {"_q)) {
+		problems.push_back(u"the help section stays"_q);
+	}
+	if (!ReadSource("mzgram/mzgram_settings.cpp").contains(u"for (const auto &row : HideableRows())"_q)) {
+		problems.push_back(u"no switches in Settings"_q);
+	}
+	Check(problems.isEmpty(), "settings: Telegram's rows hidden one by one, off by default", problems.join(u", "_q).toStdString().c_str());
+}
+
+// Settings > MZGram > Other > Unblock MZGram files: the mark of the web
+// goes, the files stay, nothing else.
+void TestUnblockFiles() {
+	auto problems = QStringList();
+	auto folder = QTemporaryDir();
+#ifdef _WIN32
+	const auto path = folder.filePath(u"sub/MZGram.exe"_q);
+	QDir().mkpath(folder.filePath(u"sub"_q));
+	{
+		auto file = QFile(path);
+		file.open(QIODevice::WriteOnly);
+		file.write("MZ test");
+	}
+	const auto other = folder.filePath(u"plain.txt"_q);
+	{
+		auto file = QFile(other);
+		file.open(QIODevice::WriteOnly);
+		file.write("plain");
+	}
+	const auto mark = (QDir::toNativeSeparators(path) + u":Zone.Identifier"_q).toStdWString();
+	const auto handle = CreateFileW(mark.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+	if (handle == INVALID_HANDLE_VALUE) {
+		problems.push_back(u"the test could not mark a file"_q);
+	} else {
+		const auto zone = QByteArray("[ZoneTransfer]\r\nZoneId=3\r\n");
+		auto written = DWORD();
+		WriteFile(handle, zone.constData(), DWORD(zone.size()), &written, nullptr);
+		CloseHandle(handle);
+	}
+	if (!MZGram::HasInternetMark(path) || MZGram::HasInternetMark(other)) {
+		problems.push_back(u"the mark is not seen"_q);
+	}
+	if (MZGram::MarkedFiles(folder.path()) != 1) {
+		problems.push_back(u"marked files"_q);
+	}
+	const auto count = MZGram::UnblockFolder(folder.path());
+	if (count != 1) {
+		problems.push_back(u"unblocked %1"_q.arg(count));
+	}
+	if (MZGram::HasInternetMark(path) || MZGram::MarkedFiles(folder.path())) {
+		problems.push_back(u"the mark stays"_q);
+	}
+	auto file = QFile(path);
+	if (!file.open(QIODevice::ReadOnly) || file.readAll() != "MZ test") {
+		problems.push_back(u"the file changed"_q);
+	}
+	if (MZGram::UnblockFolder(folder.path()) != 0) {
+		problems.push_back(u"twice"_q);
+	}
+#else // _WIN32
+	if (MZGram::UnblockFolder(folder.path()) != 0) {
+		problems.push_back(u"outside Windows"_q);
+	}
+#endif // _WIN32
+	// Only on the button, only on Windows, never Windows' own protection
+	const auto settings = ReadSource("mzgram/mzgram_settings.cpp");
+	const auto button = settings.indexOf(u"u\"mzgram/unblock-files\"_q"_q);
+	const auto guard = settings.lastIndexOf(u"#ifdef Q_OS_WIN"_q, button);
+	if (button < 0 || guard < 0 || !settings.mid(button, 1200).contains(u"MZGram::UnblockFolder(folder)"_q)
+		|| !settings.mid(button, 1200).contains(u"MakeConfirmBox"_q)) {
+		problems.push_back(u"the button"_q);
+	}
+	auto everything = QString();
+	for (auto i = QDirIterator(QString::fromUtf8(MZGRAM_SOURCE_DIR) + u"/mzgram"_q, { u"*.cpp"_q, u"*.h"_q }, QDir::Files); i.hasNext();) {
+		auto file = QFile(i.next());
+		// The texts may tell the user about PowerShell's Unblock-File
+		if (!i.fileName().startsWith(u"mzgram_tests"_q)
+			&& !i.fileName().startsWith(u"mzgram_lang_t"_q)
+			&& file.open(QIODevice::ReadOnly)) {
+			everything += QString::fromUtf8(file.readAll());
+		}
+	}
+	for (const auto never : { "Add-MpPreference", "Set-MpPreference", "ExclusionPath", "powershell", "SmartScreenEnabled" }) {
+		if (everything.contains(QString::fromLatin1(never), Qt::CaseInsensitive)) {
+			problems.push_back(u"changes protection: "_q + QString::fromLatin1(never));
+		}
+	}
+	Check(problems.isEmpty(), "unblock: the mark goes from MZGram's files on the button only", problems.join(u", "_q).toStdString().c_str());
+}
+
+// The message menu items moved from Android and the MZGram items in the
+// main chat as in sections.
+void TestMessageMenuItems() {
+	auto problems = QStringList();
+	const auto options = ReadSource("mzgram/mzgram_options.cpp");
+	for (const auto id : { "\"mzgram-copy-photo\"", "\"mzgram-delete-downloaded-file\"", "\"mzgram-forward-no-quote\"" }) {
+		if (!options.contains(QString::fromLatin1(id))) {
+			problems.push_back(QString::fromLatin1(id));
+		}
+	}
+	const auto actions = ReadSource("mzgram/mzgram_context_actions.cpp");
+	const auto all = actions.indexOf(u"void AddMessageMenuActions("_q);
+	const auto body = actions.mid(all, 900);
+	for (const auto call : {
+			"AddRepeatMessageAction(", "AddMessageDetailsAction(", "AddSaveMessageAction(",
+			"AddSetReminderAction(", "AddForwardNoQuoteAction(", "AddCopyPhotoAction(",
+			"AddDeleteDownloadedFileAction(", "Ai::AddAskAiAction(menu, item, controller, copyRestricted)" }) {
+		if (all < 0 || !body.contains(QString::fromLatin1(call))) {
+			problems.push_back(u"AddMessageMenuActions: "_q + QString::fromLatin1(call));
+		}
+	}
+	if (!actions.contains(u"Data::ForwardOptions::NoSenderNames"_q)
+		|| !actions.contains(u"MakeConfirmBox"_q)) {
+		problems.push_back(u"forward or delete"_q);
+	}
+	for (const auto path : { "history/history_inner_widget.cpp", "history/view/history_view_context_menu.cpp" }) {
+		const auto text = ReadSource(path);
+		const auto label = QString::fromLatin1(path);
+		auto from = 0;
+		auto found = 0;
+		while ((from = text.indexOf(u"MZGram::AddMessageMenuActions("_q, from)) >= 0) {
+			++found;
+			if (!text.mid(from, 300).contains(u"hasCopyRestriction("_q)) {
+				problems.push_back(label + u": without the copy restriction"_q);
+			}
+			from += 10;
+		}
+		if (!found) {
+			problems.push_back(label + u": no MZGram items"_q);
+		}
+		const auto selected = text.indexOf(u"MZGram::Ai::AddAskAiSelectedAction("_q);
+		if (selected < 0 || !text.mid(selected, 300).contains(u"hasCopyRestrictionForSelected()"_q)) {
+			problems.push_back(label + u": no Ask AI for the selection"_q);
+		}
+		// Telegram's own Copy Image gives way to Copy Photo
+		const auto copy = text.indexOf(u"tr::lng_context_copy_image(tr::now)"_q);
+		if (copy < 0 || !text.mid(copy - 200, 200).contains(u"MZGram::CopyPhotoAction()"_q)) {
+			problems.push_back(label + u": two copy items"_q);
+		}
+		if (text.contains(u"MZGram::Ai::AddAskAiAction("_q)) {
+			problems.push_back(label + u": Ask AI twice"_q);
+		}
+	}
+	const auto inner = ReadSource("history/history_inner_widget.cpp");
+	if (!inner.contains(u"MZGram::AddScanQrCodeAction("_q) || !inner.contains(u"MZGram::AddOpenInAction("_q)) {
+		problems.push_back(u"main chat: QR or Open in"_q);
+	}
+	Check(problems.isEmpty(), "message menu: Copy Photo, Delete Downloaded File, Forward without sender, the same items in every chat", problems.join(u", "_q).toStdString().c_str());
 }
 
 } // namespace
@@ -3000,6 +3482,14 @@ int main() {
 		TestAiNavigation,
 		TestAiTexts,
 		TestAiIsWired,
+		TestAiAttachmentKinds,
+		TestAiChooseAttachments,
+		TestAiFileScripts,
+		TestAiParseAttach,
+		TestAiMenuButtons,
+		TestHiddenSettingsRows,
+		TestUnblockFiles,
+		TestMessageMenuItems,
 	};
 	for (const auto &test : tests) {
 		test();

@@ -1648,6 +1648,10 @@ PRIVATE
     mzgram/mzgram_qr_scan.h
     mzgram/mzgram_settings.cpp
     mzgram/mzgram_settings.h
+    mzgram/mzgram_settings_rows.cpp
+    mzgram/mzgram_settings_rows.h
+    mzgram/mzgram_unblock.cpp
+    mzgram/mzgram_unblock.h
     mzgram/quirc/decode.c
     mzgram/quirc/identify.c
     mzgram/quirc/quirc.c

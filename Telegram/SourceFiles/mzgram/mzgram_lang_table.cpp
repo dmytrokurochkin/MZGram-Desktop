@@ -499,7 +499,7 @@ QString SupportedLanguage(const QString &localeName) {
 			return language;
 		}
 	}
-	return u"en"_q;
+	return QString::fromLatin1("en");
 }
 
 QString TranslateTo(const char *key, const QString &language) {
@@ -529,6 +529,17 @@ QString Translate(const char *key, bool ukrainian) {
 		return QString::fromUtf8(key);
 	}
 	return QString::fromUtf8(ukrainian ? i->second->ukrainian : i->second->english);
+}
+
+// The tests come first: Same as Telegram is not written yet.
+QString ResolveLanguage(
+		const QString &choice,
+		const QString &telegramLanguage,
+		const QString &systemLocale) {
+	Q_UNUSED(choice);
+	Q_UNUSED(telegramLanguage);
+	Q_UNUSED(systemLocale);
+	return QString::fromLatin1("en");
 }
 
 } // namespace MZGram

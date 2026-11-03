@@ -42,6 +42,10 @@ PRIVATE
     mzgram/mzgram_text_filters.h
     mzgram/mzgram_self_update_rules.cpp
     mzgram/mzgram_self_update_rules.h
+    mzgram/mzgram_settings_rows.cpp
+    mzgram/mzgram_settings_rows.h
+    mzgram/mzgram_unblock.cpp
+    mzgram/mzgram_unblock.h
     mzgram/mzgram_update_install.h
     mzgram/mzgram_update_rules.cpp
     mzgram/mzgram_update_rules.h

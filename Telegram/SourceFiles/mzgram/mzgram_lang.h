@@ -21,9 +21,11 @@ namespace MZGram {
 // so each new key would rebuild the whole client, and Telegram's cloud
 // language packs would not have MZGram's keys anyway.
 //
-// Their language is chosen in Settings > MZGram > Interface, apart from
-// Telegram's language: System (the system's language when MZGram has it,
-// English otherwise) or one of kLanguages.
+// Their language is chosen in Settings > MZGram > Interface: Same as
+// Telegram (the default: Telegram's language when MZGram has it, English
+// otherwise), System (the same for the system's language) or one of
+// kLanguages. With Telegram's language a screen is never part in one
+// language, part in another.
 
 struct Phrase {
 	const char *key = nullptr;
@@ -74,9 +76,18 @@ inline constexpr std::array<const char*, kLanguageCount> kLanguageNames = {
 // one MZGram has, else "en". Portuguese is Brazilian.
 [[nodiscard]] QString SupportedLanguage(const QString &localeName);
 
-// The choice in Settings: empty for System, else a code from kLanguages.
+// The choice in Settings: empty for Same as Telegram, kLanguageSystem for
+// System, else a code from kLanguages.
 extern const char kOptionLanguage[];
+inline constexpr auto kLanguageSystem = "system";
 [[nodiscard]] QString LanguageChoice();
+
+// The MZGram language for a choice, Telegram's language id ("uk",
+// "pt-br") and the system's locale name.
+[[nodiscard]] QString ResolveLanguage(
+	const QString &choice,
+	const QString &telegramLanguage,
+	const QString &systemLocale);
 
 // mzgram_lang.cpp: in the MZGram language now.
 [[nodiscard]] QString CurrentLanguage();

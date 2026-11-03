@@ -3,13 +3,15 @@
 # This build is rebuilt with the test hook (MZGRAM_TEST_HOOKS, mzgram_ai.cpp):
 # with MZGRAM_TEST_AI set, it opens the AI window of every site in turn, the
 # same window "Ask AI" opens, in its own Webview profile. Instead of the site
-# it loads a local page with an input field like the site's and a Send
-# button, puts a test message and prompt there with the script it uses on
-# the site, and reads the field back. Only mzgram_ai.cpp is compiled again,
+# it loads a local page with an input field like the site's, a file input
+# (Gemini's page: none, its field takes a paste) and a Send button, puts a
+# test message and prompt there with the script it uses on the site, gives
+# the page two files (a text file and a picture) the way it gives them to
+# the site, and reads the field and the files back. Only mzgram_ai.cpp is compiled again,
 # in the folder CMake made.
 #
-# Passes when the window of each of the five sites was created and its
-# field got the text while Send was never pressed. Signing in and the real
+# Passes when the window of each of the five sites was created, its field
+# got the text and its message the two files while Send was never pressed. Signing in and the real
 # sites are not checked here.
 param(
 	# The CMake build folder of the Build step
@@ -67,7 +69,7 @@ $problems = @()
 if (-not ($lines | Where-Object { $_ -like '*MZGram AI test: done*' })) { $problems += 'the test did not finish' }
 foreach ($site in $sites) {
 	if (-not ($lines | Where-Object { $_ -like "*MZGram AI test: $site window created*" })) { $problems += "$site`: no window" }
-	if (-not ($lines | Where-Object { $_ -like "*MZGram AI test: PASS $site*" })) { $problems += "$site`: no pass" }
+	if (-not ($lines | Where-Object { $_ -like "*MZGram AI test: PASS $site`: the field has the text, 2 files attached, nothing sent*" })) { $problems += "$site`: no pass with the text and 2 files" }
 }
 foreach ($line in $lines | Where-Object { $_ -like '*MZGram AI test: FAIL*' }) { $problems += $line }
 
@@ -79,7 +81,7 @@ if ($problems.Count) {
 	foreach ($problem in $problems) { Write-Host "FAIL: $problem" }
 	exit 1
 }
-Write-Host "PASS: the AI window of each of the five sites was created and got the text, nothing sent, windows-$Arch"
+Write-Host "PASS: the AI window of each of the five sites was created and got the text and 2 files, nothing sent, windows-$Arch"
 # GitHub's pwsh step ends with "exit $LASTEXITCODE", the code of the last
 # native command
 exit 0
