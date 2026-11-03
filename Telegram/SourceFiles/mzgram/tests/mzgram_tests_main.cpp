@@ -3544,6 +3544,80 @@ void TestMessageMenuItems() {
 // Settings > MZGram > Archive > Clear archive: the folders go aside at once
 // and are deleted on a background thread, with how much was freed; what an
 // earlier wipe left is found again.
+// Settings > MZGram > Archive: the archive's size by kind, as Telegram's
+// Storage Usage shows it, counted on a background thread, 0 at once after
+// Clear archive.
+void TestArchiveSize() {
+	auto problems = QStringList();
+	auto root = QTemporaryDir();
+	const auto write = [&](const QString &path, int size) {
+		QDir().mkpath(QFileInfo(path).absolutePath());
+		auto file = QFile(path);
+		if (!file.open(QIODevice::WriteOnly) || file.write(QByteArray(size, 'a')) != size) {
+			problems.push_back(u"the test could not write "_q + path);
+		}
+	};
+	const auto database = root.filePath(u"tdata/mzgram_messages.db"_q);
+	const auto folder = root.filePath(u"tdata/mzgram"_q);
+	const auto media = folder + u"/media"_q;
+	const auto attachments = root.filePath(u"Downloads/MZGram/Saved Attachments/"_q);
+	write(database, 1000);
+	write(database + u"-wal"_q, 24);
+	write(root.filePath(u"tdata/settings"_q), 50000);
+	write(media + u"/1/2/a.jpg"_q, 3000);
+	write(media + u"/1/3/b.pdf"_q, 500);
+	write(folder + u"/notes.txt"_q, 7);
+	write(folder + u"/media.mzgram-deleting-1/x.jpg"_q, 9000);
+	write(attachments + u"c.mp4"_q, 200);
+	const auto sizes = MZGram::MeasureArchive(database, folder, media, attachments);
+	if (sizes.database != 1024) {
+		problems.push_back(u"database %1"_q.arg(sizes.database));
+	}
+	if (sizes.media != 3500) {
+		problems.push_back(u"media %1"_q.arg(sizes.media));
+	}
+	if (sizes.attachments != 200) {
+		problems.push_back(u"attachments %1"_q.arg(sizes.attachments));
+	}
+	if (sizes.other != 7) {
+		problems.push_back(u"other %1"_q.arg(sizes.other));
+	}
+	if (sizes.total() != 4731) {
+		problems.push_back(u"total %1"_q.arg(sizes.total()));
+	}
+	const auto none = root.filePath(u"none"_q);
+	if (MZGram::MeasureArchive(none + u"/a.db"_q, none, none + u"/media"_q, none + u"/b"_q).total() != 0) {
+		problems.push_back(u"nothing there"_q);
+	}
+	// In the Archive topic, counted on a background thread, 0 at once
+	// after Clear archive, which gives the database's space back
+	const auto settings = ReadSource("mzgram/mzgram_settings.cpp");
+	for (const auto needed : {
+			"builder.addSubsectionTitle(Text(\"archive_size\"));",
+			"return MakeArchiveSize(parent);",
+			"MZGram::MeasureArchive(",
+			"crl::async([=] {",
+			"MZGram::TrNow(\"archive_size_counting\")",
+			"Ui::FormatSizeText(sizes->total())",
+			"\"archive_size_database\"",
+			"\"archive_size_media\"",
+			"\"archive_size_attachments\"",
+			"\"archive_size_other\"",
+			"ArchiveSizeResets().fire({});" }) {
+		if (!settings.contains(QString::fromLatin1(needed))) {
+			problems.push_back(u"settings: no "_q + QString::fromLatin1(needed));
+		}
+	}
+	const auto archive = settings.indexOf(u"void BuildArchive("_q);
+	if (archive < 0 || settings.indexOf(u"MakeArchiveSize(parent)"_q) < archive) {
+		problems.push_back(u"the size is not in the Archive topic"_q);
+	}
+	if (!ReadSource("mzgram/mzgram_message_store.cpp").contains(u"query.exec(u\"VACUUM\"_q)"_q)) {
+		problems.push_back(u"Clear archive keeps the database's space"_q);
+	}
+	Check(problems.isEmpty(), "archive size: by kind, counted in the background, 0 after Clear archive", problems.join(u", "_q).toStdString().c_str());
+}
+
 void TestArchiveWipe() {
 	auto problems = QStringList();
 	auto folder = QTemporaryDir();
@@ -3768,6 +3842,7 @@ int main() {
 		TestUnblockFiles,
 		TestMessageMenuItems,
 		TestArchiveWipe,
+		TestArchiveSize,
 		TestConfirmBoxesClose,
 	};
 	for (const auto &test : tests) {

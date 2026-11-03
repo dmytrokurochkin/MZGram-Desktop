@@ -93,4 +93,70 @@ QStringList LeftFromWipe(const QStringList &folders) {
 	return result;
 }
 
+namespace {
+
+[[nodiscard]] qint64 SizeOf(const QString &path) {
+	const auto info = QFileInfo(path);
+	if (!info.isDir()) {
+		return info.exists() ? info.size() : 0;
+	}
+	auto result = qint64(0);
+	auto it = QDirIterator(
+		path,
+		QDir::Files | QDir::Hidden | QDir::System,
+		QDirIterator::Subdirectories);
+	while (it.hasNext()) {
+		it.next();
+		result += it.fileInfo().size();
+	}
+	return result;
+}
+
+[[nodiscard]] QString CleanPath(const QString &path) {
+	return QDir::cleanPath(QDir::fromNativeSeparators(path));
+}
+
+} // namespace
+
+ArchiveSizes MeasureArchive(
+		const QString &database,
+		const QString &folder,
+		const QString &media,
+		const QString &attachments) {
+	auto result = ArchiveSizes();
+	const auto base = QFileInfo(database);
+	const auto name = base.fileName();
+	if (!name.isEmpty()) {
+		const auto list = base.dir().entryInfoList(
+			QDir::Files | QDir::Hidden | QDir::System);
+		for (const auto &file : list) {
+			if (file.fileName().startsWith(name)) {
+				result.database += file.size();
+			}
+		}
+	}
+	const auto mediaPath = CleanPath(media);
+	const auto attachmentsPath = CleanPath(attachments);
+	if (!folder.isEmpty()) {
+		const auto list = QDir(folder).entryInfoList(
+			QDir::AllEntries | QDir::Hidden | QDir::System | QDir::NoDotAndDotDot);
+		for (const auto &entry : list) {
+			const auto path = CleanPath(entry.absoluteFilePath());
+			if (entry.fileName().contains(u".mzgram-deleting-"_q)
+				|| path == CleanPath(database)
+				|| path == attachmentsPath) {
+				continue;
+			} else if (path == mediaPath) {
+				result.media += SizeOf(path);
+			} else if (!entry.fileName().startsWith(name) || name.isEmpty()) {
+				result.other += SizeOf(path);
+			}
+		}
+	}
+	if (!attachments.isEmpty()) {
+		result.attachments += SizeOf(attachments);
+	}
+	return result;
+}
+
 } // namespace MZGram

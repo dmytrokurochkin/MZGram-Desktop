@@ -552,6 +552,10 @@ QStringList MessageStore::wipeAll() {
 			LogFailure("wipeAll", query);
 		}
 	}
+	// The emptied database gives its space back
+	if (!query.exec(u"VACUUM"_q)) {
+		LogFailure("wipeAll", query);
+	}
 	// The files can take gigabytes: moved aside now, deleted by the caller
 	// on a background thread
 	return MZGram::SetAsideForWipe(archiveFolders());

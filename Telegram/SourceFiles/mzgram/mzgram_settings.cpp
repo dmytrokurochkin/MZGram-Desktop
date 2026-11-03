@@ -45,6 +45,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_widgets.h"
 
 #include <QtCore/QFile>
+#include <QtGui/QPainterPath>
 
 #include <array>
 
@@ -229,9 +230,160 @@ void LanguageBox(not_null<Ui::GenericBox*> box) {
 	});
 }
 
+// What Clear archive left: nothing, at once.
+[[nodiscard]] rpl::event_stream<MZGram::ArchiveSizes> &ArchiveSizeResets() {
+	static auto result = rpl::event_stream<MZGram::ArchiveSizes>();
+	return result;
+}
+
+// The archive's size as Telegram's Storage Usage shows it: the total in
+// large type, a bar split by kind in the colours of Telegram's palette and
+// a legend with a dot and the size of each kind; "Counting..." until the
+// count on a background thread ends (the media can take gigabytes).
+[[nodiscard]] object_ptr<Ui::RpWidget> MakeArchiveSize(
+		not_null<QWidget*> parent) {
+	struct State {
+		std::optional<MZGram::ArchiveSizes> sizes;
+		int count = 0;
+	};
+	auto result = object_ptr<Ui::RpWidget>(parent);
+	const auto raw = result.data();
+	const auto state = raw->lifetime().make_state<State>();
+	const auto big = style::font(
+		style::ConvertScale(24),
+		style::FontFlag::Bold,
+		0);
+	const auto skip = style::ConvertScale(8);
+	const auto bar = style::ConvertScale(8);
+	const auto row = style::ConvertScale(26);
+	const auto dot = style::ConvertScale(10);
+	raw->resize(
+		raw->width(),
+		skip + big->height + skip + bar + skip + 4 * row + skip);
+	const auto colors = std::array<const style::color*, 4>{
+		&st::historyPeer4UserpicBg,
+		&st::historyPeer2UserpicBg,
+		&st::historyPeer1UserpicBg,
+		&st::historyPeer5UserpicBg,
+	};
+	const auto names = std::array<const char*, 4>{
+		"archive_size_database",
+		"archive_size_media",
+		"archive_size_attachments",
+		"archive_size_other",
+	};
+	raw->paintRequest() | rpl::on_next([=] {
+		auto p = QPainter(raw);
+		p.setRenderHint(QPainter::Antialiasing);
+		const auto left = st::boxRowPadding.left();
+		const auto width = std::max(
+			raw->width() - left - st::boxRowPadding.right(),
+			1);
+		const auto &sizes = state->sizes;
+		const auto parts = sizes
+			? std::array<qint64, 4>{
+				sizes->database,
+				sizes->media,
+				sizes->attachments,
+				sizes->other }
+			: std::array<qint64, 4>{};
+		auto y = skip;
+		p.setFont(big);
+		p.setPen(st::windowFg);
+		p.drawText(left, y + big->ascent, sizes
+			? Ui::FormatSizeText(sizes->total())
+			: MZGram::TrNow("archive_size_counting"));
+		y += big->height + skip;
+
+		const auto line = QRect(left, y, width, bar);
+		auto path = QPainterPath();
+		path.addRoundedRect(line, bar / 2., bar / 2.);
+		p.fillPath(path, st::windowBgOver);
+		if (sizes && sizes->total() > 0) {
+			p.setClipPath(path);
+			auto x = double(left);
+			for (auto i = 0; i != 4; ++i) {
+				if (!parts[i]) {
+					continue;
+				}
+				const auto part = std::max(
+					width * double(parts[i]) / sizes->total(),
+					double(style::ConvertScale(3)));
+				p.fillRect(QRectF(x, y, part, bar), (*colors[i])->c);
+				x += part;
+			}
+			p.setClipping(false);
+		}
+		y += bar + skip;
+
+		p.setFont(st::normalFont);
+		const auto text = (row - st::normalFont->height) / 2
+			+ st::normalFont->ascent;
+		for (auto i = 0; i != 4; ++i) {
+			p.setPen(Qt::NoPen);
+			p.setBrush((*colors[i])->c);
+			p.drawEllipse(left, y + (row - dot) / 2, dot, dot);
+			p.setPen(st::windowFg);
+			p.drawText(left + dot + skip, y + text, MZGram::TrNow(names[i]));
+			if (sizes) {
+				const auto size = Ui::FormatSizeText(parts[i]);
+				p.setPen(st::windowSubTextFg);
+				p.drawText(
+					left + width - st::normalFont->width(size),
+					y + text,
+					size);
+			}
+			y += row;
+		}
+	}, raw->lifetime());
+
+	const auto apply = crl::guard(raw, [=](
+			int number,
+			MZGram::ArchiveSizes sizes) {
+		if (state->count == number) {
+			state->sizes = sizes;
+			raw->update();
+		}
+	});
+	const auto &store = MZGram::MessageStore::Instance();
+	const auto database = store.databasePath();
+	const auto folder = cWorkingDir() + u"tdata/mzgram"_q;
+	const auto media = folder + u"/media"_q;
+	const auto attachments = store.attachmentsFolder();
+	const auto number = ++state->count;
+	crl::async([=] {
+		const auto sizes = MZGram::MeasureArchive(
+			database,
+			folder,
+			media,
+			attachments);
+		crl::on_main([=]() mutable {
+			apply(number, sizes);
+		});
+	});
+	ArchiveSizeResets().events(
+	) | rpl::on_next([=](MZGram::ArchiveSizes sizes) {
+		++state->count;
+		state->sizes = sizes;
+		raw->update();
+	}, raw->lifetime());
+	return result;
+}
+
 void BuildArchive(SectionBuilder &builder) {
 	using namespace MZGram;
 
+	builder.addSubsectionTitle(Text("archive_size"));
+	builder.addControl({
+		.factory = [](not_null<Ui::VerticalLayout*> parent) {
+			return MakeArchiveSize(parent);
+		},
+		.id = u"mzgram/archive-size"_q,
+		.title = Text("archive_size"),
+		.keywords = { u"size"_q, u"storage"_q, u"space"_q },
+	});
+	builder.addSkip();
+	builder.addDivider();
 	builder.addSkip();
 	AddOptionToggle(
 		builder,
@@ -391,6 +543,7 @@ void BuildArchive(SectionBuilder &builder) {
 					// The rows go at once, the files on a background
 					// thread: gigabytes take minutes to delete
 					const auto aside = MessageStore::Instance().wipeAll();
+					ArchiveSizeResets().fire({});
 					Ui::Toast::Show(MZGram::TrNow("archive_cleared"));
 					if (aside.isEmpty()) {
 						return;
