@@ -3968,6 +3968,7 @@ void TestArchiveLevelsAreWired() {
 			"FetchOnDeletion(session, key);",
 			"MediaFetch::OnDeletion",
 			"document->filepath(true)",
+			"!OnDevice(photo, document)",
 			"AddToCounter(ArchiveCounter::Expired);",
 			"AddToCounter(ArchiveCounter::Failed);" }) {
 		if (!archive.contains(QString::fromLatin1(needed))) {

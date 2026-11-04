@@ -281,6 +281,20 @@ void CheckPending(not_null<Main::Session*> session) {
 	return 0;
 }
 
+[[nodiscard]] bool OnDevice(PhotoData *photo, DocumentData *document) {
+	if (document) {
+		if (!document->filepath(true).isEmpty()) {
+			return true;
+		}
+		const auto view = document->activeMediaView();
+		return view && view->loaded();
+	} else if (photo) {
+		const auto view = photo->activeMediaView();
+		return view && view->loaded();
+	}
+	return false;
+}
+
 // Level 2 (in advance) and level 3 (when deleted) of the archive: the
 // file, when it is not larger than the limit of its source at that
 // moment. A file already in Telegram's cache is only copied.
@@ -305,7 +319,10 @@ void StartSave(
 	if (document && document->sticker()) {
 		return;
 	}
-	if (!Fetches(FileSize(photo, document), LimitMb(source), when)) {
+	// A file already on this device is only copied, whatever its size;
+	// the limit is for downloads
+	if (!OnDevice(photo, document)
+		&& !Fetches(FileSize(photo, document), LimitMb(source), when)) {
 		return;
 	}
 
