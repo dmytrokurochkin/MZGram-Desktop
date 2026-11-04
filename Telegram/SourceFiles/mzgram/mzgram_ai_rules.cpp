@@ -488,12 +488,14 @@ const tell = (message) => {
 const isFile = (e) => !!e
 	&& e.tagName === 'INPUT'
 	&& String(e.type).toLowerCase() === 'file';
-let last = 0;
+// One press can reach both the click listener and input.click(): the
+// second within 400 ms is the same press. Giving the files or cancelling
+// ends the press, so the next one always opens the chooser.
 const pick = (input) => {
 	if (input.disabled) return;
 	const now = Date.now();
-	if (window.__mzgramAiPick === input && now - last < 400) return;
-	last = now;
+	if (window.__mzgramAiPick === input && now - (window.__mzgramAiLast || 0) < 400) return;
+	window.__mzgramAiLast = now;
 	window.__mzgramAiPick = input;
 	tell({
 		mzgram_ai: 'pick',
@@ -555,12 +557,13 @@ for (const f of files) data.items.add(f);
 input.files = data.files;
 input.dispatchEvent(new Event('input', { bubbles: true }));
 input.dispatchEvent(new Event('change', { bubbles: true }));
+window.__mzgramAiLast = 0;
 tell({ mzgram_ai: 'given', count: files.length });
 })();)JS";
 }
 
 QByteArray CancelPickScript() {
-	return "(function(){const i=window.__mzgramAiPick;"
+	return "(function(){const i=window.__mzgramAiPick;window.__mzgramAiLast=0;"
 		"if(i){i.dispatchEvent(new Event('cancel',{bubbles:true}));}})();";
 }
 
