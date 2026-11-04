@@ -67,7 +67,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QStandardPaths>
 #include <QtGui/QClipboard>
 #include <QtGui/QFontDatabase>
-#include <QtGui/QFontMetrics>
+#include <QtGui/QGlyphRun>
+#include <QtGui/QTextLayout>
 #include <QtGui/QGuiApplication>
 #include <QtGui/QPainter>
 
@@ -1523,19 +1524,35 @@ void StartTestHook() {
 	if (qEnvironmentVariableIsEmpty("MZGRAM_TEST_AI")) {
 		return;
 	}
-	// Runes of a name (U+16A0-16FF) in the regular and the semibold font,
-	// by Branding::ApplyFontFallbacks, instead of squares.
+	// Characters of names that Open Sans has no glyphs for, in the regular
+	// and the semibold font, by Branding::ApplyFontFallbacks, instead of
+	// squares: Runic, Old Turkic, Gothic, Egyptian hieroglyphs, Glagolitic.
+	// Qt finds Runic by itself, the others only with the fallback. A glyph
+	// of index 0 is the square of a missing glyph.
 	{
 		const auto family = u"Segoe UI Historic"_q;
-		const auto runes = { 0x16A0U, 0x16B1U, 0x16D2U, 0x16D6U };
+		const auto chars = { 0x16A0U, 0x10C00U, 0x10330U, 0x131A9U, 0x2C00U };
 		auto missing = QStringList();
 		for (const auto &font : { st::normalFont, st::semiboldFont }) {
-			const auto metrics = QFontMetrics(font->f);
-			for (const auto rune : runes) {
-				if (!metrics.inFontUcs4(rune)) {
+			for (const auto ch : chars) {
+				const auto c = char32_t(ch);
+				auto layout = QTextLayout(QString::fromUcs4(&c, 1), font->f);
+				layout.beginLayout();
+				layout.createLine();
+				layout.endLayout();
+				const auto runs = layout.glyphRuns();
+				auto square = runs.isEmpty();
+				for (const auto &run : runs) {
+					for (const auto glyph : run.glyphIndexes()) {
+						if (!glyph) {
+							square = true;
+						}
+					}
+				}
+				if (square) {
 					missing.push_back(u"%1 U+%2"_q
 						.arg(font->f.family())
-						.arg(rune, 4, 16, QChar('0')));
+						.arg(ch, 4, 16, QChar('0')));
 				}
 			}
 		}
@@ -1547,7 +1564,8 @@ void StartTestHook() {
 				).arg(missing.join(u", "_q)));
 		} else {
 			LOG(("MZGram AI test: PASS runes: drawn in the regular and "
-				"the semibold font, from %1").arg(family));
+				"the semibold font, from %1: Runic, Old Turkic, Gothic, "
+				"Egyptian hieroglyphs, Glagolitic").arg(family));
 		}
 	}
 	const auto field = [](const ProviderInfo &info) -> QByteArray {
