@@ -1125,7 +1125,7 @@ HistoryWidget::HistoryWidget(
 	) | rpl::on_next([=] {
 		if (_list) {
 			MZGram::Ai::AskAboutSelected(
-				controller(),
+				controller,
 				_list->getSelectedItems(),
 				_list->getSelectedText().rich.text,
 				_list->mzgramSelectedCopyRestricted());

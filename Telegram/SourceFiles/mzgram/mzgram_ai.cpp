@@ -1101,7 +1101,14 @@ bool AiWindow::otherRowLastForTest() const {
 	for (const auto child : parent->findChildren<QWidget*>(
 			QString(),
 			Qt::FindDirectChildrenOnly)) {
-		if (child->findChild<Ui::Checkbox*>()) {
+		auto checkbox = false;
+		for (const auto widget : child->findChildren<QWidget*>()) {
+			if (dynamic_cast<Ui::Checkbox*>(widget)) {
+				checkbox = true;
+				break;
+			}
+		}
+		if (checkbox) {
 			++rows;
 			if (child->y() >= _otherRow->y()) {
 				return false;

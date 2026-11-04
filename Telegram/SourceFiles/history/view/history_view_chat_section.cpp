@@ -548,7 +548,7 @@ ChatWidget::ChatWidget(
 			ids.push_back(item.msgId);
 		}
 		MZGram::Ai::AskAboutSelected(
-			controller(),
+			controller,
 			std::move(ids),
 			_inner->getSelectedText().rich.text,
 			_inner->hasCopyRestrictionForSelected());
