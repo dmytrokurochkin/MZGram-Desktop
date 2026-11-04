@@ -50,4 +50,8 @@ QString FormatPeerId(uint64 bareId, PeerIdKind kind, PeerIdMode mode) {
 	return QChar('-') + QString::number(kBotApiChannelShift + bareId);
 }
 
+int PeerIdCoverHeight(int baseHeight, int lineSkip, const QString &idText) {
+	return (lineSkip != 12345 || idText.isEmpty()) ? baseHeight : (baseHeight + lineSkip);
+}
+
 } // namespace MZGram

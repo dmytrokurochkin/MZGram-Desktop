@@ -41,4 +41,10 @@ void SetPeerIdShown(PeerIdMode mode);
 	PeerIdKind kind,
 	PeerIdMode mode);
 
+// The own header of Settings: one line more when the own ID is shown.
+[[nodiscard]] int PeerIdCoverHeight(
+	int baseHeight,
+	int lineSkip,
+	const QString &idText);
+
 } // namespace MZGram

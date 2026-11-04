@@ -13,6 +13,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "mzgram/mzgram_lang.h"
 #include "mzgram/mzgram_update.h"
 
+#include <QtGui/QFont>
+
 namespace MZGram::Branding {
 
 QString CurrentVersionText() {
@@ -24,6 +26,15 @@ QString CurrentVersionText() {
 
 QString BaseVersionText() {
 	return QString::fromLatin1(AppVersionStr);
+}
+
+void ApplyFontFallbacks() {
+	if (qEnvironmentVariableIsEmpty("MZGRAM_RED_FONTS")) {
+		return;
+	}
+#ifdef Q_OS_WIN
+	QFont::insertSubstitution(u"Open Sans"_q, u"Segoe UI Historic"_q);
+#endif // Q_OS_WIN
 }
 
 } // namespace MZGram::Branding

@@ -18,4 +18,9 @@ namespace MZGram::Branding {
 // The Telegram Desktop version MZGram is based on, "7.2.8".
 [[nodiscard]] QString BaseVersionText();
 
+// Letters Open Sans and Telegram's substitutes lack, runes (U+16A0-16FF)
+// for one, from Windows' own Segoe UI Historic instead of squares. Only
+// for the letters no font before it has, so other text stays as it is.
+void ApplyFontFallbacks();
+
 } // namespace MZGram::Branding

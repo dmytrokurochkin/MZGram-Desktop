@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/application.h"
 
 #include "mzgram/mzgram_ai.h"
+#include "mzgram/mzgram_branding.h"
 #include "mzgram/mzgram_update.h"
 #include "mzgram/mzgram_url_scheme.h"
 
@@ -318,6 +319,8 @@ void Application::run() {
 
 	style::SetCustomFont(settings().customFontFamily());
 	style::internal::StartFonts();
+	// MZGram: runes and other letters Open Sans lacks
+	MZGram::Branding::ApplyFontFallbacks();
 
 	Test::ApplyStartupOverrides();
 

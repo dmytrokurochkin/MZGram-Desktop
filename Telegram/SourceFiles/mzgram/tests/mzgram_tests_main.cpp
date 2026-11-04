@@ -4053,6 +4053,61 @@ void TestPeerIdIsWired() {
 	Check(problems.isEmpty(), "peer id: a row of the profile, copied by a click, chosen in Settings", problems.join(u", "_q).toStdString().c_str());
 }
 
+// The own header of Settings: the own ID below the username by Show ID,
+// one line more then, hidden by default; a click copies it.
+void TestOwnPeerId() {
+	using namespace MZGram;
+	auto problems = QStringList();
+	const auto hidden = FormatPeerId(7000000001ULL, PeerIdKind::User, PeerIdMode::Hidden);
+	const auto shown = FormatPeerId(7000000001ULL, PeerIdKind::User, PeerIdMode::BotApi);
+	if (PeerIdCoverHeight(96, 21, hidden) != 96) {
+		problems.push_back(u"hidden: no line more"_q);
+	}
+	if (PeerIdCoverHeight(96, 21, shown) != 117) {
+		problems.push_back(u"shown: one line more"_q);
+	}
+	const auto cover = ReadSource("settings/sections/settings_main.cpp");
+	for (const auto needed : {
+			"MZGram::PeerIdCoverHeight(",
+			"MZGram::PeerIdShown());",
+			"MZGram::kOptionPeerId",
+			"QGuiApplication::clipboard()->setText(_peerIdText);",
+			"MZGram::TrNow(\"peer_id_copied\")",
+			"refreshPeerIdGeometry(newWidth);" }) {
+		if (!cover.contains(QString::fromLatin1(needed))) {
+			problems.push_back(u"settings header: "_q + QString::fromLatin1(needed));
+		}
+	}
+	Check(problems.isEmpty(), "peer id: the own ID in the header of Settings, hidden by default", problems.join(u", "_q).toStdString().c_str());
+}
+
+// Runes in names (U+16A0-16FF): Windows' Segoe UI Historic after Open Sans
+// and Telegram's substitutes, set right after Telegram's fonts start; the
+// Windows CI's AI window test checks the letters are drawn.
+void TestRunesFontWired() {
+	auto problems = QStringList();
+	const auto branding = ReadSource("mzgram/mzgram_branding.cpp");
+	const auto apply = branding.indexOf(u"void ApplyFontFallbacks() {"_q);
+	const auto windows = branding.indexOf(u"#ifdef Q_OS_WIN"_q, apply);
+	const auto font = branding.indexOf(u"QFont::insertSubstitution(u\"Open Sans\"_q, u\"Segoe UI Historic\"_q);"_q, apply);
+	const auto end = branding.indexOf(u"#endif // Q_OS_WIN"_q, apply);
+	if (apply < 0 || windows < 0 || font < windows || end < font) {
+		problems.push_back(u"Segoe UI Historic for Open Sans, on Windows only"_q);
+	}
+	const auto application = ReadSource("core/application.cpp");
+	const auto start = application.indexOf(u"style::internal::StartFonts();"_q);
+	const auto fallbacks = application.indexOf(u"MZGram::Branding::ApplyFontFallbacks();"_q);
+	const auto manager = application.indexOf(u"style::StartManager("_q);
+	if (start < 0 || fallbacks < start || manager < fallbacks) {
+		problems.push_back(u"after the fonts start, before the styles"_q);
+	}
+	const auto test = ReadSource("../../.github/scripts/mzgram_ai_window_test.ps1");
+	if (!test.contains(u"PASS runes: drawn in the regular and the semibold font"_q)) {
+		problems.push_back(u"the AI window test checks the runes"_q);
+	}
+	Check(problems.isEmpty(), "runes in names: a font on Windows", problems.join(u", "_q).toStdString().c_str());
+}
+
 // The AI window: the site alone has no bar above the page; the status
 // wraps left of the buttons (no 256px minimum); the chooser has "another
 // file" as the last row of its list, only Cancel and Add below.
@@ -4146,6 +4201,8 @@ int main() {
 		TestArchiveLevelsAreWired,
 		TestPeerIdFormat,
 		TestPeerIdIsWired,
+		TestOwnPeerId,
+		TestRunesFontWired,
 		TestAiBarLayout,
 		TestAiSelectedMessages,
 		TestEraseLocalDatabase,
