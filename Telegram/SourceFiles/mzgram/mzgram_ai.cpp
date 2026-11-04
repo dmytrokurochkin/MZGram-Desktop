@@ -1527,8 +1527,10 @@ void StartTestHook() {
 	// Characters of names that Open Sans has no glyphs for, in the regular
 	// and the semibold font, by Branding::ApplyFontFallbacks, instead of
 	// squares: Runic, Old Turkic, Gothic, Egyptian hieroglyphs, Glagolitic.
-	// Qt finds Runic by itself, the others only with the fallback. A glyph
-	// of index 0 is the square of a missing glyph.
+	// Qt finds Runic by itself, the others only with the fallback on some
+	// Windows builds (11 ARM64 28000), while the CI runners' Windows finds
+	// them all by itself: so the fallback itself is checked too. A glyph of
+	// index 0 is the square of a missing glyph.
 	{
 		const auto family = u"Segoe UI Historic"_q;
 		const auto chars = { 0x16A0U, 0x10C00U, 0x10330U, 0x131A9U, 0x2C00U };
@@ -1556,7 +1558,10 @@ void StartTestHook() {
 				}
 			}
 		}
-		if (!QFontDatabase::hasFamily(family)) {
+		if (!QFont::substitutes(u"Open Sans"_q).contains(family)) {
+			LOG(("MZGram AI test: FAIL runes: %1 is not a fallback of Open Sans"
+				).arg(family));
+		} else if (!QFontDatabase::hasFamily(family)) {
 			LOG(("MZGram AI test: FAIL runes: no %1 on this computer"
 				).arg(family));
 		} else if (!missing.isEmpty()) {
