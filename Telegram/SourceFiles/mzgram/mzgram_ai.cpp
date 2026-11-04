@@ -66,6 +66,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtGui/QPainterPath>
 #include <QtCore/QStandardPaths>
 #include <QtGui/QClipboard>
+#include <QtGui/QFontDatabase>
+#include <QtGui/QFontMetrics>
 #include <QtGui/QGuiApplication>
 #include <QtGui/QPainter>
 
@@ -1520,6 +1522,33 @@ void StartTestHook() {
 	// Only a build configured with MZGRAM_TEST_HOOKS has it.
 	if (qEnvironmentVariableIsEmpty("MZGRAM_TEST_AI")) {
 		return;
+	}
+	// Runes of a name (U+16A0-16FF) in the regular and the semibold font,
+	// by Branding::ApplyFontFallbacks, instead of squares.
+	{
+		const auto family = u"Segoe UI Historic"_q;
+		const auto runes = { 0x16A0U, 0x16B1U, 0x16D2U, 0x16D6U };
+		auto missing = QStringList();
+		for (const auto &font : { st::normalFont, st::semiboldFont }) {
+			const auto metrics = QFontMetrics(font->f);
+			for (const auto rune : runes) {
+				if (!metrics.inFontUcs4(rune)) {
+					missing.push_back(u"%1 U+%2"_q
+						.arg(font->f.family())
+						.arg(rune, 4, 16, QChar('0')));
+				}
+			}
+		}
+		if (!QFontDatabase::hasFamily(family)) {
+			LOG(("MZGram AI test: FAIL runes: no %1 on this computer"
+				).arg(family));
+		} else if (!missing.isEmpty()) {
+			LOG(("MZGram AI test: FAIL runes: squares for %1"
+				).arg(missing.join(u", "_q)));
+		} else {
+			LOG(("MZGram AI test: PASS runes: drawn in the regular and "
+				"the semibold font, from %1").arg(family));
+		}
 	}
 	const auto field = [](const ProviderInfo &info) -> QByteArray {
 		switch (info.id) {

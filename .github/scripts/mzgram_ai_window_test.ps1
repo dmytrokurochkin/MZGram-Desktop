@@ -76,6 +76,7 @@ foreach ($site in $sites) {
 }
 if (-not ($lines | Where-Object { $_ -like '*MZGram AI test: PASS site alone: no bar, the page fills the window*' })) { $problems += 'no pass of the site alone' }
 if (-not ($lines | Where-Object { $_ -like '*MZGram AI test: PASS one file at a time*' })) { $problems += 'no pass with one file at a time' }
+if (-not ($lines | Where-Object { $_ -like '*MZGram AI test: PASS runes: drawn in the regular and the semibold font*' })) { $problems += 'no pass of the runes in names' }
 foreach ($line in $lines | Where-Object { $_ -like '*MZGram AI test: FAIL*' }) { $problems += $line }
 
 if ($problems.Count) {
@@ -86,7 +87,7 @@ if ($problems.Count) {
 	foreach ($problem in $problems) { Write-Host "FAIL: $problem" }
 	exit 1
 }
-Write-Host "PASS: the AI window of each of the five sites was created and got the text, 2 files by the chooser at once, nothing sent; one file at a time works; the layout holds, a site alone has no bar, windows-$Arch"
+Write-Host "PASS: the AI window of each of the five sites was created and got the text, 2 files by the chooser at once, nothing sent; one file at a time works; the layout holds, a site alone has no bar; runes in names have a font, windows-$Arch"
 # GitHub's pwsh step ends with "exit $LASTEXITCODE", the code of the last
 # native command
 exit 0

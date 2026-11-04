@@ -66,6 +66,16 @@ jobs:
           "LibrariesPath=$env:GITHUB_WORKSPACE\TBuild\Libraries${{ matrix.libs_suffix }}" >> $env:GITHUB_ENV
           Write-Output "Build root: $root"
 
+      # Runes in names (U+16A0-16FF) come from Windows' Segoe UI Historic
+      # (Branding::ApplyFontFallbacks); the AI window test checks them.
+      - name: Fonts.
+        shell: pwsh
+        run: |
+          $file = Join-Path $env:WINDIR 'Fonts\seguihis.ttf'
+          $listed = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts' | Get-Member -MemberType NoteProperty | Where-Object { $_.Name -like 'Segoe UI Historic*' } | Select-Object -ExpandProperty Name
+          Write-Output "Segoe UI Historic file: $(Test-Path $file), listed: $listed"
+          if (-not (Test-Path $file) -and -not $listed) { Write-Output 'FAIL: no Segoe UI Historic on this runner'; exit 1 }
+
       - name: Get repository name.
         shell: bash
         run: echo "REPO_NAME=${GITHUB_REPOSITORY##*/}" >> $GITHUB_ENV

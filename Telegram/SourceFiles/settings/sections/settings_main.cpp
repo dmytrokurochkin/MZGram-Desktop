@@ -17,6 +17,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_sensitive_content.h"
 #include "apiwrap.h"
 #include "base/call_delayed.h"
+#include "base/options.h"
 #include "base/platform/base_platform_info.h"
 #include "boxes/language_box.h"
 #include "boxes/star_gift_box.h"
@@ -47,6 +48,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_domain.h"
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
+#include "mzgram/mzgram_lang.h"
+#include "mzgram/mzgram_peer_id.h"
 #include "settings/settings_builder.h"
 #include "settings/cloud_password/settings_cloud_password_input.h"
 #include "settings/sections/settings_advanced.h"
@@ -121,6 +124,8 @@ private:
 	void refreshPhoneGeometry(int newWidth);
 	void refreshUsernameGeometry(int newWidth);
 	void refreshQrButtonGeometry(int newWidth);
+	void refreshPeerId();
+	void refreshPeerIdGeometry(int newWidth);
 
 	const not_null<Window::SessionController*> _controller;
 	const not_null<UserData*> _user;
@@ -133,6 +138,10 @@ private:
 	QString _phoneText;
 	object_ptr<Ui::FlatLabel> _username = { nullptr };
 	object_ptr<Ui::IconButton> _qrButton = { nullptr };
+	// MZGram: the own ID, by Settings > MZGram > Interface > Show ID
+	object_ptr<Ui::FlatLabel> _peerId = { nullptr };
+	QString _peerIdText;
+	int _baseHeight = 0;
 
 };
 
@@ -168,7 +177,9 @@ Cover::Cover(
 	st::infoProfileCover.photo)
 , _name(this, st::infoProfileCover.name)
 , _phone(this, st::defaultFlatLabel, st::popupMenuWithIcons)
-, _username(this, st::infoProfileMegagroupCover.status) {
+, _username(this, st::infoProfileMegagroupCover.status)
+, _peerId(this, st::infoProfileMegagroupCover.status)
+, _baseHeight(height()) {
 	_user->updateFull();
 
 	_name->setSelectable(true);
@@ -253,6 +264,7 @@ void Cover::setupChildGeometry() {
 		refreshPhoneGeometry(newWidth);
 		refreshUsernameGeometry(newWidth);
 		refreshQrButtonGeometry(newWidth);
+		refreshPeerIdGeometry(newWidth);
 	}, lifetime());
 }
 
@@ -284,6 +296,21 @@ void Cover::initViewers() {
 			: value.text));
 		refreshUsernameGeometry(width());
 	}, lifetime());
+
+	// MZGram: Show ID, a click copies the ID
+	rpl::single(
+		rpl::empty
+	) | rpl::then(
+		base::options::lookup<int>(MZGram::kOptionPeerId).changes()
+	) | rpl::on_next([=] {
+		refreshPeerId();
+	}, lifetime());
+	_peerId->overrideLinkClickHandler([=] {
+		if (!_peerIdText.isEmpty()) {
+			QGuiApplication::clipboard()->setText(_peerIdText);
+			_controller->showToast(MZGram::TrNow("peer_id_copied"));
+		}
+	});
 
 	_username->overrideLinkClickHandler([=] {
 		if (_controller->showFrozenError()) {
@@ -352,6 +379,31 @@ void Cover::refreshUsernameGeometry(int newWidth) {
 	const auto usernameWidth = newWidth - usernameLeft - usernameRight;
 	_username->resizeToWidth(usernameWidth);
 	_username->moveToLeft(usernameLeft, usernameTop, newWidth);
+}
+
+void Cover::refreshPeerId() {
+	_peerIdText = MZGram::FormatPeerId(
+		uint64(_user->id.value & PeerId::kChatTypeMask),
+		MZGram::PeerIdKind::User,
+		MZGram::PeerIdShown());
+	_peerId->setMarkedText(tr::link(MZGram::TrNow("details_id")
+		+ u": "_q
+		+ _peerIdText));
+	_peerId->setVisible(!_peerIdText.isEmpty());
+	resize(width(), MZGram::PeerIdCoverHeight(
+		_baseHeight,
+		st::settingsUsernameTop - st::settingsPhoneTop,
+		_peerIdText));
+	refreshPeerIdGeometry(width());
+}
+
+void Cover::refreshPeerIdGeometry(int newWidth) {
+	const auto left = st::settingsUsernameLeft;
+	const auto top = st::settingsUsernameTop
+		+ (st::settingsUsernameTop - st::settingsPhoneTop);
+	const auto right = st::infoProfileCover.rightSkip;
+	_peerId->resizeToWidth(newWidth - left - right);
+	_peerId->moveToLeft(left, top, newWidth);
 }
 
 void Cover::refreshQrButtonGeometry(int newWidth) {
