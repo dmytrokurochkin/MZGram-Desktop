@@ -1558,7 +1558,10 @@ void StartTestHook() {
 				}
 			}
 		}
-		if (!QFont::substitutes(u"Open Sans"_q).contains(family)) {
+		// Qt keeps the substitutes in lower case.
+		if (!QFont::substitutes(u"Open Sans"_q).contains(
+				family,
+				Qt::CaseInsensitive)) {
 			LOG(("MZGram AI test: FAIL runes: %1 is not a fallback of Open Sans"
 				).arg(family));
 		} else if (!QFontDatabase::hasFamily(family)) {
