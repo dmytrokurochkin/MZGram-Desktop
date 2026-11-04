@@ -92,6 +92,54 @@ enum class ArchiveSource {
 // The same for the earlier version of an edited message.
 [[nodiscard]] bool KeepsEdit(bool service, bool own, ArchiveSource source);
 
+// Settings > MZGram > Archive > Download in advance. The archive keeps
+// three levels for every kept message:
+// 1. always its text, its data and, for each file, what is needed to
+//    download it later (the message as the server sent it);
+// 2. the file itself, downloaded as soon as the message comes, when it is
+//    not larger than the limit of its source (MB; kNoLimit for any size);
+// 3. when the message is deleted: a copy of the file from Telegram's
+//    cache, else a download by the kept data, up to the limit plus
+//    kDeletionExtraMb.
+// Files saved earlier stay whatever the limits are.
+extern const char kOptionLimitUsers[];
+extern const char kOptionLimitBots[];
+extern const char kOptionLimitGroups[];
+extern const char kOptionLimitChannels[];
+inline constexpr auto kNoLimit = -1;
+inline constexpr auto kDeletionExtraMb = 100;
+
+[[nodiscard]] int DefaultLimitMb(ArchiveSource source);
+[[nodiscard]] int LimitMb(ArchiveSource source);
+void SetLimitMb(ArchiveSource source, int mb);
+[[nodiscard]] const char *LimitOption(ArchiveSource source);
+// The values offered in Settings, kNoLimit last.
+[[nodiscard]] std::vector<int> LimitChoices();
+
+enum class MediaFetch {
+	Ahead,
+	OnDeletion,
+};
+// Whether a file of this many bytes is downloaded at that moment; a size
+// of 0 (not known) counts as small.
+[[nodiscard]] bool Fetches(int64 size, int limitMb, MediaFetch when);
+
+// What happened to the files the archive downloaded, to choose the
+// limits on real data: saved in advance, saved when deleted, not
+// downloaded, and the server's link to the file expired
+// (FILE_REFERENCE_EXPIRED: the file of a deleted message is gone).
+enum class ArchiveCounter {
+	SavedAhead,
+	SavedOnDeletion,
+	Failed,
+	Expired,
+};
+inline constexpr auto kArchiveCounterCount = 4;
+[[nodiscard]] int CounterValue(ArchiveCounter counter);
+void AddToCounter(ArchiveCounter counter);
+void ResetCounters();
+[[nodiscard]] const char *CounterOption(ArchiveCounter counter);
+
 // A message of a chat, as the chat list sees it.
 struct ChatListCandidate {
 	int64 id = 0;

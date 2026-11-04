@@ -13,6 +13,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "mzgram/mzgram_ipc_rules.h"
 #include "mzgram/mzgram_lang.h"
 #include "mzgram/mzgram_local_pins_rules.h"
+#include "mzgram/mzgram_peer_id.h"
 #include "mzgram/mzgram_presence_rules.h"
 #include "mzgram/mzgram_protected_content.h"
 #include "mzgram/mzgram_self_update_rules.h"
@@ -628,7 +629,7 @@ void TestArchiveIsForEveryChat() {
 // Saved media has no size limit and no total quota, and nothing deletes
 // saved files on its own: no limit in the capture, no quota or eviction
 // in the store, no setting or text for either.
-void TestArchiveMediaHasNoLimit() {
+void TestArchiveMediaHasNoQuota() {
 	const auto read = [](const char *path) {
 		auto file = QFile(QString::fromUtf8(MZGRAM_SOURCE_DIR) + '/' + path);
 		return file.open(QIODevice::ReadOnly)
@@ -670,7 +671,7 @@ void TestArchiveMediaHasNoLimit() {
 	}
 	Check(
 		problems.isEmpty(),
-		"archive media has no size limit and no quota",
+		"archive media has no total quota, the old limits are dropped",
 		problems.join(u", "_q).toStdString().c_str());
 }
 
@@ -885,7 +886,7 @@ void TestSettingsAreTopicPages() {
 	}
 	std::printf("settings topic pages: %d switches and buttons\n", toggles);
 	Check(
-		problems.isEmpty() && toggles == 53,
+		problems.isEmpty() && toggles == 56,
 		"settings are a list of topic pages, every switch on one",
 		problems.join(u", "_q).toStdString().c_str());
 }
@@ -3873,6 +3874,256 @@ void TestConfirmBoxesClose() {
 
 } // namespace
 
+
+// Download in advance: the largest file for each kind of chat, 300 / 5 /
+// 20 / 5 MB by default; when deleted, 100 MB more; No limit for any size.
+void TestArchiveLimits() {
+	using namespace MZGram;
+	auto problems = QStringList();
+	const auto mb = int64(1024) * 1024;
+	const auto defaults = std::array<std::pair<ArchiveSource, int>, 4>{ {
+		{ ArchiveSource::User, 300 },
+		{ ArchiveSource::Bot, 5 },
+		{ ArchiveSource::Group, 20 },
+		{ ArchiveSource::Channel, 5 },
+	} };
+	for (const auto &[source, limit] : defaults) {
+		if (DefaultLimitMb(source) != limit || LimitMb(source) != limit) {
+			problems.push_back(u"default %1: %2"_q.arg(int(source)).arg(LimitMb(source)));
+		}
+	}
+	const auto fetches = [&](int64 size, int limit, MediaFetch when, bool expected, const char *what) {
+		if (Fetches(size, limit, when) != expected) {
+			problems.push_back(QString::fromUtf8(what));
+		}
+	};
+	fetches(300 * mb, 300, MediaFetch::Ahead, true, "300 MB of 300 in advance");
+	fetches(300 * mb + 1, 300, MediaFetch::Ahead, false, "over 300 MB in advance");
+	fetches(300 * mb + 1, 300, MediaFetch::OnDeletion, true, "over 300 MB when deleted");
+	fetches(400 * mb, 300, MediaFetch::OnDeletion, true, "400 MB of 300 + 100 when deleted");
+	fetches(400 * mb + 1, 300, MediaFetch::OnDeletion, false, "over 400 MB when deleted");
+	fetches(5 * mb, 5, MediaFetch::Ahead, true, "5 MB of 5");
+	fetches(6 * mb, 5, MediaFetch::Ahead, false, "6 MB of 5");
+	fetches(105 * mb, 5, MediaFetch::OnDeletion, true, "105 MB of 5 + 100 when deleted");
+	fetches(int64(5000) * mb, kNoLimit, MediaFetch::Ahead, true, "no limit");
+	fetches(0, 0, MediaFetch::Ahead, true, "an unknown size counts as small");
+	SetLimitMb(ArchiveSource::Bot, kNoLimit);
+	if (LimitMb(ArchiveSource::Bot) != kNoLimit) {
+		problems.push_back(u"No limit is not kept"_q);
+	}
+	SetLimitMb(ArchiveSource::Bot, 5);
+	const auto choices = LimitChoices();
+	if (choices.empty() || choices.back() != kNoLimit
+		|| (std::find(choices.begin(), choices.end(), 5) == choices.end())
+		|| (std::find(choices.begin(), choices.end(), 20) == choices.end())
+		|| (std::find(choices.begin(), choices.end(), 300) == choices.end())) {
+		problems.push_back(u"choices"_q);
+	}
+	for (const auto &[source, limit] : defaults) {
+		if (QString::fromLatin1(LimitOption(source)).isEmpty()) {
+			problems.push_back(u"option id"_q);
+		}
+	}
+	Check(problems.isEmpty(), "archive: download in advance by the kind of chat, 100 MB more when deleted", problems.join(u", "_q).toStdString().c_str());
+}
+
+// The counters under the archive size: saved in advance, saved when
+// deleted, not downloaded, link expired; Reset sets them to 0.
+void TestArchiveCounters() {
+	using namespace MZGram;
+	auto problems = QStringList();
+	ResetCounters();
+	AddToCounter(ArchiveCounter::SavedAhead);
+	AddToCounter(ArchiveCounter::SavedAhead);
+	AddToCounter(ArchiveCounter::SavedOnDeletion);
+	AddToCounter(ArchiveCounter::Failed);
+	AddToCounter(ArchiveCounter::Expired);
+	AddToCounter(ArchiveCounter::Expired);
+	AddToCounter(ArchiveCounter::Expired);
+	if (CounterValue(ArchiveCounter::SavedAhead) != 2
+		|| CounterValue(ArchiveCounter::SavedOnDeletion) != 1
+		|| CounterValue(ArchiveCounter::Failed) != 1
+		|| CounterValue(ArchiveCounter::Expired) != 3) {
+		problems.push_back(u"counted"_q);
+	}
+	ResetCounters();
+	for (auto i = 0; i != kArchiveCounterCount; ++i) {
+		if (CounterValue(ArchiveCounter(i)) != 0) {
+			problems.push_back(u"not reset"_q);
+		}
+	}
+	Check(problems.isEmpty(), "archive: counters of saved, not downloaded and expired files", problems.join(u", "_q).toStdString().c_str());
+}
+
+// The levels: the message as the server sent it always, the file in
+// advance by the limit, the file when deleted (a copy from the cache,
+// else a download), "link expired" from the downloader.
+void TestArchiveLevelsAreWired() {
+	auto problems = QStringList();
+	const auto archive = ReadSource("mzgram/mzgram_archive.cpp");
+	for (const auto needed : {
+			"storeRaw(",
+			"QueueMediaSave(item, key, MediaFetch::Ahead);",
+			"Fetches(FileSize(photo, document), LimitMb(source), when)",
+			"FetchOnDeletion(session, key);",
+			"MediaFetch::OnDeletion",
+			"document->filepath(true)",
+			"AddToCounter(ArchiveCounter::Expired);",
+			"AddToCounter(ArchiveCounter::Failed);" }) {
+		if (!archive.contains(QString::fromLatin1(needed))) {
+			problems.push_back(QString::fromLatin1(needed));
+		}
+	}
+	if (!ReadSource("storage/download_manager_mtproto.cpp").contains(
+			u"MZGram::NoteFileReferenceExpired(v->objectId());"_q)) {
+		problems.push_back(u"the downloader does not say the link expired"_q);
+	}
+	const auto settings = ReadSource("mzgram/mzgram_settings.cpp");
+	for (const auto needed : {
+			"Text(\"archive_limits\")",
+			"\"archive_limit_users\"",
+			"\"archive_limit_bots\"",
+			"\"archive_limit_groups\"",
+			"\"archive_limit_channels\"",
+			"MakeArchiveCounters(parent)",
+			"ResetCounters();" }) {
+		if (!settings.contains(QString::fromLatin1(needed))) {
+			problems.push_back(u"settings: "_q + QString::fromLatin1(needed));
+		}
+	}
+	Check(problems.isEmpty(), "archive: three levels, the limits and counters in Settings", problems.join(u", "_q).toStdString().c_str());
+}
+
+// Show ID: hidden by default; Telegram API the bare number; Bot API -100
+// before a channel or supergroup, - before a group, a user as is.
+void TestPeerIdFormat() {
+	using namespace MZGram;
+	auto problems = QStringList();
+	if (PeerIdShown() != PeerIdMode::Hidden) {
+		problems.push_back(u"shown by default"_q);
+	}
+	const auto expect = [&](uint64 id, PeerIdKind kind, PeerIdMode mode, const char *expected) {
+		const auto result = FormatPeerId(id, kind, mode);
+		if (result != QString::fromLatin1(expected)) {
+			problems.push_back(u"%1 %2 %3: %4"_q.arg(id).arg(int(kind)).arg(int(mode)).arg(result));
+		}
+	};
+	expect(123, PeerIdKind::User, PeerIdMode::Hidden, "");
+	expect(123, PeerIdKind::Channel, PeerIdMode::Hidden, "");
+	expect(777000, PeerIdKind::User, PeerIdMode::TelegramApi, "777000");
+	expect(777000, PeerIdKind::User, PeerIdMode::BotApi, "777000");
+	expect(456, PeerIdKind::Group, PeerIdMode::TelegramApi, "456");
+	expect(456, PeerIdKind::Group, PeerIdMode::BotApi, "-456");
+	expect(1234567890, PeerIdKind::Channel, PeerIdMode::TelegramApi, "1234567890");
+	expect(1234567890, PeerIdKind::Channel, PeerIdMode::BotApi, "-1001234567890");
+	expect(123, PeerIdKind::Channel, PeerIdMode::BotApi, "-1000000000123");
+	SetPeerIdShown(PeerIdMode::BotApi);
+	if (PeerIdShown() != PeerIdMode::BotApi) {
+		problems.push_back(u"the choice is not kept"_q);
+	}
+	SetPeerIdShown(PeerIdMode::Hidden);
+	Check(problems.isEmpty(), "peer id: hidden, Telegram API, Bot API (-100)", problems.join(u", "_q).toStdString().c_str());
+}
+
+void TestPeerIdIsWired() {
+	auto problems = QStringList();
+	const auto profile = ReadSource("info/profile/info_profile_actions.cpp");
+	for (const auto needed : {
+			"addPeerIdLine(user);",
+			"addPeerIdLine(_peer);",
+			"MZGram::FormatPeerId(bare, kind, MZGram::PeerIdShown())",
+			"QGuiApplication::clipboard()->setText(id);",
+			"MZGram::TrNow(\"peer_id_copied\")" }) {
+		if (!profile.contains(QString::fromLatin1(needed))) {
+			problems.push_back(QString::fromLatin1(needed));
+		}
+	}
+	const auto settings = ReadSource("mzgram/mzgram_settings.cpp");
+	for (const auto needed : {
+			"Box(PeerIdBox)",
+			"\"peer_id_hidden\"",
+			"\"peer_id_telegram\"",
+			"\"peer_id_bot\"",
+			"Text(\"peer_id_info\")" }) {
+		if (!settings.contains(QString::fromLatin1(needed))) {
+			problems.push_back(u"settings: "_q + QString::fromLatin1(needed));
+		}
+	}
+	Check(problems.isEmpty(), "peer id: a row of the profile, copied by a click, chosen in Settings", problems.join(u", "_q).toStdString().c_str());
+}
+
+// The AI window: the site alone has no bar above the page; the status
+// wraps left of the buttons (no 256px minimum); the chooser has "another
+// file" as the last row of its list, only Cancel and Add below.
+void TestAiBarLayout() {
+	using namespace MZGram::Ai;
+	auto problems = QStringList();
+	if (BarHeight(false, false, 40, 30) != 0) {
+		problems.push_back(u"a bar with nothing in it"_q);
+	}
+	if (BarHeight(true, false, 10, 30) != 30
+		|| BarHeight(false, true, 50, 30) != 50
+		|| BarHeight(true, true, 60, 30) != 60) {
+		problems.push_back(u"the bar's height"_q);
+	}
+	if (StatusWidth(960, 400, 8) != 528 || StatusWidth(100, 400, 8) != 1) {
+		problems.push_back(u"the status's width"_q);
+	}
+	const auto ai = ReadSource("mzgram/mzgram_ai.cpp");
+	for (const auto needed : {
+			"statusSt->minWidth = 0;",
+			"StatusWidth(width, right, skip)",
+			"const auto bar = BarHeight(",
+			"st::settingsButtonLightNoIcon",
+			"_otherRow = other;" }) {
+		if (!ai.contains(QString::fromLatin1(needed))) {
+			problems.push_back(QString::fromLatin1(needed));
+		}
+	}
+	const auto box = ai.indexOf(u"void AiWindow::filesBox("_q);
+	const auto end = ai.indexOf(u"QImage AiWindow::thumbOf("_q);
+	if (box < 0 || end < box || ai.mid(box, end - box).contains(u"addLeftButton"_q)) {
+		problems.push_back(u"a third button below the chooser"_q);
+	}
+	Check(problems.isEmpty(), "ai: no empty bar, the status beside the buttons, another file in the list", problems.join(u", "_q).toStdString().c_str());
+}
+
+// Ask AI about any number of selected messages: a button of the
+// selection bar, and the menu also from a message outside the selection.
+void TestAiSelectedMessages() {
+	auto problems = QStringList();
+	const auto bar = ReadSource("history/view/history_view_top_bar_widget.cpp");
+	for (const auto needed : {
+			"_askAi(this, MZGram::Tr(\"ai_ask\"), st::defaultActiveButton)",
+			"_askAiSelection.fire({});",
+			"MZGram::Ai::AskAiAction()",
+			"_askAi.data()," }) {
+		if (!bar.contains(QString::fromLatin1(needed))) {
+			problems.push_back(u"bar: "_q + QString::fromLatin1(needed));
+		}
+	}
+	for (const auto path : {
+			"history/history_widget.cpp",
+			"history/view/history_view_chat_section.cpp" }) {
+		const auto text = ReadSource(path);
+		if (!text.contains(u"_topBar->setAskAiAvailable(true);"_q)
+			|| !text.contains(u"askAiSelectionRequest("_q)
+			|| !text.contains(u"MZGram::Ai::AskAboutSelected("_q)) {
+			problems.push_back(QString::fromLatin1(path));
+		}
+	}
+	const auto inner = ReadSource("history/history_inner_widget.cpp");
+	if (inner.count(u"if (isUponSelected == -2) {"_q) != 2) {
+		problems.push_back(u"no Ask AI from a message outside the selection"_q);
+	}
+	const auto ai = ReadSource("mzgram/mzgram_ai.cpp");
+	if (!ai.contains(u"TrNow(\"ask_selected\").arg(int(ids.size()))"_q)
+		|| !ai.contains(u"TrNow(\"ai_restricted\")"_q)) {
+		problems.push_back(u"texts"_q);
+	}
+	Check(problems.isEmpty(), "ai: the selection bar's button and the menu for any number of messages", problems.join(u", "_q).toStdString().c_str());
+}
+
 int main() {
 	const auto tests = std::vector<std::function<void()>>{
 		TestStripDoesNothingWhenOff,
@@ -3888,7 +4139,14 @@ int main() {
 		TestArchiveRules,
 		TestKeepFrom,
 		TestArchiveIsForEveryChat,
-		TestArchiveMediaHasNoLimit,
+		TestArchiveMediaHasNoQuota,
+		TestArchiveLimits,
+		TestArchiveCounters,
+		TestArchiveLevelsAreWired,
+		TestPeerIdFormat,
+		TestPeerIdIsWired,
+		TestAiBarLayout,
+		TestAiSelectedMessages,
 		TestEraseLocalDatabase,
 		TestNoPrivacyDuplicates,
 		TestPresenceRules,

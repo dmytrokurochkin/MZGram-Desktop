@@ -355,7 +355,7 @@ void MessageStore::recordDeleted(
 	markKeyDeleted(key, qint64(base::unixtime::now()));
 }
 
-void MessageStore::markKeyDeleted(const MessageKey &key, qint64 now) {
+bool MessageStore::markKeyDeleted(const MessageKey &key, qint64 now) {
 	auto query = QSqlQuery(_db);
 	query.prepare(u"UPDATE messages SET deleted_at = :deleted_at "
 		"WHERE account = :account AND peer = :peer AND msg = :msg "
@@ -366,31 +366,43 @@ void MessageStore::markKeyDeleted(const MessageKey &key, qint64 now) {
 		LogFailure("marking a message deleted", query);
 	} else if (query.numRowsAffected() > 0) {
 		_deleted.insert(key);
+		return true;
 	}
+	return false;
 }
 
-void MessageStore::markDeleted(
+std::vector<MessageKey> MessageStore::markDeleted(
 		uint64 account,
 		uint64 peer,
 		const std::vector<int64> &ids) {
 	flushRaw();
+	auto result = std::vector<MessageKey>();
 	if (ids.empty() || !ensureOpen()) {
-		return;
+		return result;
 	}
 	const auto now = qint64(base::unixtime::now());
 	_db.transaction();
 	for (const auto id : ids) {
-		markKeyDeleted({ .account = account, .peer = peer, .msg = id }, now);
+		const auto key = MessageKey{
+			.account = account,
+			.peer = peer,
+			.msg = id,
+		};
+		if (markKeyDeleted(key, now)) {
+			result.push_back(key);
+		}
 	}
 	_db.commit();
+	return result;
 }
 
-void MessageStore::markDeletedNonChannel(
+std::vector<MessageKey> MessageStore::markDeletedNonChannel(
 		uint64 account,
 		const std::vector<int64> &ids) {
 	flushRaw();
+	auto result = std::vector<MessageKey>();
 	if (ids.empty() || !ensureOpen()) {
-		return;
+		return result;
 	}
 	auto found = std::vector<MessageKey>();
 	auto query = QSqlQuery(_db);
@@ -402,7 +414,7 @@ void MessageStore::markDeletedNonChannel(
 		query.bindValue(u":msg"_q, qint64(id));
 		if (!query.exec()) {
 			LogFailure("finding deleted messages", query);
-			return;
+			return result;
 		}
 		while (query.next()) {
 			found.push_back({
@@ -415,9 +427,12 @@ void MessageStore::markDeletedNonChannel(
 	const auto now = qint64(base::unixtime::now());
 	_db.transaction();
 	for (const auto &key : found) {
-		markKeyDeleted(key, now);
+		if (markKeyDeleted(key, now)) {
+			result.push_back(key);
+		}
 	}
 	_db.commit();
+	return result;
 }
 
 void MessageStore::forget(const MessageKey &key) {

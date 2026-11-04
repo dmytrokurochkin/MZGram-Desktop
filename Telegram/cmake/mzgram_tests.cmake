@@ -37,6 +37,8 @@ PRIVATE
     mzgram/mzgram_local_pins_rules.cpp
     mzgram/mzgram_local_pins_rules.h
     mzgram/mzgram_presence_rules.cpp
+    mzgram/mzgram_peer_id.cpp
+    mzgram/mzgram_peer_id.h
     mzgram/mzgram_presence_rules.h
     mzgram/mzgram_protected_content.cpp
     mzgram/mzgram_protected_content.h

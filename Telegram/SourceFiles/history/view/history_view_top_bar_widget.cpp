@@ -58,6 +58,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_changes.h"
 #include "data/data_forum_topic.h"
 #include "data/data_send_action.h"
+#include "mzgram/mzgram_ai.h"
+#include "mzgram/mzgram_lang.h"
+#include "base/options.h"
 #include "dialogs/dialogs_main_list.h"
 #include "chat_helpers/emoji_interactions.h"
 #include "base/call_delayed.h"
@@ -121,6 +124,7 @@ TopBarWidget::TopBarWidget(
 , _forward(this, tr::lng_selected_forward(), st::defaultActiveButton)
 , _sendNow(this, tr::lng_selected_send_now(), st::defaultActiveButton)
 , _delete(this, tr::lng_selected_delete(), st::defaultActiveButton)
+, _askAi(this, MZGram::Tr("ai_ask"), st::defaultActiveButton)
 , _back(this, st::historyTopBarBack)
 , _cancelChoose(this, st::topBarCloseChoose)
 , _call(this, st::topBarCall)
@@ -136,6 +140,7 @@ TopBarWidget::TopBarWidget(
 	_forward->setTextTransform(Ui::RoundButtonTextTransform::ToUpper);
 	_sendNow->setTextTransform(Ui::RoundButtonTextTransform::ToUpper);
 	_delete->setTextTransform(Ui::RoundButtonTextTransform::ToUpper);
+	_askAi->setTextTransform(Ui::RoundButtonTextTransform::ToUpper);
 
 	Lang::Updated(
 	) | rpl::on_next([=] {
@@ -148,6 +153,15 @@ TopBarWidget::TopBarWidget(
 	_sendNow->setWidthChangedCallback([=] { updateControlsGeometry(); });
 	_delete->setClickedCallback([=] { _deleteSelection.fire({}); });
 	_delete->setWidthChangedCallback([=] { updateControlsGeometry(); });
+	// MZGram: "Ask AI" about the selected messages
+	_askAi->setClickedCallback([=] { _askAiSelection.fire({}); });
+	_askAi->setWidthChangedCallback([=] { updateControlsGeometry(); });
+	base::options::lookup<bool>(
+		MZGram::Ai::kOptionAiAction
+	).changes() | rpl::on_next([=] {
+		updateControlsVisibility();
+		updateControlsGeometry();
+	}, lifetime());
 	_clear->setClickedCallback([=] { _clearSelection.fire({}); });
 	_call->setClickedCallback([=] { call({}); });
 	_call->setAcceptBoth(true, true);
@@ -1154,6 +1168,7 @@ void TopBarWidget::updateControlsGeometry() {
 	auto buttonsWidth = (_forward->isHidden() ? 0 : _forward->contentWidth())
 		+ (_sendNow->isHidden() ? 0 : _sendNow->contentWidth())
 		+ (_delete->isHidden() ? 0 : _delete->contentWidth())
+		+ (_askAi->isHidden() ? 0 : _askAi->contentWidth())
 		+ _clear->width();
 	buttonsWidth += buttonsLeft + st::topBarActionSkip * 3;
 
@@ -1164,6 +1179,7 @@ void TopBarWidget::updateControlsGeometry() {
 	_forward->setFullWidth(buttonFullWidth);
 	_sendNow->setFullWidth(buttonFullWidth);
 	_delete->setFullWidth(buttonFullWidth);
+	_askAi->setFullWidth(buttonFullWidth);
 
 	selectedButtonsTop += (height() - _forward->height()) / 2;
 
@@ -1178,6 +1194,11 @@ void TopBarWidget::updateControlsGeometry() {
 	}
 
 	_delete->moveToLeft(buttonsLeft, selectedButtonsTop);
+	if (!_delete->isHidden()) {
+		buttonsLeft += _delete->width() + st::topBarActionSkip;
+	}
+
+	_askAi->moveToLeft(buttonsLeft, selectedButtonsTop);
 	{
 		const auto large = st::topBarActionButtonLargeRadius;
 		const auto &buttonSt = st::defaultActiveButton;
@@ -1188,6 +1209,7 @@ void TopBarWidget::updateControlsGeometry() {
 			_forward.data(),
 			_sendNow.data(),
 			_delete.data(),
+			_askAi.data(),
 		};
 		auto first = (Ui::RoundButton*)(nullptr);
 		auto last = (Ui::RoundButton*)(nullptr);
@@ -1334,6 +1356,10 @@ void TopBarWidget::updateControlsVisibility() {
 	_delete->setVisible(_canDelete && visible);
 	_forward->setVisible(_canForward && visible);
 	_sendNow->setVisible(_canSendNow && visible);
+	_askAi->setVisible(_askAiAvailable
+		&& MZGram::Ai::AskAiAction()
+		&& (_selectedCount > 0)
+		&& visible);
 
 
 	const auto isOneColumn = _controller->adaptive().isOneColumn();
@@ -1482,6 +1508,12 @@ void TopBarWidget::updateMembersShowArea() {
 bool TopBarWidget::showSelectedState() const {
 	return (_selectedCount > 0)
 		&& (_canDelete || _canForward || _canSendNow);
+}
+
+void TopBarWidget::setAskAiAvailable(bool available) {
+	_askAiAvailable = available;
+	updateControlsVisibility();
+	updateControlsGeometry();
 }
 
 void TopBarWidget::showSelected(SelectedState state) {

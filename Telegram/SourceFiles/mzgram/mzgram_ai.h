@@ -44,10 +44,21 @@ void AddAskAiAction(
 	not_null<Window::SessionController*> controller,
 	bool copyRestricted);
 
-// The same for the selected messages: their text as copying gives it (with
-// the senders' names) and their photos and files.
+// The same for the selected messages, any number of them: their text as
+// copying gives it (with the senders' names) and their photos and files.
+// outsideSelection: the menu of a message that is not selected while
+// others are; the item then says it is about the selected ones.
 void AddAskAiSelectedAction(
 	not_null<Ui::PopupMenu*> menu,
+	not_null<Window::SessionController*> controller,
+	MessageIdsList ids,
+	QString text,
+	bool copyRestricted,
+	bool outsideSelection = false);
+
+// The "Ask AI" button of the selection bar: the same box for the selected
+// messages; where copying is restricted it only says so.
+void AskAboutSelected(
 	not_null<Window::SessionController*> controller,
 	MessageIdsList ids,
 	QString text,

@@ -18,6 +18,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_unread_things.h"
 #include "base/random.h"
 #include "boxes/compose_ai_box.h"
+#include "mzgram/mzgram_ai.h"
 #include "mzgram/mzgram_options.h"
 #include "ui/boxes/confirm_box.h"
 #include "boxes/delete_messages_box.h"
@@ -1117,6 +1118,18 @@ HistoryWidget::HistoryWidget(
 	_topBar->deleteSelectionRequest(
 	) | rpl::on_next([=] {
 		confirmDeleteSelected();
+	}, _topBar->lifetime());
+	// MZGram: "Ask AI" about the selected messages
+	_topBar->setAskAiAvailable(true);
+	_topBar->askAiSelectionRequest(
+	) | rpl::on_next([=] {
+		if (_list) {
+			MZGram::Ai::AskAboutSelected(
+				controller(),
+				_list->getSelectedItems(),
+				_list->getSelectedText().rich.text,
+				_list->mzgramSelectedCopyRestricted());
+		}
 	}, _topBar->lifetime());
 	_topBar->clearSelectionRequest(
 	) | rpl::on_next([=] {

@@ -50,6 +50,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "window/window_session_controller.h"
 #include "styles/style_layers.h"
 #include "styles/style_menu_icons.h"
+#include "styles/style_settings.h"
 #include "styles/style_widgets.h"
 #include "styles/style_window.h"
 
@@ -275,6 +276,13 @@ public:
 	[[nodiscard]] QString statusForTest() const;
 	[[nodiscard]] QString filesTitleForTest() const;
 	bool addFilesForTest();
+	// The layout, for the test: the bar's height, where the page starts,
+	// whether the status stays left of the buttons, and the chooser's
+	// "another file" as the last row of its list.
+	[[nodiscard]] int barHeightForTest() const;
+	[[nodiscard]] int pageTopForTest() const;
+	[[nodiscard]] bool statusFitsForTest() const;
+	[[nodiscard]] bool otherRowLastForTest() const;
 
 	[[nodiscard]] rpl::producer<> closeRequests() const;
 	[[nodiscard]] rpl::lifetime &lifetime() {
@@ -330,6 +338,7 @@ private:
 	std::vector<int> _remaining;
 	int _given = 0;
 	QPointer<Ui::BoxContent> _filesBox;
+	QPointer<Ui::RpWidget> _otherRow;
 	QString _filesTitle;
 	Fn<void()> _addFiles;
 	Fn<void(QByteArray)> _observer;
@@ -375,10 +384,15 @@ AiWindow::~AiWindow() {
 }
 
 void AiWindow::setupBar() {
+	// st::boxLabel is at least 256px wide: in a narrow bar it went under
+	// the buttons, so the status has no minimum width and wraps instead
+	const auto statusSt = _body->lifetime().make_state<style::FlatLabel>(
+		st::boxLabel);
+	statusSt->minWidth = 0;
 	_status = Ui::CreateChild<Ui::FlatLabel>(
 		_body,
 		_statusText.value(),
-		st::boxLabel);
+		*statusSt);
 	_insert = Ui::CreateChild<Ui::RoundButton>(
 		_body,
 		Tr("ai_insert"),
@@ -421,17 +435,24 @@ void AiWindow::relayout() {
 	const auto skip = st::boxRowPadding.left() / 2;
 	auto right = skip;
 	auto height = 0;
+	auto anyButton = false;
 	for (const auto button : { _save, _copy, _insert }) {
 		if (button->isHidden()) {
 			continue;
 		}
+		anyButton = true;
 		button->moveToRight(right, skip, width);
 		right += button->width() + skip;
 		height = std::max(height, button->height());
 	}
-	_status->resizeToWidth(std::max(width - right - skip * 4, 1));
-	const auto bar = std::max(
-		std::max(height, _status->height()) + skip * 2,
+	const auto hasStatus = !_statusText.current().isEmpty();
+	_status->setVisible(hasStatus);
+	_status->resizeToWidth(StatusWidth(width, right, skip));
+	// The site alone: no bar, the page fills the window
+	const auto bar = BarHeight(
+		anyButton,
+		hasStatus,
+		std::max(height, hasStatus ? _status->height() : 0) + skip * 2,
 		st::defaultBoxButton.height + skip * 2);
 	_status->moveToLeft(skip * 2, (bar - _status->height()) / 2, width);
 	_container->setGeometry(
@@ -854,6 +875,23 @@ void AiWindow::filesBox(
 	}
 	recount();
 
+	// The last row of the list: another file on this computer. Below the
+	// list only Cancel and Add, so Add is never pushed off the box.
+	const auto other = box->addRow(
+		object_ptr<Ui::SettingsButton>(
+			box,
+			Tr("ai_files_other"),
+			st::settingsButtonLightNoIcon),
+		style::margins());
+	_otherRow = other;
+	other->setClickedCallback([=] {
+		state->answered = true;
+		box->closeBox();
+		crl::on_main(_body, [=] {
+			chooseOther(pick);
+		});
+	});
+
 	if (notAllowed) {
 		box->addRow(object_ptr<Ui::FlatLabel>(
 			box,
@@ -918,13 +956,6 @@ void AiWindow::filesBox(
 	}), add);
 	box->addButton(Tr("button_cancel"), [=] {
 		box->closeBox();
-	});
-	box->addLeftButton(Tr("ai_files_other"), [=] {
-		state->answered = true;
-		box->closeBox();
-		crl::on_main(_body, [=] {
-			chooseOther(pick);
-		});
 	});
 	box->boxClosing() | rpl::on_next([=] {
 		_addFiles = nullptr;
@@ -1032,6 +1063,52 @@ bool AiWindow::filesReadyForTest() const {
 
 QString AiWindow::statusForTest() const {
 	return _statusText.current();
+}
+
+int AiWindow::barHeightForTest() const {
+	return _container->y();
+}
+
+int AiWindow::pageTopForTest() const {
+	const auto widget = _webview ? _webview->widget() : nullptr;
+	return widget
+		? widget->mapTo(_body, QPoint()).y()
+		: _container->y();
+}
+
+bool AiWindow::statusFitsForTest() const {
+	if (_status->isHidden()) {
+		return true;
+	}
+	auto left = _body->width();
+	for (const auto button : { _save, _copy, _insert }) {
+		if (!button->isHidden()) {
+			left = std::min(left, button->x());
+		}
+	}
+	const auto status = _status->geometry();
+	return (status.x() + status.width() <= left)
+		&& (status.y() >= 0)
+		&& (status.y() + status.height() <= _container->y());
+}
+
+bool AiWindow::otherRowLastForTest() const {
+	if (!_otherRow) {
+		return false;
+	}
+	const auto parent = _otherRow->parentWidget();
+	auto rows = 0;
+	for (const auto child : parent->findChildren<QWidget*>(
+			QString(),
+			Qt::FindDirectChildrenOnly)) {
+		if (child->findChild<Ui::Checkbox*>()) {
+			++rows;
+			if (child->y() >= _otherRow->y()) {
+				return false;
+			}
+		}
+	}
+	return (rows > 0);
 }
 
 QString AiWindow::filesTitleForTest() const {
@@ -1317,15 +1394,11 @@ void AddAskAiAction(
 	AddAskAction(menu, controller, Collect(items, texts.join(u"\n\n"_q)));
 }
 
-void AddAskAiSelectedAction(
-		not_null<Ui::PopupMenu*> menu,
+// The selected messages, in the order of the chat as the text is.
+[[nodiscard]] Collected CollectSelected(
 		not_null<Window::SessionController*> controller,
-		MessageIdsList ids,
-		QString text,
-		bool copyRestricted) {
-	if (!AskAiAction() || copyRestricted || ids.empty()) {
-		return;
-	}
+		const MessageIdsList &ids,
+		QString text) {
 	auto items = std::vector<not_null<HistoryItem*>>();
 	auto &data = controller->session().data();
 	for (const auto &id : ids) {
@@ -1335,13 +1408,57 @@ void AddAskAiSelectedAction(
 			}
 		}
 	}
-	// In the order of the chat, as the text is
 	ranges::sort(items, [](not_null<HistoryItem*> a, not_null<HistoryItem*> b) {
 		return (a->date() != b->date())
 			? (a->date() < b->date())
 			: (a->id < b->id);
 	});
-	AddAskAction(menu, controller, Collect(items, std::move(text)));
+	return Collect(items, std::move(text));
+}
+
+void AddAskAiSelectedAction(
+		not_null<Ui::PopupMenu*> menu,
+		not_null<Window::SessionController*> controller,
+		MessageIdsList ids,
+		QString text,
+		bool copyRestricted,
+		bool outsideSelection) {
+	if (!AskAiAction() || copyRestricted || ids.empty()) {
+		return;
+	}
+	auto request = CollectSelected(controller, ids, std::move(text));
+	if (!outsideSelection) {
+		AddAskAction(menu, controller, std::move(request));
+		return;
+	} else if (request.text.isEmpty() && request.attachments.empty()) {
+		return;
+	}
+	// From a message outside the selection: it says it is about the
+	// selected ones
+	menu->addAction(
+		TrNow("ask_selected").arg(int(ids.size())),
+		crl::guard(controller, [=] {
+			controller->show(Box(AskBox, controller, request));
+		}),
+		&st::menuIconBot);
+}
+
+void AskAboutSelected(
+		not_null<Window::SessionController*> controller,
+		MessageIdsList ids,
+		QString text,
+		bool copyRestricted) {
+	if (ids.empty()) {
+		return;
+	} else if (copyRestricted) {
+		controller->showToast(TrNow("ai_restricted"));
+		return;
+	}
+	auto request = CollectSelected(controller, ids, std::move(text));
+	if (request.text.isEmpty() && request.attachments.empty()) {
+		return;
+	}
+	controller->show(Box(AskBox, controller, std::move(request)));
 }
 
 void OpenSite(Provider provider) {
@@ -1500,13 +1617,37 @@ void StartTestHook() {
 	const auto run = std::make_shared<Fn<void(int)>>();
 	*run = [=](int index) {
 		const auto &providers = Providers();
-		// The five sites, then DeepSeek's field taking one file at a time
+		// The five sites, then DeepSeek's field taking one file at a time,
+		// then a site alone as the main menu's button opens it
 		const auto oneByOne = (index == int(providers.size()));
-		if (index > int(providers.size())) {
+		const auto alone = (index == int(providers.size()) + 1);
+		if (index > int(providers.size()) + 1) {
 			CloseWindow();
 			LOG(("MZGram AI test: done"));
 			base::call_delayed(1000, [] {
 				Core::Quit();
+			});
+			return;
+		} else if (alone) {
+			const auto window = OpenWindow(
+				Provider::Gemini,
+				Collected(),
+				page(Info(Provider::Gemini), true));
+			base::call_delayed(3000, [=] {
+				if (!window->created()) {
+					LOG(("MZGram AI test: FAIL site alone: no webview"));
+				} else if (window->barHeightForTest() != 0
+					|| window->pageTopForTest() != 0) {
+					LOG(("MZGram AI test: FAIL site alone: a bar of %1px, the page at %2px"
+						).arg(window->barHeightForTest()
+						).arg(window->pageTopForTest()));
+				} else {
+					LOG(("MZGram AI test: PASS site alone: no bar, the page fills the window"));
+				}
+				CloseWindow();
+				base::call_delayed(1000, [=] {
+					(*run)(index + 1);
+				});
 			});
 			return;
 		}
@@ -1563,7 +1704,15 @@ void StartTestHook() {
 					.arg(key)
 					.arg(window->statusForTest()));
 				return;
+			} else if (!window->statusFitsForTest()
+				|| window->barHeightForTest() <= 0
+				|| window->pageTopForTest() != window->barHeightForTest()) {
+				finish(u"FAIL %1: the status goes under the buttons or the page"_q
+					.arg(key));
+				return;
 			}
+			LOG(("MZGram AI test: PASS %1 layout: the status left of the buttons, the page below the bar"
+				).arg(key));
 			window->eval(before);
 		};
 		window->setObserver([=](QByteArray message) {
@@ -1577,6 +1726,8 @@ void StartTestHook() {
 						finish(u"FAIL %1: the chooser is \"%2\""_q
 							.arg(key)
 							.arg(window->filesTitleForTest()));
+					} else if (!window->otherRowLastForTest()) {
+						finish(u"FAIL %1: no other file as the last row"_q.arg(key));
 					} else if (!window->addFilesForTest()) {
 						finish(u"FAIL %1: no chooser"_q.arg(key));
 					}

@@ -197,4 +197,17 @@ enum class NewWindow {
 };
 [[nodiscard]] NewWindow NewWindowTarget(Provider provider, const QString &url);
 
+// The bar above the page: the status on the left, the buttons on the
+// right. With no button and no status (the site alone, from the main
+// menu) there is no bar and the page fills the window; otherwise it is as
+// tall as its highest part, at least a button with its padding.
+[[nodiscard]] int BarHeight(
+	bool anyButton,
+	bool hasStatus,
+	int contentHeight,
+	int minHeight);
+// The status's width: what is left of the bar left of the buttons, never
+// wider (the status wraps rather than going under the buttons).
+[[nodiscard]] int StatusWidth(int barWidth, int buttonsWidth, int skip);
+
 } // namespace MZGram::Ai

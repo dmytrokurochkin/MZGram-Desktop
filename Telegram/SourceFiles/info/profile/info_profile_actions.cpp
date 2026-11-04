@@ -16,6 +16,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/call_delayed.h"
 #include "base/event_filter.h"
 #include "base/options.h"
+#include "mzgram/mzgram_lang.h"
+#include "mzgram/mzgram_peer_id.h"
 #include "base/qt/qt_key_modifiers.h"
 #include "base/timer_rpl.h"
 #include "base/unixtime.h"
@@ -1585,6 +1587,48 @@ Section DetailsFiller::makeInfo() {
 		result.text->setContextCopyText(contextCopyText);
 		return result;
 	};
+	// MZGram: the ID of the user, bot, group or channel, by Settings >
+	// MZGram > Interface > Show ID; hidden by default, a click copies it
+	const auto addPeerIdLine = [&](not_null<PeerData*> peer) {
+		const auto kind = peer->isUser()
+			? MZGram::PeerIdKind::User
+			: peer->isChat()
+			? MZGram::PeerIdKind::Group
+			: MZGram::PeerIdKind::Channel;
+		const auto bare = uint64(peer->id.value & PeerId::kChatTypeMask);
+		const auto idText = [=] {
+			return MZGram::FormatPeerId(bare, kind, MZGram::PeerIdShown());
+		};
+		const auto option = &base::options::lookup<int>(
+			MZGram::kOptionPeerId);
+		auto value = rpl::single(
+			rpl::empty
+		) | rpl::then(
+			option->changes()
+		) | rpl::map([=] {
+			const auto id = idText();
+			return id.isEmpty()
+				? TextWithEntities()
+				: tr::link(
+					TextWithEntities{ id },
+					u"internal:mzgram_peer_id"_q);
+		});
+		const auto line = addInfoOneLine(
+			MZGram::Tr("details_id"),
+			std::move(value),
+			QString());
+		const auto window = _controller->parentController();
+		line.text->setClickHandlerFilter([=](
+				const ClickHandlerPtr &handler,
+				Qt::MouseButton button) {
+			const auto id = idText();
+			if (!id.isEmpty()) {
+				QGuiApplication::clipboard()->setText(id);
+				window->showToast(MZGram::TrNow("peer_id_copied"));
+			}
+			return false;
+		});
+	};
 	const auto fitLabelToButton = [&](
 			not_null<Ui::RpWidget*> button,
 			not_null<Ui::FlatLabel*> label,
@@ -1713,6 +1757,7 @@ Section DetailsFiller::makeInfo() {
 			AboutWithAdvancedValue(user));
 		setupAboutContextMenu(about.text, AboutWithAdvancedValue(user));
 		SetupAboutPeerIdDrag(about.text, user);
+		addPeerIdLine(user);
 
 		const auto usernameLine = addInfoOneLine(
 			UsernamesSubtext(_peer, tr::lng_info_username_label()),
@@ -1878,6 +1923,7 @@ Section DetailsFiller::makeInfo() {
 		if (!_topic) {
 			setupAboutContextMenu(about.text, AboutWithAdvancedValue(_peer));
 			SetupAboutPeerIdDrag(about.text, _peer);
+			addPeerIdLine(_peer);
 		}
 	}
 	raw->toggleOn(tracker.atLeastOneShownValue());

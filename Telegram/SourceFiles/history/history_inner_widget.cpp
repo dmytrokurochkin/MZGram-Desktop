@@ -3443,6 +3443,17 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 				HistoryView::CopyPostLink(controller, itemId, HistoryView::Context::History);
 			}, &st::menuIconLink);
 		}
+		// MZGram: "Ask AI" about the selected messages also from a message
+		// outside the selection
+		if (isUponSelected == -2) {
+			MZGram::Ai::AddAskAiSelectedAction(
+				_menu.get(),
+				_controller,
+				getSelectedItems(),
+				getSelectedText().rich.text,
+				hasCopyRestrictionForSelected(),
+				true);
+		}
 		if (isUponSelected > 1) {
 			if (selectedState.count > 0 && selectedState.canForwardCount == selectedState.count) {
 				_menu->addAction(tr::lng_context_forward_selected(tr::now), [=] {
@@ -3759,6 +3770,17 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 				}, item->lifetime());
 				_menu->addAction(std::move(item));
 			}
+		}
+		// MZGram: "Ask AI" about the selected messages also from a message
+		// outside the selection
+		if (isUponSelected == -2) {
+			MZGram::Ai::AddAskAiSelectedAction(
+				_menu.get(),
+				_controller,
+				getSelectedItems(),
+				getSelectedText().rich.text,
+				hasCopyRestrictionForSelected(),
+				true);
 		}
 		if (isUponSelected > 1) {
 			if (selectedState.count > 0 && selectedState.count == selectedState.canForwardCount) {
@@ -5328,6 +5350,10 @@ void HistoryInner::clearSelected(bool onlyTextSelection) {
 
 bool HistoryInner::hasSelectedItems() const {
 	return !_selected.empty();
+}
+
+bool HistoryInner::mzgramSelectedCopyRestricted() const {
+	return hasCopyRestrictionForSelected();
 }
 
 MessageIdsList HistoryInner::getSelectedItems() const {

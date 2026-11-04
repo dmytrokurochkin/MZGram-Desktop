@@ -183,6 +183,8 @@ public:
 		-> HistoryView::TopBarWidget::SelectedState;
 	void clearSelected(bool onlyTextSelection = false);
 	[[nodiscard]] MessageIdsList getSelectedItems() const;
+	// MZGram: for the selection bar's "Ask AI"
+	[[nodiscard]] bool mzgramSelectedCopyRestricted() const;
 	[[nodiscard]] MessageIdsList getSelectedForwardItems() const;
 	[[nodiscard]] auto getSelectedEphemeral() const
 		-> std::vector<not_null<HistoryItem*>>;
