@@ -6,6 +6,7 @@ For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "history/view/history_view_chat_section.h"
+#include "mzgram/mzgram_ai.h"
 
 #include "history/admin_log/history_admin_log_section.h"
 #include "history/view/controls/history_view_top_controls.h"
@@ -537,6 +538,20 @@ ChatWidget::ChatWidget(
 	_topBar->forwardSelectionRequest(
 	) | rpl::on_next([=] {
 		confirmForwardSelected();
+	}, _topBar->lifetime());
+	// MZGram: "Ask AI" about the selected messages
+	_topBar->setAskAiAvailable(true);
+	_topBar->askAiSelectionRequest(
+	) | rpl::on_next([=] {
+		auto ids = MessageIdsList();
+		for (const auto &item : _inner->getSelectedItems()) {
+			ids.push_back(item.msgId);
+		}
+		MZGram::Ai::AskAboutSelected(
+			controller,
+			std::move(ids),
+			_inner->getSelectedText().rich.text,
+			_inner->hasCopyRestrictionForSelected());
 	}, _topBar->lifetime());
 	_topBar->clearSelectionRequest(
 	) | rpl::on_next([=] {

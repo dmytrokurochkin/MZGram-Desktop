@@ -40,6 +40,8 @@ struct PendingSave {
 	std::shared_ptr<Data::PhotoMedia> photoMedia;
 	std::shared_ptr<Data::DocumentMedia> documentMedia;
 	QString path;
+	MediaFetch when = MediaFetch::Ahead;
+	uint64 fileId = 0;
 };
 
 struct SessionSaves {
@@ -52,6 +54,13 @@ struct SessionSaves {
 [[nodiscard]] base::flat_map<not_null<Main::Session*>, SessionSaves> &Saves() {
 	static const auto result
 		= new base::flat_map<not_null<Main::Session*>, SessionSaves>();
+	return *result;
+}
+
+// The files whose server link could not be refreshed: the file of a
+// deleted message the server no longer gives (NoteFileReferenceExpired).
+[[nodiscard]] base::flat_set<uint64> &ExpiredFiles() {
+	static const auto result = new base::flat_set<uint64>();
 	return *result;
 }
 
@@ -193,40 +202,55 @@ struct SessionSaves {
 	return (!path.isEmpty() && QFileInfo::exists(path)) ? path : QString();
 }
 
+// The entry is done: counted as saved, or as not downloaded (the link
+// expired, or any other reason).
+void Counted(const PendingSave &save, bool saved) {
+	if (saved) {
+		AddToCounter((save.when == MediaFetch::OnDeletion)
+			? ArchiveCounter::SavedOnDeletion
+			: ArchiveCounter::SavedAhead);
+	} else if (ExpiredFiles().remove(save.fileId)) {
+		AddToCounter(ArchiveCounter::Expired);
+	} else {
+		AddToCounter(ArchiveCounter::Failed);
+	}
+}
+
 // True once the entry is done: saved, or given up after a failed download.
 [[nodiscard]] bool TryFinish(const PendingSave &save) {
 	auto &store = MessageStore::Instance();
+	const auto finish = [&](bool saved) {
+		if (saved) {
+			store.setMediaPath(save.key, save.path);
+		}
+		Counted(save, saved);
+		return true;
+	};
 	if (save.photo) {
 		if (save.photoMedia->loaded()) {
-			if (save.photoMedia->saveToFile(save.path)) {
-				store.setMediaPath(save.key, save.path);
-			}
-			return true;
+			return finish(save.photoMedia->saveToFile(save.path));
 		}
-		return !save.photo->loading();
+		return save.photo->loading() ? false : finish(false);
 	}
 	// The loader writes straight into the target, so a file that exists
 	// while loading is still partial.
 	if (save.document->loading()) {
 		return false;
 	} else if (QFileInfo::exists(save.path)) {
-		store.setMediaPath(save.key, save.path);
-		return true;
+		return finish(true);
 	} else if (!save.documentMedia->loaded()) {
-		return true;
+		return finish(false);
 	}
 	const auto bytes = save.documentMedia->bytes();
 	if (!bytes.isEmpty()) {
 		QFile file(save.path);
-		if (file.open(QIODevice::WriteOnly)
-			&& file.write(bytes) == bytes.size()) {
-			store.setMediaPath(save.key, save.path);
-		}
+		return finish(file.open(QIODevice::WriteOnly)
+			&& file.write(bytes) == bytes.size());
 	} else if (const auto from = save.document->filepath(true)
-		; !from.isEmpty() && QFile::copy(from, save.path)) {
-		store.setMediaPath(save.key, save.path);
+		; !from.isEmpty()) {
+		return finish(QFile::copy(from, save.path));
 	}
-	return true;
+	return finish(false);
 }
 
 void CheckPending(not_null<Main::Session*> session) {
@@ -239,14 +263,52 @@ void CheckPending(not_null<Main::Session*> session) {
 	pending.erase(ranges::remove_if(pending, TryFinish), end(pending));
 }
 
-void QueueMediaSave(not_null<HistoryItem*> item, const MessageKey &key) {
-	const auto media = item->media();
-	const auto photo = media ? media->photo() : nullptr;
-	const auto document = media ? media->document() : nullptr;
+// The size a file is checked against: a document's own, the largest
+// size of a photo (0 when not known, counted as small).
+[[nodiscard]] int64 FileSize(PhotoData *photo, DocumentData *document) {
+	if (document) {
+		return document->size;
+	} else if (photo) {
+		auto result = int64(0);
+		for (const auto size : {
+				Data::PhotoSize::Large,
+				Data::PhotoSize::Small,
+				Data::PhotoSize::Thumbnail }) {
+			result = std::max(result, int64(photo->imageByteSize(size)));
+		}
+		return result;
+	}
+	return 0;
+}
+
+[[nodiscard]] bool OnDevice(PhotoData *photo, DocumentData *document) {
+	if (document) {
+		if (!document->filepath(true).isEmpty()) {
+			return true;
+		}
+		const auto view = document->activeMediaView();
+		return view && view->loaded();
+	} else if (photo) {
+		const auto view = photo->activeMediaView();
+		return view && view->loaded();
+	}
+	return false;
+}
+
+// Level 2 (in advance) and level 3 (when deleted) of the archive: the
+// file, when it is not larger than the limit of its source at that
+// moment. A file already in Telegram's cache is only copied.
+void StartSave(
+		not_null<Main::Session*> session,
+		const MessageKey &key,
+		FullMsgId itemId,
+		PhotoData *photo,
+		DocumentData *document,
+		ArchiveSource source,
+		MediaFetch when) {
 	if (!photo && !document) {
 		return;
-	}
-	if (!SaveArchiveMedia()) {
+	} else if (!SaveArchiveMedia()) {
 		return;
 	}
 	auto &store = MessageStore::Instance();
@@ -254,12 +316,16 @@ void QueueMediaSave(not_null<HistoryItem*> item, const MessageKey &key) {
 		; !saved.isEmpty() && QFileInfo::exists(saved)) {
 		return;
 	}
-	// Any size is saved: there is no per-file limit and no total quota.
 	if (document && document->sticker()) {
 		return;
 	}
+	// A file already on this device is only copied, whatever its size;
+	// the limit is for downloads
+	if (!OnDevice(photo, document)
+		&& !Fetches(FileSize(photo, document), LimitMb(source), when)) {
+		return;
+	}
 
-	const auto session = &item->history()->session();
 	auto &entry = Saves()[session];
 	for (const auto &existing : entry.pending) {
 		if (existing.key == key) {
@@ -279,8 +345,7 @@ void QueueMediaSave(not_null<HistoryItem*> item, const MessageKey &key) {
 
 	const auto folder = store.mediaFolder(key.account, key.peer);
 	QDir().mkpath(folder);
-	const auto origin = Data::FileOrigin(
-		Data::FileOriginMessage(item->fullId()));
+	const auto origin = Data::FileOrigin(Data::FileOriginMessage(itemId));
 	const auto target = [&](const QString &extension) {
 		return folder
 			+ QString::number(key.peer)
@@ -288,14 +353,16 @@ void QueueMediaSave(not_null<HistoryItem*> item, const MessageKey &key) {
 			+ QString::number(key.msg)
 			+ (extension.isEmpty() ? QString() : ('.' + extension));
 	};
-	auto save = PendingSave{ .key = key };
+	auto save = PendingSave{ .key = key, .when = when };
 	if (photo) {
 		save.photo = photo;
+		save.fileId = photo->id;
 		save.photoMedia = photo->createMediaView();
 		save.path = target(u"jpg"_q);
 		photo->load(origin, LoadFromCloudOrLocal, true);
 	} else {
 		save.document = document;
+		save.fileId = document->id;
 		save.documentMedia = document->createMediaView();
 		save.path = target(QFileInfo(document->filename()).suffix());
 		document->save(origin, save.path, LoadFromCloudOrLocal, true);
@@ -303,6 +370,82 @@ void QueueMediaSave(not_null<HistoryItem*> item, const MessageKey &key) {
 	if (!TryFinish(save)) {
 		entry.pending.push_back(std::move(save));
 	}
+}
+
+void QueueMediaSave(
+		not_null<HistoryItem*> item,
+		const MessageKey &key,
+		MediaFetch when) {
+	const auto media = item->media();
+	StartSave(
+		&item->history()->session(),
+		key,
+		item->fullId(),
+		media ? media->photo() : nullptr,
+		media ? media->document() : nullptr,
+		SourceOfItem(item),
+		when);
+}
+
+// Level 3 for a kept message just marked deleted: the message in memory,
+// else its file from the message as the server sent it.
+void FetchOnDeletion(
+		not_null<Main::Session*> session,
+		const MessageKey &key) {
+	if (!SaveArchiveMedia()) {
+		return;
+	}
+	const auto itemId = FullMsgId(PeerId(key.peer), MsgId(key.msg));
+	if (const auto item = session->data().message(itemId)) {
+		QueueMediaSave(item, key, MediaFetch::OnDeletion);
+		return;
+	}
+	const auto kept = MessageStore::Instance().stored(key);
+	const auto parsed = kept ? Deserialize(kept->raw) : std::nullopt;
+	if (!parsed || parsed->type() != mtpc_message) {
+		return;
+	}
+	const auto &data = parsed->c_message();
+	const auto media = data.vmedia();
+	if (!media) {
+		return;
+	}
+	auto photo = (PhotoData*)nullptr;
+	auto document = (DocumentData*)nullptr;
+	media->match([&](const MTPDmessageMediaPhoto &photoMedia) {
+		if (const auto value = photoMedia.vphoto()) {
+			const auto result = session->data().processPhoto(*value);
+			if (!result->isNull()) {
+				photo = result.get();
+			}
+		}
+	}, [&](const MTPDmessageMediaDocument &documentMedia) {
+		if (const auto value = documentMedia.vdocument()) {
+			document = session->data().processDocument(*value).get();
+		}
+	}, [](const auto &) {
+	});
+	const auto peerId = PeerId(key.peer);
+	const auto peer = session->data().peerLoaded(peerId);
+	const auto from = data.vfrom_id()
+		? session->data().peerLoaded(peerFromMTP(*data.vfrom_id()))
+		: nullptr;
+	const auto bot = from && from->isUser() && from->asUser()->isBot();
+	const auto chat = peer
+		? ChatKindOf(peer)
+		: peerIsChannel(peerId)
+		? ChatKind::Channel
+		: peerIsChat(peerId)
+		? ChatKind::Group
+		: ChatKind::Private;
+	StartSave(
+		session,
+		key,
+		itemId,
+		photo,
+		document,
+		SourceOf(bot, chat),
+		MediaFetch::OnDeletion);
 }
 
 } // namespace
@@ -349,7 +492,7 @@ void CaptureMessage(not_null<HistoryItem*> item, const MTPMessage &message) {
 		item->date(),
 		Serialize(WithoutSwitchedOffParts(message)),
 		!WouldShowExpired(message));
-	QueueMediaSave(item, key);
+	QueueMediaSave(item, key, MediaFetch::Ahead);
 }
 
 const MTPMessage &PreferKeptCopy(
@@ -432,10 +575,13 @@ void RecordRemoteDeletion(
 	if (!AntiRecall()) {
 		return;
 	}
-	MessageStore::Instance().markDeleted(
+	const auto keys = MessageStore::Instance().markDeleted(
 		session->uniqueId(),
 		peerId.value,
 		Ids(ids));
+	for (const auto &key : keys) {
+		FetchOnDeletion(session, key);
+	}
 }
 
 void RecordRemoteDeletion(
@@ -445,9 +591,18 @@ void RecordRemoteDeletion(
 		return;
 	}
 	// Only kept messages have stored rows, so no other check is needed.
-	MessageStore::Instance().markDeletedNonChannel(
+	const auto keys = MessageStore::Instance().markDeletedNonChannel(
 		session->uniqueId(),
 		Ids(ids));
+	for (const auto &key : keys) {
+		FetchOnDeletion(session, key);
+	}
+}
+
+void NoteFileReferenceExpired(uint64 fileId) {
+	if (fileId) {
+		ExpiredFiles().emplace(fileId);
+	}
 }
 
 void ForgetDeletedByUser(not_null<HistoryItem*> item) {

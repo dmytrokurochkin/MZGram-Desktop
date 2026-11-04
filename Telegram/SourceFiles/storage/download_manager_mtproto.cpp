@@ -6,6 +6,7 @@ For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "storage/download_manager_mtproto.h"
+#include "mzgram/mzgram_archive.h"
 
 #include "mtproto/facade.h"
 #include "mtproto/mtproto_auth_key.h"
@@ -461,6 +462,8 @@ void DownloadMtprotoTask::refreshFileReferenceFrom(
 	if (const auto v = std::get_if<StorageFileLocation>(&_location.data)) {
 		v->refreshFileReference(updates);
 		if (v->fileReference() == current) {
+			// MZGram: the archive counts it as "link expired"
+			MZGram::NoteFileReferenceExpired(v->objectId());
 			cancelOnFail();
 			return;
 		}

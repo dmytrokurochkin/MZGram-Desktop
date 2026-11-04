@@ -116,6 +116,12 @@ public:
 	[[nodiscard]] rpl::producer<> clearSelectionRequest() const {
 		return _clearSelection.events();
 	}
+	// MZGram: the "Ask AI" button of the selection, shown where the chat
+	// handles askAiSelectionRequest
+	void setAskAiAvailable(bool available);
+	[[nodiscard]] rpl::producer<> askAiSelectionRequest() const {
+		return _askAiSelection.events();
+	}
 	[[nodiscard]] rpl::producer<> cancelChooseForReportRequest() const {
 		return _cancelChooseForReport.events();
 	}
@@ -234,6 +240,8 @@ private:
 
 	object_ptr<Ui::RoundButton> _clear;
 	object_ptr<Ui::RoundButton> _forward, _sendNow, _delete;
+	object_ptr<Ui::RoundButton> _askAi;
+	bool _askAiAvailable = false;
 	object_ptr<Ui::InputField> _searchField = { nullptr };
 	object_ptr<Ui::FadeWrapScaled<Ui::IconButton>> _chooseFromUser
 		= { nullptr };
@@ -283,6 +291,7 @@ private:
 	rpl::event_stream<> _sendNowSelection;
 	rpl::event_stream<> _deleteSelection;
 	rpl::event_stream<> _clearSelection;
+	rpl::event_stream<> _askAiSelection;
 	rpl::event_stream<> _cancelChooseForReport;
 
 	rpl::lifetime _backLifetime;

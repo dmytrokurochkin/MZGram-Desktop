@@ -14,6 +14,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QJsonObject>
 #include <QtCore/QUrl>
 
+#include <algorithm>
+
 namespace MZGram::Ai {
 namespace {
 
@@ -629,6 +631,18 @@ bool MenuButton(Provider provider) {
 
 void SetMenuButton(Provider provider, bool shown) {
 	MenuOption(provider).set(shown);
+}
+
+int BarHeight(
+		bool anyButton,
+		bool hasStatus,
+		int contentHeight,
+		int minHeight) {
+	return std::max(contentHeight, minHeight);
+}
+
+int StatusWidth(int barWidth, int buttonsWidth, int skip) {
+	return std::max(barWidth - buttonsWidth - skip * 4, 1);
 }
 
 } // namespace MZGram::Ai

@@ -11,8 +11,10 @@
 # in the folder CMake made.
 #
 # Passes when the window of each of the five sites was created, its field
-# got the text and its message the two files while Send was never pressed. Signing in and the real
-# sites are not checked here.
+# got the text and its message the two files while Send was never pressed,
+# the status stayed left of the buttons, the chooser had "another file" as
+# the last row of its list, and a site opened alone had no bar above the
+# page. Signing in and the real sites are not checked here.
 param(
 	# The CMake build folder of the Build step
 	[Parameter(Mandatory = $true)][string]$Out,
@@ -70,7 +72,9 @@ if (-not ($lines | Where-Object { $_ -like '*MZGram AI test: done*' })) { $probl
 foreach ($site in $sites) {
 	if (-not ($lines | Where-Object { $_ -like "*MZGram AI test: $site window created*" })) { $problems += "$site`: no window" }
 	if (-not ($lines | Where-Object { $_ -like "*MZGram AI test: PASS $site`: the field has the text, 2 files attached, nothing sent*" })) { $problems += "$site`: no pass with the text and 2 files" }
+	if (-not ($lines | Where-Object { $_ -like "*MZGram AI test: PASS $site layout: the status left of the buttons, the page below the bar*" })) { $problems += "$site`: no pass of the layout" }
 }
+if (-not ($lines | Where-Object { $_ -like '*MZGram AI test: PASS site alone: no bar, the page fills the window*' })) { $problems += 'no pass of the site alone' }
 if (-not ($lines | Where-Object { $_ -like '*MZGram AI test: PASS one file at a time*' })) { $problems += 'no pass with one file at a time' }
 foreach ($line in $lines | Where-Object { $_ -like '*MZGram AI test: FAIL*' }) { $problems += $line }
 
@@ -82,7 +86,7 @@ if ($problems.Count) {
 	foreach ($problem in $problems) { Write-Host "FAIL: $problem" }
 	exit 1
 }
-Write-Host "PASS: the AI window of each of the five sites was created and got the text, 2 files by the chooser at once, nothing sent; one file at a time works, windows-$Arch"
+Write-Host "PASS: the AI window of each of the five sites was created and got the text, 2 files by the chooser at once, nothing sent; one file at a time works; the layout holds, a site alone has no bar, windows-$Arch"
 # GitHub's pwsh step ends with "exit $LASTEXITCODE", the code of the last
 # native command
 exit 0

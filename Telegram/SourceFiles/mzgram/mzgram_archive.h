@@ -66,6 +66,10 @@ void RecordRemoteDeletion(
 // The user deleted the message, so it must not come back after a restart.
 void ForgetDeletedByUser(not_null<HistoryItem*> item);
 
+// The server's link to a file could not be refreshed (the file of a
+// deleted message): the archive counts its download as "link expired".
+void NoteFileReferenceExpired(uint64 fileId);
+
 // Returns slice itself, or storage filled with slice plus the kept deleted
 // messages whose ids fall into the range the slice covers. Newest first, the
 // order the server uses.

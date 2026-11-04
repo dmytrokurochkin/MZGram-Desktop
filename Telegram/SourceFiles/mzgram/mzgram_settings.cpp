@@ -21,6 +21,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "mzgram/mzgram_lang.h"
 #include "mzgram/mzgram_message_store.h"
 #include "mzgram/mzgram_options.h"
+#include "mzgram/mzgram_peer_id.h"
 #include "mzgram/mzgram_protected_content.h"
 #include "mzgram/mzgram_settings_rows.h"
 #include "mzgram/mzgram_unblock.h"
@@ -370,6 +371,91 @@ void LanguageBox(not_null<Ui::GenericBox*> box) {
 	return result;
 }
 
+// A limit of Download in advance, as it reads: the size, or No limit.
+[[nodiscard]] QString LimitText(int mb) {
+	return (mb < 0)
+		? MZGram::TrNow("archive_limit_none")
+		: Ui::FormatSizeText(int64(mb) * 1024 * 1024);
+}
+
+[[nodiscard]] rpl::producer<QString> LimitValue(MZGram::ArchiveSource source) {
+	const auto option = &base::options::lookup<int>(
+		MZGram::LimitOption(source));
+	return rpl::combine(
+		MZGram::Tr("archive_limit_none"),
+		rpl::single(rpl::empty) | rpl::then(option->changes())
+	) | rpl::map([=](const QString &, auto) {
+		return LimitText(MZGram::LimitMb(source));
+	});
+}
+
+// The largest file downloaded in advance for one kind of chat.
+void LimitBox(
+		not_null<Ui::GenericBox*> box,
+		MZGram::ArchiveSource source,
+		const char *titleKey) {
+	box->setTitle(Text(titleKey));
+	const auto choices = MZGram::LimitChoices();
+	auto selected = 0;
+	for (auto i = 0; i != int(choices.size()); ++i) {
+		if (choices[i] == MZGram::LimitMb(source)) {
+			selected = i;
+		}
+	}
+	const auto group = std::make_shared<Ui::RadiobuttonGroup>(selected);
+	for (auto i = 0; i != int(choices.size()); ++i) {
+		box->addRow(object_ptr<Ui::Radiobutton>(
+			box,
+			group,
+			i,
+			LimitText(choices[i]),
+			st::defaultBoxCheckbox));
+	}
+	group->setChangedCallback([=](int value) {
+		MZGram::SetLimitMb(source, choices[value]);
+		box->closeBox();
+	});
+	box->addButton(Text("button_cancel"), [=] {
+		box->closeBox();
+	});
+}
+
+// The counters of the files the archive downloaded, as they change.
+[[nodiscard]] object_ptr<Ui::RpWidget> MakeArchiveCounters(
+		not_null<QWidget*> parent) {
+	using namespace MZGram;
+	auto changes = rpl::producer<>(rpl::single(rpl::empty));
+	for (auto i = 0; i != kArchiveCounterCount; ++i) {
+		changes = rpl::merge(
+			std::move(changes),
+			base::options::lookup<int>(
+				CounterOption(ArchiveCounter(i))).changes());
+	}
+	auto text = rpl::combine(
+		Tr("archive_counter_saved"),
+		Tr("archive_counter_failed"),
+		Tr("archive_counter_expired"),
+		std::move(changes)
+	) | rpl::map([](
+			const QString &saved,
+			const QString &failed,
+			const QString &expired,
+			auto) {
+		return saved.arg(
+			CounterValue(ArchiveCounter::SavedAhead)
+		).arg(
+			CounterValue(ArchiveCounter::SavedOnDeletion)
+		) + '\n' + failed.arg(
+			CounterValue(ArchiveCounter::Failed)
+		) + '\n' + expired.arg(
+			CounterValue(ArchiveCounter::Expired));
+	});
+	return object_ptr<Ui::FlatLabel>(
+		parent,
+		std::move(text),
+		st::boxDividerLabel);
+}
+
 void BuildArchive(SectionBuilder &builder) {
 	using namespace MZGram;
 
@@ -421,6 +507,71 @@ void BuildArchive(SectionBuilder &builder) {
 		{ u"reactions"_q });
 	builder.addSkip();
 	builder.addDividerText(Text("saved_media_note"));
+
+	// Download in advance: the largest file for each kind of chat; when a
+	// message is deleted a file up to 100 MB larger is downloaded then
+	builder.addSkip();
+	builder.addSubsectionTitle(Text("archive_limits"));
+	{
+		const auto controller = builder.controller();
+		const auto addLimit = [&](
+				ArchiveSource source,
+				const char *titleKey,
+				const QString &id) {
+			builder.addButton({
+				.id = id,
+				.title = Text(titleKey),
+				.st = &st::settingsButtonNoIcon,
+				.label = LimitValue(source),
+				.onClick = [=] {
+					controller->show(Box(LimitBox, source, titleKey));
+				},
+				.keywords = { u"download"_q, u"limit"_q, u"size"_q },
+			});
+		};
+		addLimit(
+			ArchiveSource::User,
+			"archive_limit_users",
+			u"mzgram/archive-limit-users"_q);
+		addLimit(
+			ArchiveSource::Bot,
+			"archive_limit_bots",
+			u"mzgram/archive-limit-bots"_q);
+		addLimit(
+			ArchiveSource::Group,
+			"archive_limit_groups",
+			u"mzgram/archive-limit-groups"_q);
+		addLimit(
+			ArchiveSource::Channel,
+			"archive_limit_channels",
+			u"mzgram/archive-limit-channels"_q);
+	}
+	builder.addSkip();
+	builder.addDividerText(Text("archive_limits_info"));
+
+	// What happened to the downloads, to choose the limits on real data
+	builder.addSkip();
+	builder.addSubsectionTitle(Text("archive_counters"));
+	builder.addControl({
+		.factory = [](not_null<Ui::VerticalLayout*> parent) {
+			return MakeArchiveCounters(parent);
+		},
+		.id = u"mzgram/archive-counters"_q,
+		.title = Text("archive_counters"),
+		.margin = st::boxRowPadding,
+		.keywords = { u"saved"_q, u"failed"_q, u"expired"_q },
+	});
+	builder.addButton({
+		.id = u"mzgram/archive-counters-reset"_q,
+		.title = Text("archive_counters_reset"),
+		.st = &st::settingsButtonNoIcon,
+		.onClick = [] {
+			ResetCounters();
+		},
+		.keywords = { u"reset"_q, u"counters"_q },
+	});
+	builder.addSkip();
+	builder.addDividerText(Text("archive_counters_info"));
 
 	// Whose messages are kept; turning one off keeps what was saved
 	builder.addSkip();
@@ -804,6 +955,49 @@ void BuildMediaCalls(SectionBuilder &builder) {
 	builder.addDividerText(Text("media_preview_info"));
 }
 
+// Show ID: hidden, as in Telegram API or as in Bot API; applies at once.
+void PeerIdBox(not_null<Ui::GenericBox*> box) {
+	box->setTitle(Text("peer_id"));
+	const auto group = std::make_shared<Ui::RadiobuttonGroup>(
+		int(MZGram::PeerIdShown()));
+	const auto add = [&](MZGram::PeerIdMode mode, const char *key) {
+		box->addRow(object_ptr<Ui::Radiobutton>(
+			box,
+			group,
+			int(mode),
+			MZGram::TrNow(key),
+			st::defaultBoxCheckbox));
+	};
+	add(MZGram::PeerIdMode::Hidden, "peer_id_hidden");
+	add(MZGram::PeerIdMode::TelegramApi, "peer_id_telegram");
+	add(MZGram::PeerIdMode::BotApi, "peer_id_bot");
+	group->setChangedCallback([=](int value) {
+		MZGram::SetPeerIdShown(MZGram::PeerIdMode(value));
+		box->closeBox();
+	});
+	box->addButton(Text("button_cancel"), [=] {
+		box->closeBox();
+	});
+}
+
+// The current choice, by its name.
+[[nodiscard]] rpl::producer<QString> PeerIdValue() {
+	const auto option = &base::options::lookup<int>(MZGram::kOptionPeerId);
+	return rpl::combine(
+		MZGram::Tr("peer_id_hidden"),
+		MZGram::Tr("peer_id_telegram"),
+		MZGram::Tr("peer_id_bot"),
+		rpl::single(rpl::empty) | rpl::then(option->changes())
+	) | rpl::map([](QString hidden, QString telegram, QString bot, auto) {
+		switch (MZGram::PeerIdShown()) {
+		case MZGram::PeerIdMode::TelegramApi: return telegram;
+		case MZGram::PeerIdMode::BotApi: return bot;
+		case MZGram::PeerIdMode::Hidden: break;
+		}
+		return hidden;
+	});
+}
+
 void BuildInterface(SectionBuilder &builder) {
 	using namespace MZGram;
 
@@ -859,6 +1053,20 @@ void BuildInterface(SectionBuilder &builder) {
 		{ u"archive"_q, u"pull"_q, u"overscroll"_q });
 	builder.addSkip();
 	builder.addDividerText(Text("open_archive_on_pull_info"));
+
+	builder.addSkip();
+	builder.addButton({
+		.id = u"mzgram/peer-id"_q,
+		.title = Text("peer_id"),
+		.st = &st::settingsButtonNoIcon,
+		.label = PeerIdValue(),
+		.onClick = [=] {
+			controller->show(Box(PeerIdBox));
+		},
+		.keywords = { u"id"_q, u"peer"_q, u"bot api"_q },
+	});
+	builder.addSkip();
+	builder.addDividerText(Text("peer_id_info"));
 
 	// Rows of Telegram's own Settings page, each hidden by its own switch
 	builder.addSkip();

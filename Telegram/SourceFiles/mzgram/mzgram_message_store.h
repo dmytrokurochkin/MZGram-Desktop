@@ -72,13 +72,17 @@ public:
 		uint64 sender,
 		int64 date,
 		const QString &text);
-	void markDeleted(
+	// Both return the kept messages that were marked now, so their files
+	// can still be fetched (level 3 of the archive).
+	std::vector<MessageKey> markDeleted(
 		uint64 account,
 		uint64 peer,
 		const std::vector<int64> &ids);
 	// Private chats and basic groups share one id sequence per account, so
 	// such a deletion names only ids and the peer is looked up here.
-	void markDeletedNonChannel(uint64 account, const std::vector<int64> &ids);
+	std::vector<MessageKey> markDeletedNonChannel(
+		uint64 account,
+		const std::vector<int64> &ids);
 	// Drops a message the user deleted, together with its saved media.
 	void forget(const MessageKey &key);
 
@@ -88,8 +92,8 @@ public:
 	[[nodiscard]] bool isDeleted(const MessageKey &key);
 	[[nodiscard]] std::vector<StoredEdit> edits(const MessageKey &key);
 
-	// Saved media has no size limit and no total quota, and is never
-	// deleted on its own.
+	// Saved media has a size limit per file (Download in advance, by the
+	// kind of chat), no total quota, and is never deleted on its own.
 	[[nodiscard]] QString mediaFolder(uint64 account, uint64 peer) const;
 	// Downloads/MZGram/Saved Attachments, empty when there is no Downloads.
 	[[nodiscard]] QString attachmentsFolder() const;
@@ -145,7 +149,7 @@ private:
 	bool ensureOpen();
 	void loadCaches();
 	void flushRaw();
-	void markKeyDeleted(const MessageKey &key, qint64 now);
+	bool markKeyDeleted(const MessageKey &key, qint64 now);
 
 	QSqlDatabase _db;
 	std::set<MessageKey> _deleted;
