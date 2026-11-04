@@ -412,15 +412,15 @@ void FetchOnDeletion(
 	}
 	auto photo = (PhotoData*)nullptr;
 	auto document = (DocumentData*)nullptr;
-	media->match([&](const MTPDmessageMediaPhoto &data) {
-		if (const auto value = data.vphoto()) {
+	media->match([&](const MTPDmessageMediaPhoto &photoMedia) {
+		if (const auto value = photoMedia.vphoto()) {
 			const auto result = session->data().processPhoto(*value);
 			if (!result->isNull()) {
 				photo = result.get();
 			}
 		}
-	}, [&](const MTPDmessageMediaDocument &data) {
-		if (const auto value = data.vdocument()) {
+	}, [&](const MTPDmessageMediaDocument &documentMedia) {
+		if (const auto value = documentMedia.vdocument()) {
 			document = session->data().processDocument(*value).get();
 		}
 	}, [](const auto &) {
