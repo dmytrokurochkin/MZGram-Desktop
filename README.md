@@ -106,7 +106,7 @@ CI builds Windows x64, Windows ARM64 and Linux x64 on every push to `mzgram` (`.
 
 ## Upstream
 
-MZGram Desktop is based on Telegram Desktop **7.3.1** from [telegramdesktop/tdesktop](https://github.com/telegramdesktop/tdesktop). Upstream updates are taken from that repository: the `mzgram` branch shares upstream's history from the `v7.2.8` tag on, so a newer upstream release tag is merged into it and the fork stays a readable set of patches on top of it.
+MZGram Desktop is based on Telegram Desktop **7.4.1** from [telegramdesktop/tdesktop](https://github.com/telegramdesktop/tdesktop). Upstream updates are taken from that repository: the `mzgram` branch shares upstream's history from the `v7.2.8` tag on, so a newer upstream release tag is merged into it and the fork stays a readable set of patches on top of it.
 
 Every fork commit has the `[mzgram]` prefix; an upstream commit taken in on its own keeps its message and says where it was cherry-picked from. To list all changes against upstream:
 
