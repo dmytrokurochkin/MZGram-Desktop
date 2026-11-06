@@ -2448,7 +2448,6 @@ void HistoryItem::applyEdition(HistoryMessageEdition &&edition) {
 	if (_isServiceMessage) {
 		return;
 	}
-	MZGram::RecordEditBefore(this, edition.textWithEntities);
 	history()->session().ephemeralMessages().revertAnchored(this);
 
 	int keyboardTop = -1;

@@ -3353,8 +3353,6 @@ void Session::checkFormattedDateUpdates() {
 void Session::processMessagesDeleted(
 		PeerId peerId,
 		const QVector<MTPint> &data) {
-	// MZGram: before the early return, which skips chats not loaded now.
-	MZGram::RecordRemoteDeletion(_session, peerId, data);
 	Tgw::ClearMessagesStorage(_session, peerId, data);
 	const auto list = messagesList(peerId);
 	const auto affected = historyLoaded(peerId);
@@ -3389,7 +3387,6 @@ void Session::processMessagesDeleted(
 }
 
 void Session::processNonChannelMessagesDeleted(const QVector<MTPint> &data) {
-	MZGram::RecordRemoteDeletion(_session, data);
 	Tgw::ClearNonChannelStorage(_session, data);
 	auto toDestroy = std::vector<not_null<HistoryItem*>>();
 	auto historiesToCheck = base::flat_set<not_null<History*>>();

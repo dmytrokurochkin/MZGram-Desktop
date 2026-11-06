@@ -672,53 +672,47 @@ void BuildHelpSection(SectionBuilder &builder) {
 	builder.addSkip();
 
 	const auto controller = builder.controller();
-	// MZGram: Settings > MZGram > Interface can hide it
-	if (!MZGram::RowHidden("faq")) {
-		const auto faq = builder.addButton({
-			.id = u"main/faq"_q,
-			.title = tr::lng_settings_faq(),
-			.icon = { &st::menuIconFaq },
-			.onClick = [=] { OpenFaq(controller); },
-			.keywords = {
-				u"help"_q,
-				u"support"_q,
-				u"questions"_q,
-				u"shortcuts"_q,
-				u"keyboard"_q,
-				u"hotkeys"_q,
-				u"legend"_q,
-				u"gestures"_q,
-			},
+	const auto faq = builder.addButton({
+		.id = u"main/faq"_q,
+		.title = tr::lng_settings_faq(),
+		.icon = { &st::menuIconFaq },
+		.onClick = [=] { OpenFaq(controller); },
+		.keywords = {
+			u"help"_q,
+			u"support"_q,
+			u"questions"_q,
+			u"shortcuts"_q,
+			u"keyboard"_q,
+			u"hotkeys"_q,
+			u"legend"_q,
+			u"gestures"_q,
+		},
+	});
+	if (faq) {
+		const auto legend = Ui::CreateChild<CircleRippleIconButton>(
+			faq,
+			st::settingsFaqKeysLegend);
+		legend->setAccessibleName(tr::lng_keys_legend_title(tr::now));
+		faq->sizeValue(
+		) | rpl::on_next([=](const QSize &size) {
+			const auto right = st::settingsButtonRightSkip
+				- st::settingsFaqKeysLegend.iconPosition.x();
+			legend->moveToRight(
+				right,
+				(size.height() - legend->height()) / 2);
+		}, legend->lifetime());
+		legend->setClickedCallback([=] {
+			ShowKeysLegend(&controller->window());
 		});
-		if (faq) {
-			const auto legend = Ui::CreateChild<CircleRippleIconButton>(
-				faq,
-				st::settingsFaqKeysLegend);
-			legend->setAccessibleName(tr::lng_keys_legend_title(tr::now));
-			faq->sizeValue(
-			) | rpl::on_next([=](const QSize &size) {
-				const auto right = st::settingsButtonRightSkip
-					- st::settingsFaqKeysLegend.iconPosition.x();
-				legend->moveToRight(
-					right,
-					(size.height() - legend->height()) / 2);
-			}, legend->lifetime());
-			legend->setClickedCallback([=] {
-				ShowKeysLegend(&controller->window());
-			});
-		}
 	}
 
-	// MZGram: Settings > MZGram > Interface can hide it
-	if (!MZGram::RowHidden("features")) {
-		builder.addButton({
-			.id = u"main/features"_q,
-			.title = tr::lng_settings_features(),
-			.icon = { &st::menuIconEmojiObjects },
-			.onClick = [=] { OpenFeatures(controller); },
-			.keywords = { u"tips"_q, u"tutorial"_q },
-		});
-	}
+	builder.addButton({
+		.id = u"main/features"_q,
+		.title = tr::lng_settings_features(),
+		.icon = { &st::menuIconEmojiObjects },
+		.onClick = [=] { OpenFeatures(controller); },
+		.keywords = { u"tips"_q, u"tutorial"_q },
+	});
 
 	// MZGram: Settings > MZGram > Interface can hide it
 	if (!MZGram::RowHidden("ask-question")) {

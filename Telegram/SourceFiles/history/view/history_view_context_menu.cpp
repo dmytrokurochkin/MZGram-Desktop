@@ -383,15 +383,12 @@ void AddPhotoActions(
 				&photo->session(),
 				[=] { SavePhotoToFile(photo); }),
 			&st::menuIconSaveImage);
-		// MZGram: its Copy Photo stands for this while its switch is on
-		if (!MZGram::CopyPhotoAction()) {
-			menu->addAction(tr::lng_context_copy_image(tr::now), [=] {
-				const auto item = photo->owner().message(contextId);
-				if (item && !list->showCopyMediaRestriction(item)) {
-					CopyImage(photo);
-				}
-			}, &st::menuIconCopy);
-		}
+		menu->addAction(tr::lng_context_copy_image(tr::now), [=] {
+			const auto item = photo->owner().message(contextId);
+			if (item && !list->showCopyMediaRestriction(item)) {
+				CopyImage(photo);
+			}
+		}, &st::menuIconCopy);
 	}
 	if (photo->hasAttachedStickers()) {
 		const auto controller = list->controller();
