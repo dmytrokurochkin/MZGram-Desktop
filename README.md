@@ -146,6 +146,10 @@ MZGram for Android is licensed under GPL v2, see its [repository](https://github
 * Hunspell ([LGPL](https://github.com/hunspell/hunspell/blob/master/COPYING.LESSER))
 * Ada ([Apache License 2.0](https://github.com/ada-url/ada/blob/main/LICENSE-APACHE))
 * zxcvbn-c ([MIT License](https://github.com/tsyrogit/zxcvbn-c/blob/master/LICENSE.txt))
+* twidget ([BSD 3-Clause License](https://github.com/TelegramMessenger/twidget/blob/main/LICENSE))
+* litehtml ([BSD 3-Clause License](https://github.com/litehtml/litehtml/blob/master/LICENSE))
+* Gumbo ([Apache License 2.0](https://github.com/google/gumbo-parser/blob/master/COPYING))
+* QuickJS-ng ([MIT License](https://github.com/quickjs-ng/quickjs/blob/master/LICENSE))
 * FrequencyWords by Hermit Dave ([Creative Commons Attribution-ShareAlike 4.0](https://creativecommons.org/licenses/by-sa/4.0/))
 * quirc ([ISC License](Telegram/SourceFiles/mzgram/quirc/LICENSE-quirc.txt)), used by MZGram for QR code scanning
 
