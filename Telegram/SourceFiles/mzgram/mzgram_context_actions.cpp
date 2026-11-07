@@ -18,6 +18,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/file_utilities.h"
 #include "data/data_document_media.h"
 #include "data/data_download_manager.h"
+#include "data/data_file_click_handler.h"
 #include "data/data_photo_media.h"
 #include "storage/cache/storage_cache_database.h"
 #include "data/data_document.h"
@@ -536,8 +537,10 @@ void AddOpenInAction(
 	if (filepath.isEmpty()) {
 		return;
 	}
+	// As Telegram's own Open With: with no chooser, the file is launched
+	// after the warning Telegram shows for files that can run.
 	menu->addAction(MZGram::TrNow("open_in"), [=] {
-		File::OpenWith(filepath);
+		DocumentOpenWithClickHandler::Open(Data::FileOrigin(), document);
 	}, &st::menuIconFile);
 }
 
