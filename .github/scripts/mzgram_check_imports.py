@@ -33,10 +33,21 @@ SYSTEM = {
     "winspool.drv", "wintrust.dll", "ws2_32.dll", "wtsapi32.dll",
 }
 API_SET = re.compile(r"^(api|ext)-ms-win-[a-z0-9-]+\.dll$")
+# Windows DLLs newer than 1809 that may only be delay-loaded, by code that
+# checks first that Windows has them. icu.dll (Windows 10 1903) is ICU for the
+# HTML widgets of bots since Telegram Desktop 7.4: it is linked with
+# /DELAYLOAD:icu.dll and used only after SafeLoadLibrary(L"icu.dll") worked.
+DELAYED_ONLY = {"icu.dll"}
 
 
 def imports(data):
     """The DLL names a PE file imports, normal and delay-loaded."""
+    normal, delayed = import_tables(data)
+    return normal + delayed
+
+
+def import_tables(data):
+    """The DLL names of the import table and of the delay-load table."""
     pe = struct.unpack_from("<I", data, 0x3C)[0]
     if data[pe:pe + 4] != b"PE\0\0":
         raise ValueError("not a PE file")
@@ -61,31 +72,37 @@ def imports(data):
         start = offset(rva)
         return data[start:data.index(b"\0", start)].decode("ascii")
 
-    result = []
+    tables = []
     for index, size, name_field in ((1, 20, 3), (13, 32, 1)):
+        result = []
         rva = struct.unpack_from("<I", data, dirs + index * 8)[0]
-        if not rva:
-            continue
-        at = offset(rva)
-        while True:
-            fields = struct.unpack_from(f"<{size // 4}I", data, at)
-            if not any(fields):
-                break
-            result.append(name(fields[name_field]))
-            at += size
-    return result
+        if rva:
+            at = offset(rva)
+            while True:
+                fields = struct.unpack_from(f"<{size // 4}I", data, at)
+                if not any(fields):
+                    break
+                result.append(name(fields[name_field]))
+                at += size
+        tables.append(result)
+    return tables[0], tables[1]
 
 
-def foreign(names):
-    return sorted(n for n in names if n.lower() not in SYSTEM and not API_SET.match(n.lower()))
+def foreign(names, delayed=()):
+    allowed = lambda n, late: (
+        n in SYSTEM or API_SET.match(n) or (late and n in DELAYED_ONLY))
+    return sorted(
+        [n for n in names if not allowed(n.lower(), False)]
+        + [n for n in delayed if not allowed(n.lower(), True)])
 
 
 def main(paths):
     failed = False
     for path in paths:
         with open(path, "rb") as file:
-            names = imports(file.read())
-        extra = foreign(names)
+            normal, delayed = import_tables(file.read())
+        names = normal + delayed
+        extra = foreign(normal, delayed)
         if extra:
             failed = True
             print(f"FAIL: {path} imports {', '.join(extra)}, which Windows does not have")
